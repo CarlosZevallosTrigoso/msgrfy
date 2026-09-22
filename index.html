@@ -11,29 +11,45 @@
 
   <!-- Panel Lateral -->
   <aside class="w-80 bg-white border-r border-gray-200 flex flex-col shadow-lg z-10">
-    <div class="p-4 border-b border-gray-200 bg-gray-50">
-      <h1 class="text-xl font-bold text-gray-800">MuseoDraft</h1>
-      <p class="text-xs text-gray-500">Renderizado Espacial 2D</p>
+    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+      <div>
+        <h1 class="text-xl font-bold text-gray-800">MuseoDraft</h1>
+        <p class="text-xs text-gray-500">Mesa de Dibujo 2D</p>
+      </div>
+    </div>
+
+    <!-- Herramientas (Máquina de Estados) -->
+    <div class="p-3 border-b border-gray-200 flex space-x-2 bg-white">
+      <button id="toolMove" class="flex-1 bg-blue-100 text-blue-800 border border-blue-300 py-1.5 rounded text-xs font-bold transition-colors">
+        ✋ Mover
+      </button>
+      <button id="toolMeasure" class="flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors">
+        📏 Medir
+      </button>
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 space-y-6">
       
       <!-- Controles Globales -->
       <div class="space-y-3">
-        <h2 class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Proyecto</h2>
+        <h2 class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Muro Base</h2>
         <div class="grid grid-cols-2 gap-2">
           <label class="block text-xs font-medium text-gray-700">
-            Ancho Muro (cm)
+            Ancho (cm)
             <input type="number" id="wallWidth" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm" value="500">
           </label>
           <label class="block text-xs font-medium text-gray-700">
-            Alto Muro (cm)
+            Alto (cm)
             <input type="number" id="wallHeight" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm" value="300">
           </label>
         </div>
         
-        <label class="block w-full cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-md text-sm font-medium transition-colors">
-          + Subir Imagen
+        <p class="text-xs text-gray-500 mt-2 italic text-center">
+          💡 Puedes arrastrar imágenes desde tu computadora directamente al lienzo.
+        </p>
+        
+        <label class="block w-full cursor-pointer bg-gray-800 hover:bg-gray-900 text-white text-center py-2 px-4 rounded-md text-sm font-medium transition-colors">
+          o Subir Imagen Manualmente
           <input type="file" id="uploadImage" class="hidden" accept="image/*">
         </label>
       </div>
@@ -41,28 +57,30 @@
       <!-- Panel de Propiedades (Solo visible si hay selección) -->
       <div id="propertiesPanel" class="hidden space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
         <div class="flex justify-between items-center mb-2">
-          <h2 class="text-sm font-semibold text-blue-800 uppercase tracking-wider">Imagen Seleccionada</h2>
+          <h2 class="text-sm font-semibold text-blue-800 uppercase tracking-wider">Selección</h2>
         </div>
-        <p id="propName" class="text-xs text-gray-600 truncate mb-2"></p>
+        <p id="propName" class="text-xs text-gray-800 font-medium truncate mb-2"></p>
         
-        <div class="grid grid-cols-2 gap-2">
-          <label class="block text-xs font-medium text-gray-700">
-            Ancho Real (cm)
-            <input type="number" id="propWidth" step="0.1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm">
-          </label>
-          <label class="block text-xs font-medium text-gray-700">
-            Alto Real (cm)
-            <input type="number" id="propHeight" step="0.1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm">
+        <!-- Controles para Imágenes -->
+        <div id="imageProps" class="hidden space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block text-xs font-medium text-gray-700">
+              Ancho Real (cm)
+              <input type="number" id="propWidth" step="0.1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm">
+            </label>
+            <label class="block text-xs font-medium text-gray-700">
+              Alto Real (cm)
+              <input type="number" id="propHeight" step="0.1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm">
+            </label>
+          </div>
+          <label class="flex items-center space-x-2 mt-2 cursor-pointer">
+            <input type="checkbox" id="lockRatio" class="rounded text-blue-600 focus:ring-blue-500" checked>
+            <span class="text-[11px] text-gray-700 font-medium">Mantener proporción original</span>
           </label>
         </div>
         
-        <label class="flex items-center space-x-2 mt-2 cursor-pointer">
-          <input type="checkbox" id="lockRatio" class="rounded text-blue-600 focus:ring-blue-500" checked>
-          <span class="text-[11px] text-gray-700 font-medium">Mantener proporción original</span>
-        </label>
-        
-        <button id="deleteBtn" class="w-full mt-3 bg-red-100 hover:bg-red-200 text-red-700 py-1.5 rounded-md text-xs font-medium transition-colors">
-          Eliminar Imagen
+        <button id="deleteBtn" class="w-full mt-3 bg-red-100 hover:bg-red-200 text-red-700 py-1.5 rounded-md text-xs font-bold transition-colors">
+          Eliminar Seleccionado (Supr)
         </button>
       </div>
 
@@ -72,10 +90,7 @@
     <div class="p-4 border-t border-gray-200 bg-gray-50 space-y-2">
       <h2 class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Exportar / Importar</h2>
       <button id="exportWallBtn" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-1.5 rounded-md text-xs font-medium transition-colors">
-        Exportar Muro (PNG)
-      </button>
-      <button id="exportItemBtn" class="w-full bg-gray-600 hover:bg-gray-700 text-white py-1.5 rounded-md text-xs font-medium transition-colors opacity-50 cursor-not-allowed" disabled>
-        Exportar Selección (PNG)
+        Exportar Vista (PNG)
       </button>
       <div class="grid grid-cols-2 gap-2 mt-2">
         <button id="saveProjectBtn" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 py-1.5 rounded-md text-xs font-medium transition-colors">
@@ -89,27 +104,41 @@
     </div>
   </aside>
 
-  <!-- Lienzo -->
-  <main class="flex-1 relative cursor-grab active:cursor-grabbing bg-gray-200" id="canvasContainer">
+  <!-- Lienzo (Dropzone) -->
+  <main class="flex-1 relative bg-gray-200" id="canvasContainer">
     <!-- Konva se montará aquí -->
+    
+    <!-- Cursor indicador según herramienta -->
+    <style>
+      .mode-move { cursor: grab; }
+      .mode-move:active { cursor: grabbing; }
+      .mode-measure { cursor: crosshair !important; }
+    </style>
   </main>
 
   <script>
-    // --- ESTADO DE LA APLICACIÓN ---
+    // --- ESTADO Y MÁQUINA DE ESTADOS ---
     const STATE = {
       scale: 10, // 1cm = 10px
       wall: { width: 500, height: 300 },
       items: [],
-      selectedId: null
+      measurements: [], // [{id, x1, y1, x2, y2, lengthCm}]
+      selectedId: null,
+      selectedType: null, // 'image' o 'measurement'
+      mode: 'move', // 'move' o 'measure'
+      isDrawing: false,
+      currentLine: null
     };
 
     // --- CONFIGURACIÓN DE KONVA ---
     const container = document.getElementById('canvasContainer');
+    container.classList.add('mode-move'); // Cursor inicial
+
     const stage = new Konva.Stage({
       container: 'canvasContainer',
       width: container.offsetWidth,
       height: container.offsetHeight,
-      draggable: true // Permite mover el lienzo infinito
+      draggable: true
     });
 
     const layer = new Konva.Layer();
@@ -137,22 +166,143 @@
       stage.position(newPos);
     });
 
-    // Deseleccionar al hacer clic en el fondo
-    stage.on('click tap', (e) => {
-      if (e.target === stage || e.target.name() === 'wallRect') {
-        STATE.selectedId = null;
-        renderSidebar();
+    // --- EVENTOS DEL LIENZO (DIBUJO DE LÍNEAS) ---
+    // Función para obtener coordenadas reales ignorando zoom/paneo
+    function getRelativePointerPosition() {
+      const transform = stage.getAbsoluteTransform().copy();
+      transform.invert();
+      const pos = stage.getPointerPosition();
+      return transform.point(pos);
+    }
+
+    stage.on('mousedown touchstart', (e) => {
+      if (STATE.mode === 'measure') {
+        // Iniciar línea
+        STATE.isDrawing = true;
+        const pos = getRelativePointerPosition();
+        STATE.currentLine = { x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
+        renderCanvas();
+      } else {
+        // Modo Mover: Deseleccionar si se hace clic en fondo
+        if (e.target === stage || e.target.name() === 'wallRect') {
+          STATE.selectedId = null;
+          STATE.selectedType = null;
+          renderSidebar();
+          renderCanvas();
+        }
+      }
+    });
+
+    stage.on('mousemove touchmove', () => {
+      if (STATE.mode === 'measure' && STATE.isDrawing) {
+        const pos = getRelativePointerPosition();
+        STATE.currentLine.x2 = pos.x;
+        STATE.currentLine.y2 = pos.y;
         renderCanvas();
       }
     });
+
+    stage.on('mouseup touchend', () => {
+      if (STATE.mode === 'measure' && STATE.isDrawing) {
+        STATE.isDrawing = false;
+        
+        // Calcular longitud real
+        const dx = STATE.currentLine.x2 - STATE.currentLine.x1;
+        const dy = STATE.currentLine.y2 - STATE.currentLine.y1;
+        const pxLength = Math.sqrt(dx * dx + dy * dy);
+        const cmLength = pxLength / STATE.scale;
+
+        // Solo guardar si es más larga que 1cm para evitar clics accidentales
+        if (cmLength > 1) {
+            STATE.measurements.push({
+                id: 'm_' + Date.now(),
+                x1: STATE.currentLine.x1,
+                y1: STATE.currentLine.y1,
+                x2: STATE.currentLine.x2,
+                y2: STATE.currentLine.y2,
+                lengthCm: cmLength
+            });
+        }
+        STATE.currentLine = null;
+        
+        // Retornar auto a modo Mover tras medir para comodidad (Opcional, pero UX recomendada)
+        setMode('move');
+        renderCanvas();
+      }
+    });
+
+    // --- HTML5 DRAG & DROP DESDE EL SISTEMA OPERATIVO ---
+    container.addEventListener('dragover', (e) => {
+      e.preventDefault(); // Necesario para permitir el drop
+      e.dataTransfer.dropEffect = 'copy';
+    });
+
+    container.addEventListener('drop', (e) => {
+      e.preventDefault();
+      
+      const file = e.dataTransfer.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+
+      // Calcular la posición donde se soltó el archivo respecto al lienzo (considerando pan/zoom)
+      stage.setPointersPositions(e);
+      const pos = getRelativePointerPosition();
+
+      processImageFile(file, pos.x, pos.y);
+    });
+
+    // Función para procesar archivos subidos (Botón o Drop)
+    function processImageFile(file, dropX = null, dropY = null) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const src = event.target.result;
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.naturalWidth / img.naturalHeight;
+          let defaultWidth = 50; // Asumimos 50cm
+          let defaultHeight = defaultWidth / ratio;
+          
+          if (defaultHeight > 70) {
+              defaultHeight = 50;
+              defaultWidth = defaultHeight * ratio;
+          }
+
+          // Si no hay dropX (Subido por botón), lo centramos en el muro
+          const finalX = dropX !== null ? dropX : stage.width() / 2 - (defaultWidth * STATE.scale)/2 - stage.x();
+          const finalY = dropY !== null ? dropY : 50 + ((STATE.wall.height * STATE.scale) / 2) - ((defaultHeight * STATE.scale) / 2) - stage.y();
+
+          STATE.items.push({
+            id: 'img_' + Date.now().toString(),
+            name: file.name,
+            src: src,
+            x: finalX,
+            y: finalY,
+            realWidth: defaultWidth,
+            realHeight: defaultHeight,
+            ratio: ratio 
+          });
+          
+          STATE.selectedId = STATE.items[STATE.items.length - 1].id;
+          STATE.selectedType = 'image';
+          setMode('move'); // Forzar modo mover para que lo edite
+          renderSidebar();
+          renderCanvas();
+        };
+        img.src = src;
+      };
+      reader.readAsDataURL(file);
+    }
+
 
     // --- RENDERIZADO ---
     function renderCanvas() {
       layer.destroyChildren();
 
+      const allowDrag = STATE.mode === 'move';
+      stage.draggable(allowDrag); // Bloquear paneo del lienzo si estamos midiendo
+
       // 1. Dibujar el Muro
       const wallGroup = new Konva.Group({
-        x: stage.width() / 2 - (STATE.wall.width * STATE.scale) / 2, // Centrado inicial
+        x: stage.width() / 2 - (STATE.wall.width * STATE.scale) / 2, 
         y: 50,
         name: 'wallGroup'
       });
@@ -168,10 +318,9 @@
       });
       wallGroup.add(wallRect);
 
-      // Etiqueta del muro
       wallGroup.add(new Konva.Text({
         x: 10, y: -25,
-        text: `Muro: ${STATE.wall.width}cm x ${STATE.wall.height}cm`,
+        text: `Muro Base: ${STATE.wall.width}cm x ${STATE.wall.height}cm`,
         fontSize: 16,
         fill: '#666',
         name: 'wallLabel'
@@ -179,7 +328,7 @@
 
       layer.add(wallGroup);
 
-      // 2. Dibujar Imágenes y Cotas
+      // 2. Dibujar Imágenes
       STATE.items.forEach(item => {
         const pWidth = item.realWidth * STATE.scale;
         const pHeight = item.realHeight * STATE.scale;
@@ -188,28 +337,26 @@
         const group = new Konva.Group({
           x: item.x,
           y: item.y,
-          draggable: true,
+          draggable: allowDrag, // Solo arrastrable en modo Mover
           id: item.id
         });
 
-        // Guardar nueva posición al arrastrar
         group.on('dragend', (e) => {
           item.x = e.target.x();
           item.y = e.target.y();
         });
 
-        // Seleccionar imagen
         group.on('mousedown touchstart', () => {
-          STATE.selectedId = item.id;
-          renderSidebar();
-          renderCanvas(); // Re-render para mostrar estilos de selección
+          if (STATE.mode === 'move') {
+            STATE.selectedId = item.id;
+            STATE.selectedType = 'image';
+            renderSidebar();
+            renderCanvas();
+          }
         });
 
-        // Objeto de Imagen
         const imageObj = new window.Image();
-        imageObj.onload = () => {
-          layer.batchDraw();
-        };
+        imageObj.onload = () => layer.batchDraw();
         imageObj.src = item.src;
         
         const konvaImg = new Konva.Image({
@@ -225,72 +372,197 @@
           name: 'Image'
         });
 
-        // --- DIBUJO DE COTAS ---
+        // Cotas automáticas de imagen
         const offset = 20; 
-        const lineProps = { stroke: '#e11d48', strokeWidth: 1.5 };
-        const textProps = { fill: '#e11d48', fontSize: 14, fontFamily: 'sans-serif', align: 'center' };
+        const lineProps = { stroke: '#94a3b8', strokeWidth: 1 };
+        const textProps = { fill: '#64748b', fontSize: 12, fontFamily: 'sans-serif', align: 'center' };
 
-        // Cota Superior
         group.add(new Konva.Line({ points: [0, -offset, pWidth, -offset], ...lineProps })); 
         group.add(new Konva.Line({ points: [0, -offset-5, 0, -offset+5], ...lineProps })); 
         group.add(new Konva.Line({ points: [pWidth, -offset-5, pWidth, -offset+5], ...lineProps })); 
-        group.add(new Konva.Text({ x: 0, y: -offset - 20, width: pWidth, text: `${item.realWidth.toFixed(1)} cm`, ...textProps }));
+        group.add(new Konva.Text({ x: 0, y: -offset - 16, width: pWidth, text: `${item.realWidth.toFixed(1)}`, ...textProps }));
 
-        // Cota Lateral Derecha
         group.add(new Konva.Line({ points: [pWidth + offset, 0, pWidth + offset, pHeight], ...lineProps })); 
         group.add(new Konva.Line({ points: [pWidth + offset - 5, 0, pWidth + offset + 5, 0], ...lineProps })); 
         group.add(new Konva.Line({ points: [pWidth + offset - 5, pHeight, pWidth + offset + 5, pHeight], ...lineProps })); 
-        group.add(new Konva.Text({ x: pWidth + offset + 10, y: (pHeight / 2) - 7, text: `${item.realHeight.toFixed(1)} cm`, ...textProps }));
+        group.add(new Konva.Text({ x: pWidth + offset + 8, y: (pHeight / 2) - 6, text: `${item.realHeight.toFixed(1)}`, ...textProps }));
 
         group.add(konvaImg);
         layer.add(group);
       });
+
+      // 3. Dibujar Medidas Manuales
+      STATE.measurements.forEach(m => {
+          drawMeasurementLine(m.x1, m.y1, m.x2, m.y2, m.lengthCm, m.id);
+      });
+
+      // 4. Dibujar Línea en curso (si existe)
+      if (STATE.currentLine) {
+        const cl = STATE.currentLine;
+        const dx = cl.x2 - cl.x1;
+        const dy = cl.y2 - cl.y1;
+        const cm = (Math.sqrt(dx*dx + dy*dy) / STATE.scale);
+        drawMeasurementLine(cl.x1, cl.y1, cl.x2, cl.y2, cm, null, true);
+      }
       
       layer.batchDraw();
     }
 
+    // Función auxiliar para dibujar líneas de medición
+    function drawMeasurementLine(x1, y1, x2, y2, lengthCm, id, isTemp = false) {
+        const isSelected = STATE.selectedId === id && !isTemp;
+        const color = isTemp ? '#f59e0b' : (isSelected ? '#2563eb' : '#e11d48');
+        
+        const group = new Konva.Group({
+            id: id || 'temp',
+            draggable: STATE.mode === 'move' && !isTemp
+        });
+
+        // Actualizar coords si se mueve entera
+        group.on('dragend', (e) => {
+            const m = STATE.measurements.find(meas => meas.id === id);
+            if (m) {
+                m.x1 += e.target.x();
+                m.y1 += e.target.y();
+                m.x2 += e.target.x();
+                m.y2 += e.target.y();
+                e.target.position({x: 0, y: 0}); // Reset group pos, modify absolute points
+                renderCanvas();
+            }
+        });
+
+        group.on('mousedown touchstart', () => {
+            if (STATE.mode === 'move' && !isTemp) {
+                STATE.selectedId = id;
+                STATE.selectedType = 'measurement';
+                renderSidebar();
+                renderCanvas();
+            }
+        });
+
+        // Línea principal
+        group.add(new Konva.Line({
+            points: [x1, y1, x2, y2],
+            stroke: color,
+            strokeWidth: 2,
+            hitStrokeWidth: 10 // Área invisible más ancha para facilitar el clic
+        }));
+
+        // Topes
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const perpAngle = angle + (Math.PI / 2);
+        const capLen = 5;
+
+        const cap1x1 = x1 + Math.cos(perpAngle) * capLen;
+        const cap1y1 = y1 + Math.sin(perpAngle) * capLen;
+        const cap1x2 = x1 - Math.cos(perpAngle) * capLen;
+        const cap1y2 = y1 - Math.sin(perpAngle) * capLen;
+
+        const cap2x1 = x2 + Math.cos(perpAngle) * capLen;
+        const cap2y1 = y2 + Math.sin(perpAngle) * capLen;
+        const cap2x2 = x2 - Math.cos(perpAngle) * capLen;
+        const cap2y2 = y2 - Math.sin(perpAngle) * capLen;
+
+        group.add(new Konva.Line({ points: [cap1x1, cap1y1, cap1x2, cap1y2], stroke: color, strokeWidth: 2 }));
+        group.add(new Konva.Line({ points: [cap2x1, cap2y1, cap2x2, cap2y2], stroke: color, strokeWidth: 2 }));
+
+        // Texto centrado y rotado
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+        
+        let deg = angle * (180 / Math.PI);
+        // Si el texto queda boca abajo, lo volteamos
+        if (deg > 90 || deg < -90) deg += 180;
+
+        group.add(new Konva.Text({
+            x: midX,
+            y: midY,
+            text: `${lengthCm.toFixed(1)} cm`,
+            fill: color,
+            fontSize: 14,
+            fontFamily: 'sans-serif',
+            fontStyle: 'bold',
+            padding: 4,
+            rotation: deg,
+            offsetY: 20, // Levantar el texto sobre la línea
+            offsetX: 20, // Centrado aproximado
+            shadowColor: 'white',
+            shadowBlur: 2,
+            shadowOpacity: 1
+        }));
+
+        layer.add(group);
+    }
+
     // --- INTERFAZ (UI) ---
     const ui = {
+      btnMove: document.getElementById('toolMove'),
+      btnMeasure: document.getElementById('toolMeasure'),
       wallW: document.getElementById('wallWidth'),
       wallH: document.getElementById('wallHeight'),
       propPanel: document.getElementById('propertiesPanel'),
       propName: document.getElementById('propName'),
+      imgProps: document.getElementById('imageProps'),
       propW: document.getElementById('propWidth'),
       propH: document.getElementById('propHeight'),
-      lockRatio: document.getElementById('lockRatio'),
-      btnExpSel: document.getElementById('exportItemBtn'),
+      lockRatio: document.getElementById('lockRatio')
     };
+
+    function setMode(mode) {
+      STATE.mode = mode;
+      
+      // Estilos de botones
+      if (mode === 'move') {
+        ui.btnMove.className = "flex-1 bg-blue-100 text-blue-800 border border-blue-300 py-1.5 rounded text-xs font-bold transition-colors";
+        ui.btnMeasure.className = "flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors";
+        container.classList.add('mode-move');
+        container.classList.remove('mode-measure');
+      } else {
+        ui.btnMeasure.className = "flex-1 bg-red-100 text-red-800 border border-red-300 py-1.5 rounded text-xs font-bold transition-colors";
+        ui.btnMove.className = "flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors";
+        container.classList.remove('mode-move');
+        container.classList.add('mode-measure');
+        // Deseleccionar al cambiar a regla
+        STATE.selectedId = null;
+        STATE.selectedType = null;
+      }
+      renderSidebar();
+      renderCanvas();
+    }
+
+    ui.btnMove.addEventListener('click', () => setMode('move'));
+    ui.btnMeasure.addEventListener('click', () => setMode('measure'));
 
     function renderSidebar() {
       ui.wallW.value = STATE.wall.width;
       ui.wallH.value = STATE.wall.height;
 
-      const selected = STATE.items.find(i => i.id === STATE.selectedId);
-      
-      if (selected) {
+      if (STATE.selectedId) {
         ui.propPanel.classList.remove('hidden');
-        ui.propName.textContent = selected.name;
         
-        if (document.activeElement !== ui.propW) ui.propW.value = selected.realWidth.toFixed(1);
-        if (document.activeElement !== ui.propH) ui.propH.value = selected.realHeight.toFixed(1);
-        
-        ui.btnExpSel.disabled = false;
-        ui.btnExpSel.classList.remove('opacity-50', 'cursor-not-allowed');
+        if (STATE.selectedType === 'image') {
+          const selected = STATE.items.find(i => i.id === STATE.selectedId);
+          ui.propName.textContent = `🖼️ ${selected.name}`;
+          ui.imgProps.classList.remove('hidden');
+          
+          if (document.activeElement !== ui.propW) ui.propW.value = selected.realWidth.toFixed(1);
+          if (document.activeElement !== ui.propH) ui.propH.value = selected.realHeight.toFixed(1);
+        } else if (STATE.selectedType === 'measurement') {
+          const selected = STATE.measurements.find(m => m.id === STATE.selectedId);
+          ui.propName.textContent = `📏 Medida: ${selected.lengthCm.toFixed(1)} cm`;
+          ui.imgProps.classList.add('hidden'); // Ocultar inputs de alto y ancho
+        }
       } else {
         ui.propPanel.classList.add('hidden');
-        ui.btnExpSel.disabled = true;
-        ui.btnExpSel.classList.add('opacity-50', 'cursor-not-allowed');
       }
     }
 
-    // --- EVENTOS DE USUARIO ---
-
-    // Cambiar muro
+    // Eventos de entrada
     ui.wallW.addEventListener('input', (e) => { STATE.wall.width = Number(e.target.value) || 10; renderCanvas(); });
     ui.wallH.addEventListener('input', (e) => { STATE.wall.height = Number(e.target.value) || 10; renderCanvas(); });
 
-    // Editar imagen seleccionada (Con control de Aspect Ratio)
     ui.propW.addEventListener('input', (e) => {
+      if (STATE.selectedType !== 'image') return;
       const selected = STATE.items.find(i => i.id === STATE.selectedId);
       if (selected && e.target.value) {
         selected.realWidth = parseFloat(e.target.value);
@@ -298,13 +570,14 @@
             selected.realHeight = selected.realWidth / selected.ratio; 
             ui.propH.value = selected.realHeight.toFixed(1); 
         } else {
-            selected.ratio = selected.realWidth / selected.realHeight; // Nueva proporción
+            selected.ratio = selected.realWidth / selected.realHeight;
         }
         renderCanvas();
       }
     });
 
     ui.propH.addEventListener('input', (e) => {
+      if (STATE.selectedType !== 'image') return;
       const selected = STATE.items.find(i => i.id === STATE.selectedId);
       if (selected && e.target.value) {
         selected.realHeight = parseFloat(e.target.value);
@@ -312,68 +585,47 @@
             selected.realWidth = selected.realHeight * selected.ratio; 
             ui.propW.value = selected.realWidth.toFixed(1); 
         } else {
-            selected.ratio = selected.realWidth / selected.realHeight; // Nueva proporción
+            selected.ratio = selected.realWidth / selected.realHeight;
         }
         renderCanvas();
       }
     });
 
-    // Eliminar imagen
-    document.getElementById('deleteBtn').addEventListener('click', () => {
-      STATE.items = STATE.items.filter(i => i.id !== STATE.selectedId);
+    // Función de eliminación
+    function deleteSelected() {
+      if (!STATE.selectedId) return;
+      if (STATE.selectedType === 'image') {
+        STATE.items = STATE.items.filter(i => i.id !== STATE.selectedId);
+      } else if (STATE.selectedType === 'measurement') {
+        STATE.measurements = STATE.measurements.filter(m => m.id !== STATE.selectedId);
+      }
       STATE.selectedId = null;
+      STATE.selectedType = null;
       renderSidebar();
       renderCanvas();
+    }
+
+    document.getElementById('deleteBtn').addEventListener('click', deleteSelected);
+    
+    // Escuchar tecla Suprimir (Delete o Backspace)
+    window.addEventListener('keydown', (e) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && STATE.selectedId) {
+        // Evitar borrar si estamos escribiendo en un input
+        if (document.activeElement.tagName === 'INPUT') return; 
+        deleteSelected();
+      }
     });
 
-    // Subir imagen
+    // Subir imagen manualmente
     document.getElementById('uploadImage').addEventListener('change', (e) => {
       const file = e.target.files[0];
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const src = event.target.result;
-        const img = new Image();
-        img.onload = () => {
-          const ratio = img.naturalWidth / img.naturalHeight;
-          let defaultWidth = 50; 
-          let defaultHeight = defaultWidth / ratio;
-          
-          if (defaultHeight > 70) {
-              defaultHeight = 50;
-              defaultWidth = defaultHeight * ratio;
-          }
-
-          // Calcular posición central relativa al muro y añadir un offset en cascada si hay varias
-          const cascadeOffset = STATE.items.length * 20;
-          const centerX = (stage.width() / 2) - ((defaultWidth * STATE.scale) / 2) - stage.x() + cascadeOffset;
-          const centerY = 50 + ((STATE.wall.height * STATE.scale) / 2) - ((defaultHeight * STATE.scale) / 2) - stage.y() + cascadeOffset;
-
-          STATE.items.push({
-            id: Date.now().toString(),
-            name: file.name,
-            src: src,
-            x: centerX,
-            y: centerY,
-            realWidth: defaultWidth,
-            realHeight: defaultHeight,
-            ratio: ratio 
-          });
-          
-          STATE.selectedId = STATE.items[STATE.items.length - 1].id;
+      if (file) {
+          processImageFile(file); // Usa posicionamiento al centro del muro
           e.target.value = ''; 
-          renderSidebar();
-          renderCanvas();
-        };
-        img.src = src;
-      };
-      reader.readAsDataURL(file);
+      }
     });
 
-    // --- FUNCIONES DE EXPORTACIÓN (ROBUSTAS) ---
-    
-    // Función nativa para convertir Base64 a archivo (Blob) sin usar fetch (Evita errores CORS y file://)
+    // --- EXPORTACIÓN E IMPORTACIÓN ---
     function dataURItoBlob(dataURI) {
       const byteString = atob(dataURI.split(',')[1]);
       const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
@@ -397,49 +649,30 @@
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } catch (err) {
-        console.error(err);
-        alert("Ocurrió un error al generar el archivo. Intenta reducir el tamaño del muro.");
+        alert("Error al generar archivo.");
       }
     }
 
     document.getElementById('exportWallBtn').addEventListener('click', () => {
-      // 1. Ocultar el marco azul
-      let imgNode = null;
-      if (STATE.selectedId) {
-        const group = layer.findOne(`#${STATE.selectedId}`);
-        if (group) {
-            imgNode = group.findOne('.Image');
-            if(imgNode) imgNode.strokeEnabled(false);
-        }
-      }
+      let activeSel = STATE.selectedId;
+      STATE.selectedId = null; // Ocultar marcos
+      renderCanvas();
 
-      // 2. Localizar el muro y preparar el recorte
       const wallRect = layer.findOne('.wallRect');
-      if (!wallRect) {
-         if(imgNode) imgNode.strokeEnabled(true);
-         return;
-      }
-      
+      if (!wallRect) return;
       const wallGroup = wallRect.getParent();
       const padding = 60;
 
-      // 3. Resetear zoom y posición temporalmente
       const oldScale = stage.scaleX();
       const oldPos = stage.position();
       stage.scale({x: 1, y: 1});
       stage.position({x: 0, y: 0});
-      
-      // Forzar renderizado sin marco
       stage.draw();
 
-      // 4. Calcular el área y la calidad segura
       const box = wallGroup.getClientRect({ skipTransform: false });
-      
-      // Prevención de colapso de memoria: si el área es muy masiva, bajamos la calidad a 1
       const isHuge = box.width > 3000 || box.height > 3000;
       const safePixelRatio = isHuge ? 1 : 2;
 
-      // 5. Exportar
       try {
         const dataURL = stage.toDataURL({
           x: box.x - padding,
@@ -448,60 +681,17 @@
           height: box.height + (padding * 2),
           pixelRatio: safePixelRatio
         });
-
-        if (dataURL.length < 100) throw new Error("Canvas vacío");
-        downloadURI(dataURL, 'muro-museografico.png');
-        
+        downloadURI(dataURL, 'mesa-dibujo.png');
       } catch (e) {
-        alert("El muro es demasiado grande para ser procesado por el navegador. Reduce las dimensiones (ej: escala del muro).");
+        alert("El área es demasiado grande. Reduce el muro.");
       }
 
-      // 6. Restaurar vista original
       stage.scale({x: oldScale, y: oldScale});
       stage.position(oldPos);
-      if(imgNode) imgNode.strokeEnabled(true);
-      stage.draw();
+      STATE.selectedId = activeSel;
+      renderCanvas();
     });
 
-    document.getElementById('exportItemBtn').addEventListener('click', () => {
-      if (!STATE.selectedId) return;
-      const group = layer.findOne(`#${STATE.selectedId}`);
-      if (!group) return;
-
-      const imgNode = group.findOne('.Image');
-      if(imgNode) imgNode.strokeEnabled(false);
-      
-      const oldScale = stage.scaleX();
-      const oldPos = stage.position();
-      stage.scale({x: 1, y: 1});
-      stage.position({x: 0, y: 0});
-      stage.draw();
-      
-      const box = group.getClientRect({ skipTransform: false });
-      const padding = 30;
-
-      try {
-        const dataURL = stage.toDataURL({
-          x: box.x - padding,
-          y: box.y - padding,
-          width: box.width + (padding * 2),
-          height: box.height + (padding * 2),
-          pixelRatio: 2 // Aquí es seguro usar calidad 2 porque es solo una obra pequeña
-        });
-        
-        if (dataURL.length < 100) throw new Error("Canvas vacío");
-        downloadURI(dataURL, `obra-${STATE.selectedId}.png`);
-      } catch (e) {
-        alert("Error al exportar la imagen individual.");
-      }
-      
-      stage.scale({x: oldScale, y: oldScale});
-      stage.position(oldPos);
-      if(imgNode) imgNode.strokeEnabled(true);
-      stage.draw();
-    });
-
-    // Guardar / Cargar JSON
     document.getElementById('saveProjectBtn').addEventListener('click', () => {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(STATE));
       const link = document.createElement('a');
@@ -521,29 +711,31 @@
           const loadedState = JSON.parse(event.target.result);
           Object.assign(STATE, loadedState);
           
+          // Compatibilidad: inicializar arrays si no existían en proyectos viejos
+          if(!STATE.measurements) STATE.measurements = [];
+          
           STATE.items.forEach(item => {
               if(!item.ratio) item.ratio = item.realWidth / item.realHeight;
           });
-
+          
+          setMode('move');
           renderSidebar();
           renderCanvas();
         } catch (error) {
-          alert('Error leyendo el archivo JSON');
+          alert('Error leyendo JSON');
         }
       };
       reader.readAsText(file);
       e.target.value = '';
     });
 
-    // Manejar resize de ventana
     window.addEventListener('resize', () => {
       stage.width(container.offsetWidth);
       stage.height(container.offsetHeight);
     });
 
     // Inicializar
-    renderSidebar();
-    renderCanvas();
+    setMode('move');
 
   </script>
 </body>
