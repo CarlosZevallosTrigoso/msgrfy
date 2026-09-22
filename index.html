@@ -14,7 +14,7 @@
     <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
       <div>
         <h1 class="text-xl font-bold text-gray-800">MuseoDraft</h1>
-        <p class="text-xs text-gray-500">Mesa de Dibujo 2D</p>
+        <p class="text-xs text-gray-500">Mesa de Dibujo 2D (Motor Optimizado)</p>
       </div>
     </div>
 
@@ -104,11 +104,8 @@
     </div>
   </aside>
 
-  <!-- Lienzo (Dropzone) -->
+  <!-- Lienzo -->
   <main class="flex-1 relative bg-gray-200" id="canvasContainer">
-    <!-- Konva se montará aquí -->
-    
-    <!-- Cursor indicador según herramienta -->
     <style>
       .mode-move { cursor: grab; }
       .mode-move:active { cursor: grabbing; }
@@ -117,78 +114,66 @@
   </main>
 
   <script>
-    // --- ESTADO Y MÁQUINA DE ESTADOS ---
+    // --- 1. ESTADO DE LA APLICACIÓN ---
     const STATE = {
-      scale: 10, // 1cm = 10px
+      scale: 10,
       wall: { width: 500, height: 300 },
-      items: [],
-      measurements: [], // [{id, x1, y1, x2, y2, lengthCm}]
+      items: [], // Datos puros, sin objetos de Konva
+      measurements: [],
       selectedId: null,
-      selectedType: null, // 'image' o 'measurement'
-      mode: 'move', // 'move' o 'measure'
+      selectedType: null, // 'image' | 'measurement'
+      mode: 'move', // 'move' | 'measure'
       isDrawing: false,
       currentLine: null
     };
 
-    // --- CONFIGURACIÓN DE KONVA ---
+    // --- 2. CONFIGURACIÓN DEL MOTOR GRÁFICO (KONVA) ---
     const container = document.getElementById('canvasContainer');
-    container.classList.add('mode-move'); // Cursor inicial
-
     const stage = new Konva.Stage({
       container: 'canvasContainer',
       width: container.offsetWidth,
       height: container.offsetHeight,
-      draggable: true
+      draggable: true // El paneo del lienzo
     });
 
-    const layer = new Konva.Layer();
-    stage.add(layer);
+    // Separamos el fondo (muro) de los elementos interactivos
+    const bgLayer = new Konva.Layer();
+    const mainLayer = new Konva.Layer();
+    stage.add(bgLayer);
+    stage.add(mainLayer);
 
-    // Zoom con la rueda del ratón
+    // Zoom
     stage.on('wheel', (e) => {
       e.evt.preventDefault();
       const scaleBy = 1.1;
       const oldScale = stage.scaleX();
       const pointer = stage.getPointerPosition();
-
       const mousePointTo = {
         x: (pointer.x - stage.x()) / oldScale,
         y: (pointer.y - stage.y()) / oldScale,
       };
-
       const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
       stage.scale({ x: newScale, y: newScale });
-
-      const newPos = {
+      stage.position({
         x: pointer.x - mousePointTo.x * newScale,
         y: pointer.y - mousePointTo.y * newScale,
-      };
-      stage.position(newPos);
+      });
     });
 
-    // --- EVENTOS DEL LIENZO (DIBUJO DE LÍNEAS) ---
-    // Función para obtener coordenadas reales ignorando zoom/paneo
-    function getRelativePointerPosition() {
-      const transform = stage.getAbsoluteTransform().copy();
-      transform.invert();
-      const pos = stage.getPointerPosition();
-      return transform.point(pos);
-    }
-
+    // Clics en el lienzo (Deselección y Medición)
     stage.on('mousedown touchstart', (e) => {
       if (STATE.mode === 'measure') {
-        // Iniciar línea
         STATE.isDrawing = true;
         const pos = getRelativePointerPosition();
         STATE.currentLine = { x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
-        renderCanvas();
+        renderCurrentLine();
       } else {
-        // Modo Mover: Deseleccionar si se hace clic en fondo
-        if (e.target === stage || e.target.name() === 'wallRect') {
+        // En modo mover, si hacemos clic en el escenario (o en el muro), deseleccionamos
+        if (e.target === stage || e.target.name() === 'wallRect' || e.target.name() === 'wallLabel') {
           STATE.selectedId = null;
           STATE.selectedType = null;
+          updateSelectionVisually();
           renderSidebar();
-          renderCanvas();
         }
       }
     });
@@ -198,7 +183,7 @@
         const pos = getRelativePointerPosition();
         STATE.currentLine.x2 = pos.x;
         STATE.currentLine.y2 = pos.y;
-        renderCanvas();
+        renderCurrentLine();
       }
     });
 
@@ -206,51 +191,256 @@
       if (STATE.mode === 'measure' && STATE.isDrawing) {
         STATE.isDrawing = false;
         
-        // Calcular longitud real
         const dx = STATE.currentLine.x2 - STATE.currentLine.x1;
         const dy = STATE.currentLine.y2 - STATE.currentLine.y1;
         const pxLength = Math.sqrt(dx * dx + dy * dy);
         const cmLength = pxLength / STATE.scale;
 
-        // Solo guardar si es más larga que 1cm para evitar clics accidentales
-        if (cmLength > 1) {
-            STATE.measurements.push({
+        if (cmLength > 1) { // Ignorar clics accidentales sin recorrido
+            const newMeasurement = {
                 id: 'm_' + Date.now(),
                 x1: STATE.currentLine.x1,
                 y1: STATE.currentLine.y1,
                 x2: STATE.currentLine.x2,
                 y2: STATE.currentLine.y2,
                 lengthCm: cmLength
-            });
+            };
+            STATE.measurements.push(newMeasurement);
+            drawMeasurementLine(newMeasurement);
         }
+        
+        // Limpiar la línea temporal
+        const tempNode = mainLayer.findOne('#tempLine');
+        if (tempNode) tempNode.destroy();
         STATE.currentLine = null;
         
-        // Retornar auto a modo Mover tras medir para comodidad (Opcional, pero UX recomendada)
-        setMode('move');
-        renderCanvas();
+        setMode('move'); // Volver a modo mover automáticamente
       }
     });
 
-    // --- HTML5 DRAG & DROP DESDE EL SISTEMA OPERATIVO ---
-    container.addEventListener('dragover', (e) => {
-      e.preventDefault(); // Necesario para permitir el drop
-      e.dataTransfer.dropEffect = 'copy';
-    });
+    function getRelativePointerPosition() {
+      const transform = stage.getAbsoluteTransform().copy();
+      transform.invert();
+      return transform.point(stage.getPointerPosition());
+    }
 
+    // --- 3. GESTIÓN DEL RENDERIZADO (MUTACIÓN, NO DESTRUCCIÓN) ---
+
+    // Dibuja o actualiza el muro
+    function updateWall() {
+      let wallGroup = bgLayer.findOne('#wallGroup');
+      const w = STATE.wall.width * STATE.scale;
+      const h = STATE.wall.height * STATE.scale;
+      const x = stage.width() / 2 - w / 2;
+      const y = 50;
+
+      if (!wallGroup) {
+        wallGroup = new Konva.Group({ id: 'wallGroup', x, y });
+        wallGroup.add(new Konva.Rect({
+          id: 'wallRect', name: 'wallRect',
+          fill: '#ffffff', shadowColor: 'black', shadowBlur: 10, shadowOpacity: 0.1
+        }));
+        wallGroup.add(new Konva.Text({
+          id: 'wallLabel', name: 'wallLabel',
+          x: 10, y: -25, fontSize: 16, fill: '#666'
+        }));
+        bgLayer.add(wallGroup);
+      }
+
+      wallGroup.position({ x, y });
+      wallGroup.findOne('#wallRect').size({ width: w, height: h });
+      wallGroup.findOne('#wallLabel').text(`Muro Base: ${STATE.wall.width}cm x ${STATE.wall.height}cm`);
+      bgLayer.batchDraw();
+    }
+
+    // Crea un nodo de imagen por primera vez y lo añade al lienzo
+    function renderNewImage(item) {
+      const pWidth = item.realWidth * STATE.scale;
+      const pHeight = item.realHeight * STATE.scale;
+
+      const group = new Konva.Group({
+        id: item.id,
+        name: 'artworkGroup',
+        x: item.x,
+        y: item.y,
+        draggable: STATE.mode === 'move'
+      });
+
+      // ARQUITECTURA CLAVE: Bloqueamos el burbujeo para que el lienzo no se arrastre
+      group.on('mousedown touchstart', (e) => {
+        if (STATE.mode === 'move') {
+          e.cancelBubble = true; // <-- ESTO SOLUCIONA TU PROBLEMA DE ARRASTRE
+          STATE.selectedId = item.id;
+          STATE.selectedType = 'image';
+          updateSelectionVisually();
+          renderSidebar();
+        }
+      });
+
+      group.on('dragend', (e) => {
+        item.x = e.target.x();
+        item.y = e.target.y();
+      });
+
+      const konvaImg = new Konva.Image({
+        name: 'coreImage',
+        width: pWidth, height: pHeight,
+        stroke: '#ccc', strokeWidth: 1,
+        shadowColor: 'black', shadowBlur: 5, shadowOpacity: 0.3, shadowOffset: { x: 2, y: 2 }
+      });
+      group.add(konvaImg);
+
+      // Cargar imagen de forma asíncrona pero sin re-renderizar todo
+      const imageObj = new window.Image();
+      imageObj.onload = () => {
+        konvaImg.image(imageObj);
+        mainLayer.batchDraw();
+      };
+      imageObj.src = item.src;
+
+      mainLayer.add(group);
+      
+      // Dibujar cotas iniciales
+      updateArtworkDimensionsVisuals(item.id);
+    }
+
+    // Actualiza las cotas (líneas y texto) y el tamaño de un grupo existente
+    function updateArtworkDimensionsVisuals(id) {
+      const item = STATE.items.find(i => i.id === id);
+      const group = mainLayer.findOne(`#${id}`);
+      if (!item || !group) return;
+
+      const pWidth = item.realWidth * STATE.scale;
+      const pHeight = item.realHeight * STATE.scale;
+
+      // Actualizar imagen principal
+      const konvaImg = group.findOne('.coreImage');
+      konvaImg.size({ width: pWidth, height: pHeight });
+
+      // Limpiar cotas viejas
+      const oldLines = group.find('.dimensionLine');
+      oldLines.forEach(l => l.destroy());
+
+      // Dibujar cotas nuevas
+      const offset = 20; 
+      const lineProps = { stroke: '#94a3b8', strokeWidth: 1, name: 'dimensionLine' };
+      const textProps = { fill: '#64748b', fontSize: 12, fontFamily: 'sans-serif', align: 'center', name: 'dimensionLine' };
+
+      // Superior
+      group.add(new Konva.Line({ points: [0, -offset, pWidth, -offset], ...lineProps })); 
+      group.add(new Konva.Line({ points: [0, -offset-5, 0, -offset+5], ...lineProps })); 
+      group.add(new Konva.Line({ points: [pWidth, -offset-5, pWidth, -offset+5], ...lineProps })); 
+      group.add(new Konva.Text({ x: 0, y: -offset - 16, width: pWidth, text: `${item.realWidth.toFixed(1)}`, ...textProps }));
+      // Lateral
+      group.add(new Konva.Line({ points: [pWidth + offset, 0, pWidth + offset, pHeight], ...lineProps })); 
+      group.add(new Konva.Line({ points: [pWidth + offset - 5, 0, pWidth + offset + 5, 0], ...lineProps })); 
+      group.add(new Konva.Line({ points: [pWidth + offset - 5, pHeight, pWidth + offset + 5, pHeight], ...lineProps })); 
+      group.add(new Konva.Text({ x: pWidth + offset + 8, y: (pHeight / 2) - 6, text: `${item.realHeight.toFixed(1)}`, ...textProps }));
+
+      mainLayer.batchDraw();
+    }
+
+    // Dibuja una línea de medición manual (fija o temporal)
+    function drawMeasurementLine(m, isTemp = false) {
+      const isSelected = STATE.selectedId === m.id && !isTemp;
+      const color = isTemp ? '#f59e0b' : (isSelected ? '#2563eb' : '#e11d48');
+      
+      let group = mainLayer.findOne(`#${isTemp ? 'tempLine' : m.id}`);
+      if (group) group.destroy(); // Si ya existe la recreamos (barato para líneas simples)
+
+      group = new Konva.Group({
+          id: isTemp ? 'tempLine' : m.id,
+          name: isTemp ? 'tempLineGroup' : 'measurementGroup',
+          draggable: STATE.mode === 'move' && !isTemp
+      });
+
+      if (!isTemp) {
+        group.on('mousedown touchstart', (e) => {
+            if (STATE.mode === 'move') {
+                e.cancelBubble = true;
+                STATE.selectedId = m.id;
+                STATE.selectedType = 'measurement';
+                updateSelectionVisually();
+                renderSidebar();
+            }
+        });
+        group.on('dragend', (e) => {
+            m.x1 += e.target.x();
+            m.y1 += e.target.y();
+            m.x2 += e.target.x();
+            m.y2 += e.target.y();
+            e.target.position({x: 0, y: 0});
+            drawMeasurementLine(m); // Redibujar en nueva pos absoluta
+        });
+      }
+
+      group.add(new Konva.Line({ points: [m.x1, m.y1, m.x2, m.y2], stroke: color, strokeWidth: 2, hitStrokeWidth: 10 }));
+
+      // Topes
+      const angle = Math.atan2(m.y2 - m.y1, m.x2 - m.x1);
+      const pAngle = angle + (Math.PI / 2);
+      const cap = 5;
+      group.add(new Konva.Line({ points: [m.x1 + Math.cos(pAngle)*cap, m.y1 + Math.sin(pAngle)*cap, m.x1 - Math.cos(pAngle)*cap, m.y1 - Math.sin(pAngle)*cap], stroke: color, strokeWidth: 2 }));
+      group.add(new Konva.Line({ points: [m.x2 + Math.cos(pAngle)*cap, m.y2 + Math.sin(pAngle)*cap, m.x2 - Math.cos(pAngle)*cap, m.y2 - Math.sin(pAngle)*cap], stroke: color, strokeWidth: 2 }));
+
+      // Texto
+      let deg = angle * (180 / Math.PI);
+      if (deg > 90 || deg < -90) deg += 180;
+      group.add(new Konva.Text({
+          x: (m.x1 + m.x2) / 2, y: (m.y1 + m.y2) / 2,
+          text: `${m.lengthCm.toFixed(1)} cm`,
+          fill: color, fontSize: 14, fontStyle: 'bold',
+          rotation: deg, offsetY: 20, offsetX: 20,
+          shadowColor: 'white', shadowBlur: 2, shadowOpacity: 1
+      }));
+
+      mainLayer.add(group);
+      mainLayer.batchDraw();
+    }
+
+    function renderCurrentLine() {
+      if (!STATE.currentLine) return;
+      const dx = STATE.currentLine.x2 - STATE.currentLine.x1;
+      const dy = STATE.currentLine.y2 - STATE.currentLine.y1;
+      const cm = (Math.sqrt(dx*dx + dy*dy) / STATE.scale);
+      drawMeasurementLine({ id: 'temp', x1: STATE.currentLine.x1, y1: STATE.currentLine.y1, x2: STATE.currentLine.x2, y2: STATE.currentLine.y2, lengthCm: cm }, true);
+    }
+
+    // Actualiza SOLO LOS BORDES de los objetos según la selección actual (Súper rápido)
+    function updateSelectionVisually() {
+      // Restablecer todas las imágenes
+      const artworks = mainLayer.find('.artworkGroup');
+      artworks.forEach(grp => {
+        const img = grp.findOne('.coreImage');
+        if (img) {
+          if (grp.id() === STATE.selectedId) {
+            img.stroke('#2563eb'); img.strokeWidth(3); grp.moveToTop();
+          } else {
+            img.stroke('#ccc'); img.strokeWidth(1);
+          }
+        }
+      });
+      // Restablecer medidas
+      STATE.measurements.forEach(m => drawMeasurementLine(m));
+      mainLayer.batchDraw();
+    }
+
+    // --- 4. CARGA DE ARCHIVOS Y DRAG & DROP ---
+    container.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
     container.addEventListener('drop', (e) => {
       e.preventDefault();
-      
       const file = e.dataTransfer.files[0];
       if (!file || !file.type.startsWith('image/')) return;
-
-      // Calcular la posición donde se soltó el archivo respecto al lienzo (considerando pan/zoom)
       stage.setPointersPositions(e);
       const pos = getRelativePointerPosition();
-
       processImageFile(file, pos.x, pos.y);
     });
 
-    // Función para procesar archivos subidos (Botón o Drop)
+    document.getElementById('uploadImage').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) { processImageFile(file); e.target.value = ''; }
+    });
+
     function processImageFile(file, dropX = null, dropY = null) {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -258,308 +448,95 @@
         const img = new Image();
         img.onload = () => {
           const ratio = img.naturalWidth / img.naturalHeight;
-          let defaultWidth = 50; // Asumimos 50cm
+          let defaultWidth = 50; 
           let defaultHeight = defaultWidth / ratio;
-          
-          if (defaultHeight > 70) {
-              defaultHeight = 50;
-              defaultWidth = defaultHeight * ratio;
-          }
+          if (defaultHeight > 70) { defaultHeight = 50; defaultWidth = defaultHeight * ratio; }
 
-          // Si no hay dropX (Subido por botón), lo centramos en el muro
           const finalX = dropX !== null ? dropX : stage.width() / 2 - (defaultWidth * STATE.scale)/2 - stage.x();
           const finalY = dropY !== null ? dropY : 50 + ((STATE.wall.height * STATE.scale) / 2) - ((defaultHeight * STATE.scale) / 2) - stage.y();
 
-          STATE.items.push({
+          const newItem = {
             id: 'img_' + Date.now().toString(),
-            name: file.name,
-            src: src,
-            x: finalX,
-            y: finalY,
-            realWidth: defaultWidth,
-            realHeight: defaultHeight,
-            ratio: ratio 
-          });
+            name: file.name, src: src,
+            x: finalX, y: finalY,
+            realWidth: defaultWidth, realHeight: defaultHeight, ratio: ratio 
+          };
+
+          STATE.items.push(newItem);
+          renderNewImage(newItem);
           
-          STATE.selectedId = STATE.items[STATE.items.length - 1].id;
+          STATE.selectedId = newItem.id;
           STATE.selectedType = 'image';
-          setMode('move'); // Forzar modo mover para que lo edite
-          renderSidebar();
-          renderCanvas();
+          setMode('move'); 
         };
         img.src = src;
       };
       reader.readAsDataURL(file);
     }
 
-
-    // --- RENDERIZADO ---
-    function renderCanvas() {
-      layer.destroyChildren();
-
-      const allowDrag = STATE.mode === 'move';
-      stage.draggable(allowDrag); // Bloquear paneo del lienzo si estamos midiendo
-
-      // 1. Dibujar el Muro
-      const wallGroup = new Konva.Group({
-        x: stage.width() / 2 - (STATE.wall.width * STATE.scale) / 2, 
-        y: 50,
-        name: 'wallGroup'
-      });
-
-      const wallRect = new Konva.Rect({
-        width: STATE.wall.width * STATE.scale,
-        height: STATE.wall.height * STATE.scale,
-        fill: '#ffffff',
-        shadowColor: 'black',
-        shadowBlur: 10,
-        shadowOpacity: 0.1,
-        name: 'wallRect'
-      });
-      wallGroup.add(wallRect);
-
-      wallGroup.add(new Konva.Text({
-        x: 10, y: -25,
-        text: `Muro Base: ${STATE.wall.width}cm x ${STATE.wall.height}cm`,
-        fontSize: 16,
-        fill: '#666',
-        name: 'wallLabel'
-      }));
-
-      layer.add(wallGroup);
-
-      // 2. Dibujar Imágenes
-      STATE.items.forEach(item => {
-        const pWidth = item.realWidth * STATE.scale;
-        const pHeight = item.realHeight * STATE.scale;
-        const isSelected = STATE.selectedId === item.id;
-
-        const group = new Konva.Group({
-          x: item.x,
-          y: item.y,
-          draggable: allowDrag, // Solo arrastrable en modo Mover
-          id: item.id
-        });
-
-        group.on('dragend', (e) => {
-          item.x = e.target.x();
-          item.y = e.target.y();
-        });
-
-        group.on('mousedown touchstart', () => {
-          if (STATE.mode === 'move') {
-            STATE.selectedId = item.id;
-            STATE.selectedType = 'image';
-            renderSidebar();
-            renderCanvas();
-          }
-        });
-
-        const imageObj = new window.Image();
-        imageObj.onload = () => layer.batchDraw();
-        imageObj.src = item.src;
-        
-        const konvaImg = new Konva.Image({
-          image: imageObj,
-          width: pWidth,
-          height: pHeight,
-          stroke: isSelected ? '#2563eb' : '#ccc',
-          strokeWidth: isSelected ? 3 : 1,
-          shadowColor: 'black',
-          shadowBlur: 5,
-          shadowOpacity: 0.3,
-          shadowOffset: { x: 2, y: 2 },
-          name: 'Image'
-        });
-
-        // Cotas automáticas de imagen
-        const offset = 20; 
-        const lineProps = { stroke: '#94a3b8', strokeWidth: 1 };
-        const textProps = { fill: '#64748b', fontSize: 12, fontFamily: 'sans-serif', align: 'center' };
-
-        group.add(new Konva.Line({ points: [0, -offset, pWidth, -offset], ...lineProps })); 
-        group.add(new Konva.Line({ points: [0, -offset-5, 0, -offset+5], ...lineProps })); 
-        group.add(new Konva.Line({ points: [pWidth, -offset-5, pWidth, -offset+5], ...lineProps })); 
-        group.add(new Konva.Text({ x: 0, y: -offset - 16, width: pWidth, text: `${item.realWidth.toFixed(1)}`, ...textProps }));
-
-        group.add(new Konva.Line({ points: [pWidth + offset, 0, pWidth + offset, pHeight], ...lineProps })); 
-        group.add(new Konva.Line({ points: [pWidth + offset - 5, 0, pWidth + offset + 5, 0], ...lineProps })); 
-        group.add(new Konva.Line({ points: [pWidth + offset - 5, pHeight, pWidth + offset + 5, pHeight], ...lineProps })); 
-        group.add(new Konva.Text({ x: pWidth + offset + 8, y: (pHeight / 2) - 6, text: `${item.realHeight.toFixed(1)}`, ...textProps }));
-
-        group.add(konvaImg);
-        layer.add(group);
-      });
-
-      // 3. Dibujar Medidas Manuales
-      STATE.measurements.forEach(m => {
-          drawMeasurementLine(m.x1, m.y1, m.x2, m.y2, m.lengthCm, m.id);
-      });
-
-      // 4. Dibujar Línea en curso (si existe)
-      if (STATE.currentLine) {
-        const cl = STATE.currentLine;
-        const dx = cl.x2 - cl.x1;
-        const dy = cl.y2 - cl.y1;
-        const cm = (Math.sqrt(dx*dx + dy*dy) / STATE.scale);
-        drawMeasurementLine(cl.x1, cl.y1, cl.x2, cl.y2, cm, null, true);
-      }
-      
-      layer.batchDraw();
-    }
-
-    // Función auxiliar para dibujar líneas de medición
-    function drawMeasurementLine(x1, y1, x2, y2, lengthCm, id, isTemp = false) {
-        const isSelected = STATE.selectedId === id && !isTemp;
-        const color = isTemp ? '#f59e0b' : (isSelected ? '#2563eb' : '#e11d48');
-        
-        const group = new Konva.Group({
-            id: id || 'temp',
-            draggable: STATE.mode === 'move' && !isTemp
-        });
-
-        // Actualizar coords si se mueve entera
-        group.on('dragend', (e) => {
-            const m = STATE.measurements.find(meas => meas.id === id);
-            if (m) {
-                m.x1 += e.target.x();
-                m.y1 += e.target.y();
-                m.x2 += e.target.x();
-                m.y2 += e.target.y();
-                e.target.position({x: 0, y: 0}); // Reset group pos, modify absolute points
-                renderCanvas();
-            }
-        });
-
-        group.on('mousedown touchstart', () => {
-            if (STATE.mode === 'move' && !isTemp) {
-                STATE.selectedId = id;
-                STATE.selectedType = 'measurement';
-                renderSidebar();
-                renderCanvas();
-            }
-        });
-
-        // Línea principal
-        group.add(new Konva.Line({
-            points: [x1, y1, x2, y2],
-            stroke: color,
-            strokeWidth: 2,
-            hitStrokeWidth: 10 // Área invisible más ancha para facilitar el clic
-        }));
-
-        // Topes
-        const angle = Math.atan2(y2 - y1, x2 - x1);
-        const perpAngle = angle + (Math.PI / 2);
-        const capLen = 5;
-
-        const cap1x1 = x1 + Math.cos(perpAngle) * capLen;
-        const cap1y1 = y1 + Math.sin(perpAngle) * capLen;
-        const cap1x2 = x1 - Math.cos(perpAngle) * capLen;
-        const cap1y2 = y1 - Math.sin(perpAngle) * capLen;
-
-        const cap2x1 = x2 + Math.cos(perpAngle) * capLen;
-        const cap2y1 = y2 + Math.sin(perpAngle) * capLen;
-        const cap2x2 = x2 - Math.cos(perpAngle) * capLen;
-        const cap2y2 = y2 - Math.sin(perpAngle) * capLen;
-
-        group.add(new Konva.Line({ points: [cap1x1, cap1y1, cap1x2, cap1y2], stroke: color, strokeWidth: 2 }));
-        group.add(new Konva.Line({ points: [cap2x1, cap2y1, cap2x2, cap2y2], stroke: color, strokeWidth: 2 }));
-
-        // Texto centrado y rotado
-        const midX = (x1 + x2) / 2;
-        const midY = (y1 + y2) / 2;
-        
-        let deg = angle * (180 / Math.PI);
-        // Si el texto queda boca abajo, lo volteamos
-        if (deg > 90 || deg < -90) deg += 180;
-
-        group.add(new Konva.Text({
-            x: midX,
-            y: midY,
-            text: `${lengthCm.toFixed(1)} cm`,
-            fill: color,
-            fontSize: 14,
-            fontFamily: 'sans-serif',
-            fontStyle: 'bold',
-            padding: 4,
-            rotation: deg,
-            offsetY: 20, // Levantar el texto sobre la línea
-            offsetX: 20, // Centrado aproximado
-            shadowColor: 'white',
-            shadowBlur: 2,
-            shadowOpacity: 1
-        }));
-
-        layer.add(group);
-    }
-
-    // --- INTERFAZ (UI) ---
+    // --- 5. INTERFAZ Y EVENTOS LATERALES ---
     const ui = {
-      btnMove: document.getElementById('toolMove'),
-      btnMeasure: document.getElementById('toolMeasure'),
-      wallW: document.getElementById('wallWidth'),
-      wallH: document.getElementById('wallHeight'),
-      propPanel: document.getElementById('propertiesPanel'),
-      propName: document.getElementById('propName'),
-      imgProps: document.getElementById('imageProps'),
-      propW: document.getElementById('propWidth'),
-      propH: document.getElementById('propHeight'),
-      lockRatio: document.getElementById('lockRatio')
+      btnMove: document.getElementById('toolMove'), btnMeasure: document.getElementById('toolMeasure'),
+      wallW: document.getElementById('wallWidth'), wallH: document.getElementById('wallHeight'),
+      propPanel: document.getElementById('propertiesPanel'), propName: document.getElementById('propName'),
+      imgProps: document.getElementById('imageProps'), propW: document.getElementById('propWidth'),
+      propH: document.getElementById('propHeight'), lockRatio: document.getElementById('lockRatio')
     };
 
     function setMode(mode) {
       STATE.mode = mode;
       
-      // Estilos de botones
-      if (mode === 'move') {
-        ui.btnMove.className = "flex-1 bg-blue-100 text-blue-800 border border-blue-300 py-1.5 rounded text-xs font-bold transition-colors";
-        ui.btnMeasure.className = "flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors";
-        container.classList.add('mode-move');
-        container.classList.remove('mode-measure');
-      } else {
-        ui.btnMeasure.className = "flex-1 bg-red-100 text-red-800 border border-red-300 py-1.5 rounded text-xs font-bold transition-colors";
-        ui.btnMove.className = "flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors";
-        container.classList.remove('mode-move');
-        container.classList.add('mode-measure');
-        // Deseleccionar al cambiar a regla
+      // UI Styling
+      ui.btnMove.className = mode === 'move' ? "flex-1 bg-blue-100 text-blue-800 border border-blue-300 py-1.5 rounded text-xs font-bold transition-colors" : "flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors";
+      ui.btnMeasure.className = mode === 'measure' ? "flex-1 bg-red-100 text-red-800 border border-red-300 py-1.5 rounded text-xs font-bold transition-colors" : "flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors";
+      
+      container.classList.remove('mode-move', 'mode-measure');
+      container.classList.add(`mode-${mode}`);
+      
+      // Comportamiento del Motor
+      stage.draggable(mode === 'move'); // Bloquear el fondo en medición
+      
+      const artworks = mainLayer.find('.artworkGroup');
+      artworks.forEach(grp => grp.draggable(mode === 'move'));
+      
+      const measures = mainLayer.find('.measurementGroup');
+      measures.forEach(grp => grp.draggable(mode === 'move'));
+
+      if (mode === 'measure') {
         STATE.selectedId = null;
         STATE.selectedType = null;
       }
+      
+      updateSelectionVisually();
       renderSidebar();
-      renderCanvas();
     }
 
     ui.btnMove.addEventListener('click', () => setMode('move'));
     ui.btnMeasure.addEventListener('click', () => setMode('measure'));
 
     function renderSidebar() {
-      ui.wallW.value = STATE.wall.width;
-      ui.wallH.value = STATE.wall.height;
+      ui.wallW.value = STATE.wall.width; ui.wallH.value = STATE.wall.height;
 
       if (STATE.selectedId) {
         ui.propPanel.classList.remove('hidden');
-        
         if (STATE.selectedType === 'image') {
           const selected = STATE.items.find(i => i.id === STATE.selectedId);
           ui.propName.textContent = `🖼️ ${selected.name}`;
           ui.imgProps.classList.remove('hidden');
-          
           if (document.activeElement !== ui.propW) ui.propW.value = selected.realWidth.toFixed(1);
           if (document.activeElement !== ui.propH) ui.propH.value = selected.realHeight.toFixed(1);
-        } else if (STATE.selectedType === 'measurement') {
+        } else {
           const selected = STATE.measurements.find(m => m.id === STATE.selectedId);
           ui.propName.textContent = `📏 Medida: ${selected.lengthCm.toFixed(1)} cm`;
-          ui.imgProps.classList.add('hidden'); // Ocultar inputs de alto y ancho
+          ui.imgProps.classList.add('hidden');
         }
       } else {
         ui.propPanel.classList.add('hidden');
       }
     }
 
-    // Eventos de entrada
-    ui.wallW.addEventListener('input', (e) => { STATE.wall.width = Number(e.target.value) || 10; renderCanvas(); });
-    ui.wallH.addEventListener('input', (e) => { STATE.wall.height = Number(e.target.value) || 10; renderCanvas(); });
+    ui.wallW.addEventListener('input', (e) => { STATE.wall.width = Number(e.target.value) || 10; updateWall(); });
+    ui.wallH.addEventListener('input', (e) => { STATE.wall.height = Number(e.target.value) || 10; updateWall(); });
 
     ui.propW.addEventListener('input', (e) => {
       if (STATE.selectedType !== 'image') return;
@@ -569,10 +546,8 @@
         if (ui.lockRatio.checked) {
             selected.realHeight = selected.realWidth / selected.ratio; 
             ui.propH.value = selected.realHeight.toFixed(1); 
-        } else {
-            selected.ratio = selected.realWidth / selected.realHeight;
-        }
-        renderCanvas();
+        } else { selected.ratio = selected.realWidth / selected.realHeight; }
+        updateArtworkDimensionsVisuals(selected.id);
       }
     });
 
@@ -584,123 +559,41 @@
         if (ui.lockRatio.checked) {
             selected.realWidth = selected.realHeight * selected.ratio; 
             ui.propW.value = selected.realWidth.toFixed(1); 
-        } else {
-            selected.ratio = selected.realWidth / selected.realHeight;
-        }
-        renderCanvas();
+        } else { selected.ratio = selected.realWidth / selected.realHeight; }
+        updateArtworkDimensionsVisuals(selected.id);
       }
     });
 
-    // Función de eliminación
     function deleteSelected() {
       if (!STATE.selectedId) return;
-      if (STATE.selectedType === 'image') {
-        STATE.items = STATE.items.filter(i => i.id !== STATE.selectedId);
-      } else if (STATE.selectedType === 'measurement') {
-        STATE.measurements = STATE.measurements.filter(m => m.id !== STATE.selectedId);
-      }
-      STATE.selectedId = null;
-      STATE.selectedType = null;
+      const node = mainLayer.findOne(`#${STATE.selectedId}`);
+      if (node) node.destroy();
+
+      if (STATE.selectedType === 'image') STATE.items = STATE.items.filter(i => i.id !== STATE.selectedId);
+      if (STATE.selectedType === 'measurement') STATE.measurements = STATE.measurements.filter(m => m.id !== STATE.selectedId);
+      
+      STATE.selectedId = null; STATE.selectedType = null;
+      mainLayer.batchDraw();
       renderSidebar();
-      renderCanvas();
     }
 
     document.getElementById('deleteBtn').addEventListener('click', deleteSelected);
-    
-    // Escuchar tecla Suprimir (Delete o Backspace)
     window.addEventListener('keydown', (e) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && STATE.selectedId) {
-        // Evitar borrar si estamos escribiendo en un input
         if (document.activeElement.tagName === 'INPUT') return; 
         deleteSelected();
       }
     });
 
-    // Subir imagen manualmente
-    document.getElementById('uploadImage').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-          processImageFile(file); // Usa posicionamiento al centro del muro
-          e.target.value = ''; 
-      }
-    });
-
-    // --- EXPORTACIÓN E IMPORTACIÓN ---
-    function dataURItoBlob(dataURI) {
-      const byteString = atob(dataURI.split(',')[1]);
-      const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) {
-          ia[i] = byteString.charCodeAt(i);
-      }
-      return new Blob([ab], {type: mimeString});
+    // --- 6. IMPORTAR / EXPORTAR ---
+    function fullRebuildFromState() {
+      mainLayer.destroyChildren(); // Limpieza profunda al cargar proyecto entero
+      STATE.items.forEach(item => renderNewImage(item));
+      STATE.measurements.forEach(m => drawMeasurementLine(m));
+      updateWall();
+      updateSelectionVisually();
+      setMode('move');
     }
-
-    function downloadURI(uri, name) {
-      try {
-        const blob = dataURItoBlob(uri);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.download = name;
-        link.href = url;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } catch (err) {
-        alert("Error al generar archivo.");
-      }
-    }
-
-    document.getElementById('exportWallBtn').addEventListener('click', () => {
-      let activeSel = STATE.selectedId;
-      STATE.selectedId = null; // Ocultar marcos
-      renderCanvas();
-
-      const wallRect = layer.findOne('.wallRect');
-      if (!wallRect) return;
-      const wallGroup = wallRect.getParent();
-      const padding = 60;
-
-      const oldScale = stage.scaleX();
-      const oldPos = stage.position();
-      stage.scale({x: 1, y: 1});
-      stage.position({x: 0, y: 0});
-      stage.draw();
-
-      const box = wallGroup.getClientRect({ skipTransform: false });
-      const isHuge = box.width > 3000 || box.height > 3000;
-      const safePixelRatio = isHuge ? 1 : 2;
-
-      try {
-        const dataURL = stage.toDataURL({
-          x: box.x - padding,
-          y: box.y - padding,
-          width: box.width + (padding * 2),
-          height: box.height + (padding * 2),
-          pixelRatio: safePixelRatio
-        });
-        downloadURI(dataURL, 'mesa-dibujo.png');
-      } catch (e) {
-        alert("El área es demasiado grande. Reduce el muro.");
-      }
-
-      stage.scale({x: oldScale, y: oldScale});
-      stage.position(oldPos);
-      STATE.selectedId = activeSel;
-      renderCanvas();
-    });
-
-    document.getElementById('saveProjectBtn').addEventListener('click', () => {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(STATE));
-      const link = document.createElement('a');
-      link.download = "proyecto-museo.json";
-      link.href = dataStr;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    });
 
     document.getElementById('loadProject').addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -708,35 +601,59 @@
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
-          const loadedState = JSON.parse(event.target.result);
-          Object.assign(STATE, loadedState);
-          
-          // Compatibilidad: inicializar arrays si no existían en proyectos viejos
+          Object.assign(STATE, JSON.parse(event.target.result));
           if(!STATE.measurements) STATE.measurements = [];
-          
-          STATE.items.forEach(item => {
-              if(!item.ratio) item.ratio = item.realWidth / item.realHeight;
-          });
-          
-          setMode('move');
-          renderSidebar();
-          renderCanvas();
-        } catch (error) {
-          alert('Error leyendo JSON');
-        }
+          STATE.items.forEach(item => { if(!item.ratio) item.ratio = item.realWidth / item.realHeight; });
+          fullRebuildFromState();
+        } catch (error) { alert('Error leyendo JSON'); }
       };
-      reader.readAsText(file);
-      e.target.value = '';
+      reader.readAsText(file); e.target.value = '';
     });
 
-    window.addEventListener('resize', () => {
-      stage.width(container.offsetWidth);
-      stage.height(container.offsetHeight);
+    function dataURItoBlob(dataURI) {
+      const byteString = atob(dataURI.split(',')[1]);
+      const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) { ia[i] = byteString.charCodeAt(i); }
+      return new Blob([ab], {type: mimeString});
+    }
+
+    document.getElementById('exportWallBtn').addEventListener('click', () => {
+      let activeSel = STATE.selectedId;
+      STATE.selectedId = null; updateSelectionVisually();
+
+      const wallRect = bgLayer.findOne('#wallRect');
+      if (!wallRect) return;
+      const box = bgLayer.findOne('#wallGroup').getClientRect({ skipTransform: false });
+
+      const oldScale = stage.scaleX(); const oldPos = stage.position();
+      stage.scale({x: 1, y: 1}); stage.position({x: 0, y: 0}); stage.draw();
+
+      const safePixelRatio = (box.width > 3000 || box.height > 3000) ? 1 : 2;
+
+      try {
+        const dataURL = stage.toDataURL({ x: box.x - 60, y: box.y - 60, width: box.width + 120, height: box.height + 120, pixelRatio: safePixelRatio });
+        const url = URL.createObjectURL(dataURItoBlob(dataURL));
+        const link = document.createElement('a'); link.download = 'mesa-dibujo.png'; link.href = url;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
+      } catch (e) { alert("Área muy grande. Reduce el muro antes de exportar."); }
+
+      stage.scale({x: oldScale, y: oldScale}); stage.position(oldPos);
+      STATE.selectedId = activeSel; updateSelectionVisually();
     });
+
+    document.getElementById('saveProjectBtn').addEventListener('click', () => {
+      const link = document.createElement('a'); link.download = "proyecto-museo.json";
+      link.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(STATE));
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    });
+
+    window.addEventListener('resize', () => { stage.width(container.offsetWidth); stage.height(container.offsetHeight); });
 
     // Inicializar
+    updateWall();
     setMode('move');
-
   </script>
 </body>
 </html>
