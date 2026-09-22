@@ -1,659 +1,2115 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MuseoDraft - Diseño Museográfico</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MuseoDraft · mesa de montaje</title>
+<style>
+:root{
+  --bg:#ffffff; --ink:#111111; --dim:#6b6b64; --line:#d6d6d0; --soft:#f4f4f1; --paste:#efeeea;
+  --moss:#8fa676; --mossD:#586a45; --steel:#4f6b82; --orange:#b06a36; --danger:#9b3b2a;
+  --mono: ui-monospace, "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:12px;line-height:1.45;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+button,input,select{font-family:var(--mono);font-size:12px;color:var(--ink)}
+:focus-visible{outline:2px solid var(--mossD);outline-offset:1px}
+
+/* barra superior */
+#top{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);flex:none;flex-wrap:wrap}
+#brand{background:none;border:0;padding:4px 6px 4px 0;font-weight:700;letter-spacing:.04em;cursor:pointer;font-size:13px}
+#brand span{font-weight:400;color:var(--dim);margin-left:6px;letter-spacing:0}
+.sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+.tb{background:#fff;border:1px solid var(--line);border-radius:2px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;min-height:28px}
+.tb:hover:not(:disabled){border-color:var(--ink)}
+.tb:disabled{opacity:.35;cursor:default}
+.tb[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tb kbd{font-family:var(--mono);font-size:10px;color:var(--dim)}
+.tb[aria-pressed="true"] kbd{color:#bbb}
+.tb svg{width:16px;height:16px;flex:none}
+#zoomv{width:62px;text-align:right;border:1px solid var(--line);border-radius:2px;padding:4px 6px;min-height:28px}
+.grow{flex:1}
+
+/* área de trabajo */
+#main{flex:1;display:flex;min-height:0}
+#work{flex:1;position:relative;min-width:0;background:var(--paste);overflow:hidden}
+#cv{position:absolute;inset:0;touch-action:none;display:block}
+#empty{position:absolute;left:50%;bottom:36px;transform:translateX(-50%);background:#fff;border:1px solid var(--line);border-radius:2px;padding:10px 14px;max-width:min(460px,90%);color:var(--dim);pointer-events:none;text-align:center}
+#empty b{color:var(--ink)}
+#work.drop::after{content:"Suelta aquí: imágenes para añadir obras, o un .json para abrir un proyecto";position:absolute;inset:12px;border:2px dashed var(--mossD);display:flex;align-items:center;justify-content:center;color:var(--mossD);background:rgba(255,255,255,.7);pointer-events:none}
+
+/* panel */
+#panel{width:312px;flex:none;border-left:1px solid var(--line);overflow-y:auto;background:#fff}
+#panel details{border-bottom:1px solid var(--line)}
+#panel summary{padding:9px 14px;cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center}
+#panel summary::-webkit-details-marker{display:none}
+#panel summary::after{content:"+";color:var(--dim);font-weight:400}
+#panel details[open] summary::after{content:"−"}
+.pb{padding:2px 14px 12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.g6{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+label.f{display:flex;flex-direction:column;gap:2px;color:var(--dim);font-size:11px;min-width:0}
+label.f input,label.f select{width:100%;border:1px solid var(--line);border-radius:2px;padding:4px 6px;background:#fff;color:var(--ink);min-height:26px}
+label.f input[type=color]{padding:1px 2px;height:26px}
+label.c{display:flex;align-items:center;gap:6px;cursor:pointer;margin:4px 0}
+label.c input{accent-color:var(--mossD);margin:0}
+.row{display:flex;gap:6px;align-items:end;flex-wrap:wrap}
+.row > .f{flex:1}
+.pbtn{background:#fff;border:1px solid var(--line);border-radius:2px;padding:5px 8px;cursor:pointer;text-align:center;min-height:28px}
+.pbtn:hover:not(:disabled){border-color:var(--ink)}
+.pbtn:disabled{opacity:.35;cursor:default}
+.pbtn.main{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pbtn.main:hover{background:#333}
+.pbtn.danger{color:var(--danger)}
+.pbtn.ic{padding:4px;display:flex;align-items:center;justify-content:center}
+.pbtn.ic svg{width:18px;height:18px}
+.stack{display:flex;flex-direction:column;gap:6px}
+.muted{color:var(--dim)}
+.small{font-size:11px}
+.out{font-variant-numeric:tabular-nums}
+h4{margin:10px 0 6px;font-size:11px;font-weight:600;color:var(--steel)}
+h4:first-child{margin-top:4px}
+.kv{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+.kv b{font-weight:600}
+.note{font-size:11px;color:var(--dim);margin:4px 0 0}
+
+/* capas */
+#layers{list-style:none;margin:0;padding:0;max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:2px}
+#layers li{display:flex;align-items:center;gap:4px;padding:3px 4px;border-bottom:1px solid var(--soft);cursor:pointer}
+#layers li:last-child{border-bottom:0}
+#layers li.on{background:#eef1e9}
+#layers li .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#layers li .ty{color:var(--dim);width:14px;text-align:center}
+#layers li.hid .nm{color:var(--dim);text-decoration:line-through}
+#layers button{background:none;border:1px solid transparent;border-radius:2px;padding:1px 3px;cursor:pointer;color:var(--dim);line-height:1;display:flex}
+#layers button:hover{border-color:var(--line);color:var(--ink)}
+#layers button.act{color:var(--ink)}
+#layers button svg{width:14px;height:14px}
+
+/* estado */
+#status{display:flex;gap:16px;padding:4px 10px;border-top:1px solid var(--line);color:var(--dim);flex:none;font-size:11px;min-height:24px;align-items:center;white-space:nowrap;overflow:hidden}
+#st-msg{color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+#st-pos{font-variant-numeric:tabular-nums;min-width:170px}
+
+/* diálogos */
+dialog{border:1px solid var(--ink);border-radius:2px;padding:0;max-width:min(520px,94vw);font-family:var(--mono);font-size:12px;color:var(--ink)}
+dialog::backdrop{background:rgba(17,17,17,.25)}
+dialog .dh{padding:12px 16px;border-bottom:1px solid var(--line);font-weight:700}
+dialog .db{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+dialog .df{padding:10px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+#calib-box{height:auto;border:2px solid var(--ink);background:repeating-linear-gradient(45deg,#fff 0 6px,#f1f1ee 6px 12px);margin:6px 0}
+table.keys{border-collapse:collapse;width:100%}
+#dlg-export{max-width:min(1000px,96vw);width:1000px}
+#dlg-export .db{max-height:calc(100vh - 130px);overflow-y:auto}
+#dlg-export .db > *{flex:none}
+#ex-prevwrap{background:var(--paste);border:1px solid var(--line);border-radius:2px;padding:10px;display:flex;align-items:center;justify-content:center;min-height:120px;position:relative}
+#ex-prev{display:block;background:#fff;box-shadow:0 0 0 1px var(--line);cursor:zoom-in}
+#dlg-export.big #ex-prev{cursor:zoom-out}
+.prevbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.exgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.exgrid fieldset{border:1px solid var(--line);border-radius:2px;margin:0;padding:6px 10px 8px;min-width:0}
+.exgrid legend{padding:0 4px;font-weight:600;color:var(--steel);font-size:11px}
+.exgrid label.c{margin:3px 0;align-items:flex-start}
+.exgrid label.c input{margin-top:2px}
+.presets{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+@media (max-width:640px){.exgrid{grid-template-columns:1fr}}
+table.keys td{padding:3px 6px;border-bottom:1px solid var(--soft);vertical-align:top}
+table.keys td:first-child{white-space:nowrap;color:var(--steel)}
+.warn{color:var(--orange)}
+
+@media (max-width:820px){
+  #main{flex-direction:column}
+  #work{flex:1 1 56%;min-height:0}
+  #panel{width:100%;flex:0 0 44%;border-left:0;border-top:1px solid var(--line);max-height:none;min-height:0}
+  #top .lbl{display:none}
+  #st-pos{min-width:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
 </head>
-<body class="bg-gray-100 h-screen flex overflow-hidden font-sans">
+<body>
+<header id="top">
+  <button id="brand" title="Recargar la página">MuseoDraft<span>mesa de montaje</span></button>
+  <div class="sep"></div>
+  <button class="tb" id="t-select" aria-pressed="true" title="Seleccionar y mover (V)"><svg viewBox="0 0 16 16"><path d="M3 2l9 5-4 1 2.5 5-1.6.8L6.4 9 3 12z" fill="currentColor"/></svg><span class="lbl">Mover</span><kbd>V</kbd></button>
+  <button class="tb" id="t-hand" aria-pressed="false" title="Mano: desplazar la vista (H, o mantén Espacio)"><svg viewBox="0 0 16 16"><path d="M5 8V3.5a1 1 0 012 0V7m0-4.5a1 1 0 012 0V7m0-3.5a1 1 0 012 0V8m0-2a1 1 0 012 0v4c0 3-2 4.5-4.5 4.5S5 13 4 11.5L2.3 8.8a1 1 0 011.6-1.1L5 9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg><span class="lbl">Mano</span><kbd>H</kbd></button>
+  <button class="tb" id="t-measure" aria-pressed="false" title="Medir: arrastra entre dos puntos (M). Shift = horizontal o vertical"><svg viewBox="0 0 16 16"><path d="M1.5 10.5l9-9 4 4-9 9z M4 8l1.5 1.5 M6 6l2 2 M8 4l1.5 1.5 M10 2l2 2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg><span class="lbl">Medir</span><kbd>M</kbd></button>
+  <div class="sep"></div>
+  <button class="tb" id="b-undo" title="Deshacer (Ctrl/⌘ Z)" disabled><svg viewBox="0 0 16 16"><path d="M5 3L2 6l3 3M2 6h7a4 4 0 010 8H6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></button>
+  <button class="tb" id="b-redo" title="Rehacer (Ctrl/⌘ Shift Z)" disabled><svg viewBox="0 0 16 16"><path d="M11 3l3 3-3 3M14 6H7a4 4 0 000 8h3" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></button>
+  <div class="sep"></div>
+  <button class="tb" id="b-zout" title="Alejar (Ctrl/⌘ −)">−</button>
+  <input id="zoomv" aria-label="Zoom en porcentaje" title="100 % = tamaño real en pantalla (calíbralo en Vista y ajustes)">
+  <button class="tb" id="b-zin" title="Acercar (Ctrl/⌘ +)">+</button>
+  <button class="tb" id="b-fit" title="Encajar el muro en la ventana (Shift 1 o Ctrl/⌘ 0)">Encajar</button>
+  <button class="tb" id="b-100" title="Tamaño real en pantalla (Shift 0)">100 %</button>
+  <button class="tb" id="b-center" title="Centrar la vista en la selección, o en el muro si no hay selección (Shift 2)">Centrar</button>
+  <div class="grow"></div>
+  <button class="tb" id="b-help" title="Atajos de teclado (?)">Atajos</button>
+</header>
 
-  <!-- Panel Lateral -->
-  <aside class="w-80 bg-white border-r border-gray-200 flex flex-col shadow-lg z-10">
-    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-      <div>
-        <h1 class="text-xl font-bold text-gray-800">MuseoDraft</h1>
-        <p class="text-xs text-gray-500">Mesa de Dibujo 2D (Motor Optimizado)</p>
-      </div>
-    </div>
+<div id="main">
+  <div id="work">
+    <canvas id="cv" tabindex="0" aria-label="Muro de montaje"></canvas>
+    <div id="empty"><b>Arrastra imágenes de obras al muro</b> o usa «Añadir obra». Todas las medidas están en centímetros; las obras nuevas se colocan con el centro en el eje visual.</div>
+  </div>
 
-    <!-- Herramientas (Máquina de Estados) -->
-    <div class="p-3 border-b border-gray-200 flex space-x-2 bg-white">
-      <button id="toolMove" class="flex-1 bg-blue-100 text-blue-800 border border-blue-300 py-1.5 rounded text-xs font-bold transition-colors">
-        ✋ Mover
-      </button>
-      <button id="toolMeasure" class="flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors">
-        📏 Medir
-      </button>
-    </div>
-
-    <div class="flex-1 overflow-y-auto p-4 space-y-6">
-      
-      <!-- Controles Globales -->
-      <div class="space-y-3">
-        <h2 class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Muro Base</h2>
-        <div class="grid grid-cols-2 gap-2">
-          <label class="block text-xs font-medium text-gray-700">
-            Ancho (cm)
-            <input type="number" id="wallWidth" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm" value="500">
-          </label>
-          <label class="block text-xs font-medium text-gray-700">
-            Alto (cm)
-            <input type="number" id="wallHeight" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm" value="300">
-          </label>
+  <aside id="panel">
+    <details open>
+      <summary>Muro</summary>
+      <div class="pb stack">
+        <label class="f">Título<input id="w-title" type="text"></label>
+        <div class="g2">
+          <label class="f">Ancho (cm)<input id="w-w" type="number" min="1" step="1"></label>
+          <label class="f">Alto (cm)<input id="w-h" type="number" min="1" step="1"></label>
+          <label class="f">Eje visual (cm)<input id="w-eje" type="number" min="0" step="1" title="Altura del centro de las obras desde el piso"></label>
+          <label class="f">Color<input id="w-color" type="color"></label>
         </div>
-        
-        <p class="text-xs text-gray-500 mt-2 italic text-center">
-          💡 Puedes arrastrar imágenes desde tu computadora directamente al lienzo.
-        </p>
-        
-        <label class="block w-full cursor-pointer bg-gray-800 hover:bg-gray-900 text-white text-center py-2 px-4 rounded-md text-sm font-medium transition-colors">
-          o Subir Imagen Manualmente
-          <input type="file" id="uploadImage" class="hidden" accept="image/*">
+      </div>
+    </details>
+
+    <details open>
+      <summary>Añadir</summary>
+      <div class="pb g2">
+        <button class="pbtn main" id="a-img" title="Añadir obras desde archivos de imagen">Obra</button>
+        <button class="pbtn" id="a-blank" title="Obra sin imagen, solo con medidas">Obra sin imagen</button>
+        <button class="pbtn" id="a-vano" title="Puerta, ventana, enchufe, extintor u otro obstáculo">Vano</button>
+        <button class="pbtn" id="a-persona" title="Figura humana de referencia; puedes añadir varias">Persona</button>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Selección</summary>
+      <div class="pb" id="sel-body"></div>
+    </details>
+
+    <details open>
+      <summary>Disposición</summary>
+      <div class="pb stack">
+        <label class="f">Alinear respecto a
+          <select id="al-ref"><option value="sel">la selección</option><option value="wall">el muro</option></select>
         </label>
-      </div>
-
-      <!-- Panel de Propiedades (Solo visible si hay selección) -->
-      <div id="propertiesPanel" class="hidden space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-        <div class="flex justify-between items-center mb-2">
-          <h2 class="text-sm font-semibold text-blue-800 uppercase tracking-wider">Selección</h2>
+        <div class="g6" id="al-btns">
+          <button class="pbtn ic" data-al="left" title="Alinear bordes izquierdos"><svg viewBox="0 0 18 18"><path d="M2 1v16" stroke="currentColor" stroke-width="1.4"/><rect x="4" y="4" width="10" height="3.5" fill="currentColor"/><rect x="4" y="10.5" width="6" height="3.5" fill="currentColor"/></svg></button>
+          <button class="pbtn ic" data-al="hcenter" title="Alinear centros horizontales"><svg viewBox="0 0 18 18"><path d="M9 1v16" stroke="currentColor" stroke-width="1.4"/><rect x="3" y="4" width="12" height="3.5" fill="currentColor"/><rect x="5.5" y="10.5" width="7" height="3.5" fill="currentColor"/></svg></button>
+          <button class="pbtn ic" data-al="right" title="Alinear bordes derechos"><svg viewBox="0 0 18 18"><path d="M16 1v16" stroke="currentColor" stroke-width="1.4"/><rect x="4" y="4" width="10" height="3.5" fill="currentColor"/><rect x="8" y="10.5" width="6" height="3.5" fill="currentColor"/></svg></button>
+          <button class="pbtn ic" data-al="top" title="Alinear bordes superiores"><svg viewBox="0 0 18 18"><path d="M1 2h16" stroke="currentColor" stroke-width="1.4"/><rect x="4" y="4" width="3.5" height="10" fill="currentColor"/><rect x="10.5" y="4" width="3.5" height="6" fill="currentColor"/></svg></button>
+          <button class="pbtn ic" data-al="vmiddle" title="Alinear centros verticales"><svg viewBox="0 0 18 18"><path d="M1 9h16" stroke="currentColor" stroke-width="1.4"/><rect x="4" y="3" width="3.5" height="12" fill="currentColor"/><rect x="10.5" y="5.5" width="3.5" height="7" fill="currentColor"/></svg></button>
+          <button class="pbtn ic" data-al="bottom" title="Alinear bordes inferiores"><svg viewBox="0 0 18 18"><path d="M1 16h16" stroke="currentColor" stroke-width="1.4"/><rect x="4" y="4" width="3.5" height="10" fill="currentColor"/><rect x="10.5" y="8" width="3.5" height="6" fill="currentColor"/></svg></button>
         </div>
-        <p id="propName" class="text-xs text-gray-800 font-medium truncate mb-2"></p>
-        
-        <!-- Controles para Imágenes -->
-        <div id="imageProps" class="hidden space-y-2">
-          <div class="grid grid-cols-2 gap-2">
-            <label class="block text-xs font-medium text-gray-700">
-              Ancho Real (cm)
-              <input type="number" id="propWidth" step="0.1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm">
-            </label>
-            <label class="block text-xs font-medium text-gray-700">
-              Alto Real (cm)
-              <input type="number" id="propHeight" step="0.1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1.5 text-sm">
-            </label>
-          </div>
-          <label class="flex items-center space-x-2 mt-2 cursor-pointer">
-            <input type="checkbox" id="lockRatio" class="rounded text-blue-600 focus:ring-blue-500" checked>
-            <span class="text-[11px] text-gray-700 font-medium">Mantener proporción original</span>
-          </label>
+        <h4>Distribuir</h4>
+        <div class="g2">
+          <button class="pbtn" id="d-eqh" title="Misma separación horizontal entre la primera y la última (3 o más)">Igual ↔</button>
+          <button class="pbtn" id="d-eqv" title="Misma separación vertical entre la primera y la última (3 o más)">Igual ↕</button>
         </div>
-        
-        <button id="deleteBtn" class="w-full mt-3 bg-red-100 hover:bg-red-200 text-red-700 py-1.5 rounded-md text-xs font-bold transition-colors">
-          Eliminar Seleccionado (Supr)
-        </button>
+        <div class="row">
+          <label class="f">Separación fija (cm)<input id="d-gap" type="number" min="0" step="0.5" value="10"></label>
+          <button class="pbtn" id="d-gaph" title="Separar horizontalmente con la medida indicada">↔</button>
+          <button class="pbtn" id="d-gapv" title="Separar verticalmente con la medida indicada">↕</button>
+        </div>
+        <h4>Centrar</h4>
+        <div class="g2">
+          <button class="pbtn" id="c-eye" title="Coloca el centro de cada obra seleccionada sobre el eje visual">En el eje visual</button>
+          <button class="pbtn" id="c-wall" title="Centra el conjunto seleccionado a lo ancho del muro">Conjunto en muro</button>
+        </div>
+        <h4>Orden</h4>
+        <div class="g2">
+          <button class="pbtn" id="o-front" title="Traer al frente (Ctrl/⌘ Shift ])">Al frente</button>
+          <button class="pbtn" id="o-back" title="Enviar al fondo (Ctrl/⌘ Shift [)">Al fondo</button>
+        </div>
       </div>
+    </details>
 
-    </div>
+    <details open>
+      <summary>Capas</summary>
+      <div class="pb"><ul id="layers" aria-label="Elementos del muro"></ul><p class="note">Arriba en la lista es adelante en el muro. Los elementos bloqueados solo se seleccionan desde aquí.</p></div>
+    </details>
 
-    <!-- Panel de Exportación -->
-    <div class="p-4 border-t border-gray-200 bg-gray-50 space-y-2">
-      <h2 class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Exportar / Importar</h2>
-      <button id="exportWallBtn" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-1.5 rounded-md text-xs font-medium transition-colors">
-        Exportar Vista (PNG)
-      </button>
-      <div class="grid grid-cols-2 gap-2 mt-2">
-        <button id="saveProjectBtn" class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 py-1.5 rounded-md text-xs font-medium transition-colors">
-          Guardar .json
-        </button>
-        <label class="bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 py-1.5 rounded-md text-xs font-medium transition-colors text-center cursor-pointer">
-          Cargar .json
-          <input type="file" id="loadProject" class="hidden" accept=".json">
+    <details>
+      <summary>Vista y ajustes</summary>
+      <div class="pb stack">
+        <label class="f">Cotas
+          <select id="o-cotas"><option value="sel">de la selección</option><option value="all">de todas las obras</option><option value="none">ocultas</option></select>
         </label>
+        <label class="c"><input type="checkbox" id="o-eje"> Eje visual</label>
+        <label class="c"><input type="checkbox" id="o-muro"> Tamaño del muro</label>
+        <label class="c"><input type="checkbox" id="o-human"> Personas de referencia</label>
+        <label class="c"><input type="checkbox" id="o-ojos"> Altura de ojos de las personas</label>
+        <label class="c"><input type="checkbox" id="o-fichas"> Fichas bajo las obras</label>
+        <p class="note">Añade personas desde «Añadir». Su estatura y figura se cambian en Selección o arrastrando sus esquinas superiores.</p>
+        <h4>Cuadrícula y guías</h4>
+        <label class="c"><input type="checkbox" id="o-grid"> Cuadrícula</label>
+        <label class="f">Paso de cuadrícula (cm)<input id="o-gridstep" type="number" min="0.5" step="0.5"></label>
+        <label class="c"><input type="checkbox" id="o-guides"> Guías <span class="muted small">(arrástralas desde las reglas)</span></label>
+        <button class="pbtn" id="o-clearguides">Borrar guías</button>
+        <h4>Ajustar a</h4>
+        <label class="c"><input type="checkbox" id="s-obj"> Bordes y centros de obras y del muro</label>
+        <label class="c"><input type="checkbox" id="s-guides"> Guías y eje visual</label>
+        <label class="c"><input type="checkbox" id="s-grid"> Cuadrícula</label>
+        <p class="note">Mantén Ctrl/⌘ mientras arrastras para mover sin ajuste.</p>
+        <h4>Tamaño real</h4>
+        <button class="pbtn" id="o-calib">Calibrar el 100 %</button>
       </div>
-    </div>
+    </details>
+
+    <details open>
+      <summary>Archivo</summary>
+      <div class="pb stack">
+        <div class="g2">
+          <button class="pbtn" id="f-save" title="Guardar proyecto (Ctrl/⌘ S)">Guardar proyecto</button>
+          <button class="pbtn" id="f-open" title="Abrir proyecto (Ctrl/⌘ O)">Abrir proyecto</button>
+        </div>
+        <button class="pbtn main" id="f-export" title="Exportar el muro como PNG o SVG (Ctrl/⌘ E)">Exportar imagen…</button>
+        <button class="pbtn" id="f-csv" title="Tabla con medidas, posición y altura de clavo de cada obra">Hoja de montaje (CSV)</button>
+        <button class="pbtn danger" id="f-new">Nuevo muro</button>
+      </div>
+    </details>
   </aside>
+</div>
 
-  <!-- Lienzo -->
-  <main class="flex-1 relative bg-gray-200" id="canvasContainer">
-    <style>
-      .mode-move { cursor: grab; }
-      .mode-move:active { cursor: grabbing; }
-      .mode-measure { cursor: crosshair !important; }
-    </style>
-  </main>
+<footer id="status"><span id="st-pos"></span><span id="st-msg" role="status" aria-live="polite"></span></footer>
 
-  <script>
-    // --- 1. ESTADO DE LA APLICACIÓN ---
-    const STATE = {
-      scale: 10,
-      wall: { width: 500, height: 300 },
-      items: [], // Datos puros, sin objetos de Konva
-      measurements: [],
-      selectedId: null,
-      selectedType: null, // 'image' | 'measurement'
-      mode: 'move', // 'move' | 'measure'
-      isDrawing: false,
-      currentLine: null
+<input type="file" id="file-img" accept="image/*" multiple hidden>
+<input type="file" id="file-json" accept=".json,application/json" hidden>
+<input type="file" id="file-replace" accept="image/*" hidden>
+
+<dialog id="dlg-export">
+  <div class="dh">Exportar imagen</div>
+  <div class="db">
+    <div class="prevbar"><span class="muted small">Vista previa: se actualiza con cada opción</span><button class="pbtn" id="ex-zoom">Ampliar</button></div>
+    <div id="ex-prevwrap"><canvas id="ex-prev" aria-label="Vista previa de la exportación" title="Clic para ampliar o reducir"></canvas></div>
+    <div class="g2">
+      <label class="f">Formato<select id="ex-fmt"><option value="png">PNG</option><option value="svg">SVG (vectorial)</option></select></label>
+      <label class="f">Resolución (px por cm)<input id="ex-pxcm" type="number" min="1" max="100" step="1"></label>
+      <label class="f">Margen (cm)<input id="ex-margin" type="number" min="0" step="5"></label>
+      <label class="f">Cotas de<select id="ex-scope"><option value="all">todas las obras</option><option value="sel">la selección</option></select></label>
+    </div>
+    <div class="presets"><span class="muted small">Preajustes:</span>
+      <button class="pbtn" data-preset="montaje" title="Todo lo necesario para colgar: cotas, fichas, eje y medidas">Plano de montaje</button>
+      <button class="pbtn" data-preset="presentacion" title="Obras, fichas y personas, sin cotas">Presentación</button>
+      <button class="pbtn" data-preset="tecnico" title="Cotas y referencias sin imágenes de las obras">Técnico</button>
+    </div>
+    <div class="exgrid">
+      <fieldset><legend>Cotas</legend>
+        <label class="c"><input type="checkbox" data-ex="muro"> Tamaño del muro</label>
+        <label class="c"><input type="checkbox" data-ex="dims"> Tamaño de las obras</label>
+        <label class="c"><input type="checkbox" data-ex="gaps"> Separaciones entre obras</label>
+        <label class="c"><input type="checkbox" data-ex="bordes"> Distancias a los bordes y al piso</label>
+        <label class="c"><input type="checkbox" data-ex="centro"> Altura del centro</label>
+        <label class="c"><input type="checkbox" data-ex="lineas"> Líneas de cota <span class="muted small">(sin ellas quedan solo los números)</span></label>
+        <label class="c"><input type="checkbox" data-ex="medidas"> Medidas hechas a mano</label>
+      </fieldset>
+      <fieldset><legend>Muro</legend>
+        <label class="c"><input type="checkbox" data-ex="imagenes"> Imágenes de las obras</label>
+        <label class="c"><input type="checkbox" data-ex="fichas"> Fichas <span class="muted small">(título, autor, año, técnica; se completan en Selección)</span></label>
+        <label class="c"><input type="checkbox" data-ex="vanos"> Vanos</label>
+        <label class="c"><input type="checkbox" data-ex="eje"> Eje visual</label>
+        <label class="c"><input type="checkbox" data-ex="guias"> Guías</label>
+        <label class="c"><input type="checkbox" data-ex="grid"> Cuadrícula</label>
+      </fieldset>
+      <fieldset><legend>Referencias</legend>
+        <label class="c"><input type="checkbox" data-ex="human"> Personas</label>
+        <label class="c"><input type="checkbox" data-ex="ojos"> Altura de ojos</label>
+        <label class="c"><input type="checkbox" data-ex="escala"> Escala gráfica</label>
+        <label class="c"><input type="checkbox" data-ex="rotulo"> Rótulo (título y medidas del muro)</label>
+      </fieldset>
+    </div>
+    <p class="out small" id="ex-info"></p>
+  </div>
+  <div class="df"><button class="pbtn" id="ex-cancel">Cancelar</button><button class="pbtn main" id="ex-go">Exportar</button></div>
+</dialog>
+
+<dialog id="dlg-calib">
+  <div class="dh">Calibrar el 100 %</div>
+  <div class="db">
+    <p style="margin:0">Apoya una tarjeta bancaria o un DNI (8,56 × 5,4 cm) sobre la pantalla y ajusta el control hasta que el recuadro tenga exactamente su tamaño.</p>
+    <div id="calib-box"></div>
+    <input type="range" id="calib-r" min="15" max="90" step="0.1" aria-label="Píxeles por centímetro">
+    <p class="out small muted" id="calib-v"></p>
+  </div>
+  <div class="df"><button class="pbtn" id="calib-reset">Valor por defecto</button><button class="pbtn" id="calib-cancel">Cancelar</button><button class="pbtn main" id="calib-ok">Guardar</button></div>
+</dialog>
+
+<dialog id="dlg-help">
+  <div class="dh">Atajos</div>
+  <div class="db">
+    <table class="keys">
+      <tr><td>V · H · M</td><td>Mover · Mano · Medir</td></tr>
+      <tr><td>Espacio + arrastrar</td><td>Desplazar la vista con cualquier herramienta</td></tr>
+      <tr><td>Rueda / dos dedos</td><td>Desplazar la vista</td></tr>
+      <tr><td>Ctrl/⌘ o Alt + rueda, pellizco</td><td>Zoom hacia el cursor</td></tr>
+      <tr><td>Shift 1 · Ctrl/⌘ 0</td><td>Encajar el muro</td></tr>
+      <tr><td>Shift 0</td><td>100 % (tamaño real)</td></tr>
+      <tr><td>Shift 2</td><td>Centrar la vista en la selección</td></tr>
+      <tr><td>Ctrl/⌘ + · −</td><td>Acercar · alejar</td></tr>
+      <tr><td>Clic · Shift clic</td><td>Seleccionar · añadir o quitar de la selección</td></tr>
+      <tr><td>Arrastrar en vacío</td><td>Selección por área</td></tr>
+      <tr><td>Alt + arrastrar</td><td>Duplicar y mover</td></tr>
+      <tr><td>Shift + arrastrar</td><td>Mover solo en horizontal o vertical</td></tr>
+      <tr><td>Ctrl/⌘ + arrastrar</td><td>Mover sin ajuste</td></tr>
+      <tr><td>Esquinas</td><td>Cambiar tamaño (Shift invierte la proporción fija)</td></tr>
+      <tr><td>Personas</td><td>Se arrastran a lo largo del piso; sus esquinas superiores cambian la estatura</td></tr>
+      <tr><td>Flechas</td><td>Mover 1 cm · Shift 10 cm · Alt 0,1 cm</td></tr>
+      <tr><td>Ctrl/⌘ D</td><td>Duplicar</td></tr>
+      <tr><td>Ctrl/⌘ A</td><td>Seleccionar todo</td></tr>
+      <tr><td>Supr / ⌫</td><td>Eliminar selección</td></tr>
+      <tr><td>Ctrl/⌘ ] · [</td><td>Subir · bajar un nivel (con Shift: al frente · al fondo)</td></tr>
+      <tr><td>Ctrl/⌘ Z · Shift Z</td><td>Deshacer · rehacer</td></tr>
+      <tr><td>Ctrl/⌘ S · O · E</td><td>Guardar · abrir · exportar</td></tr>
+      <tr><td>Esc</td><td>Cancelar medida o quitar selección</td></tr>
+      <tr><td>Reglas</td><td>Arrastra desde una regla para crear una guía; devuélvela a la regla para borrarla</td></tr>
+    </table>
+  </div>
+  <div class="df"><button class="pbtn main" id="help-ok">Cerrar</button></div>
+</dialog>
+
+<script>
+/* MuseoDraft · núcleo puro (sin DOM). Unidades: centímetros.
+   Origen: esquina superior izquierda del muro; y crece hacia abajo.
+   Las alturas "desde el piso" se derivan: piso = muro.h - y.
+   Se prueba en Node y se incrusta idéntico en el HTML. */
+const MD = (() => {
+'use strict';
+
+const EPS = 1e-6;
+const COL = {
+  ink: '#111111', line: '#d6d6d0', paste: '#efeeea', white: '#ffffff',
+  moss: '#8fa676', mossD: '#586a45', steel: '#4f6b82', orange: '#b06a36',
+  marco: '#2e2d29', pp: '#faf8f2', ph: '#e7e6e0', vano: '#eeede8', hatch: '#c9c7bf',
+};
+const FONT = 'ui-monospace, "Fira Code", "SF Mono", Menlo, Consolas, monospace';
+
+// ---------- utilidades ----------
+function fmt(v, d = 1) {
+  if (typeof v !== 'number' || !isFinite(v)) return '–';
+  const f = Math.pow(10, d);
+  let r = Math.round(v * f) / f;
+  if (Object.is(r, -0)) r = 0;
+  let s = r.toFixed(d);
+  if (d > 0) s = s.replace(/\.?0+$/, '');
+  return s;
+}
+let _n = 0;
+function uid(p) {
+  _n = (_n + 1) % 1e6;
+  return (p || 'x') + Date.now().toString(36) + _n.toString(36) + Math.floor(Math.random() * 1296).toString(36);
+}
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const num = (v, def) => { const n = +v; return isFinite(n) ? n : def; };
+
+// ---------- documento ----------
+function newDoc() {
+  return {
+    version: 2, titulo: 'Muro A',
+    wall: { w: 500, h: 300, color: '#ffffff', eje: 150 },
+    items: [makePersona({ nombre: 'Persona 170', h: 170, x: -75 }, 300)], images: {}, guides: { v: [], h: [] },
+    opts: {
+      cotas: 'sel', showEje: true, showHuman: true, showOjos: false, showFichas: false,
+      showGrid: false, grid: 10, showGuides: true, showMuro: false,
+      snapObj: true, snapGuides: true, snapGrid: false,
+      exp: defaultExp(),
+    },
+  };
+}
+// qué incluye la exportación (se guarda con el proyecto)
+function defaultExp() {
+  return {
+    fmt: 'png', pxcm: 10, margen: 40, scope: 'all',
+    imagenes: true, vanos: true, human: true, ojos: false, eje: true, grid: false, guias: false,
+    dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, muro: true,
+    fichas: false, escala: true, rotulo: true,
+  };
+}
+const EXP_PRESETS = {
+  montaje: { muro: true, imagenes: true, vanos: true, human: false, ojos: false, eje: true, grid: false, guias: false, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, fichas: true, escala: true, rotulo: true },
+  presentacion: { muro: false, imagenes: true, vanos: true, human: true, ojos: false, eje: false, grid: false, guias: false, dims: false, gaps: false, bordes: false, centro: false, lineas: false, medidas: false, fichas: true, escala: true, rotulo: true },
+  tecnico: { muro: true, imagenes: false, vanos: true, human: true, ojos: true, eje: true, grid: false, guias: true, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, fichas: false, escala: true, rotulo: true },
+};
+function makeObra(o) {
+  return Object.assign({
+    id: uid('o'), tipo: 'obra', nombre: 'Obra', x: 0, y: 0, w: 50, h: 70,
+    marco: 0, pp: 0, caida: 0, rot: 0, lock: true, bloqueado: false, oculto: false,
+    imgId: null, imgRatio: null,
+    ficha: { titulo: '', autor: '', anio: '', tecnica: '', inv: '' },
+  }, o);
+}
+function makeVano(o) {
+  return Object.assign({ id: uid('v'), tipo: 'vano', nombre: 'Vano', x: 0, y: 0, w: 90, h: 210, bloqueado: false, oculto: false }, o);
+}
+// persona de referencia: siempre apoyada en el piso; x = borde izquierdo, h = estatura (o altura total en silla)
+const FIG = { pie: { w: 0.29, ojos: 0.936 }, silla: { w: 0.585, ojos: 0.92 } };
+function personaW(h, figura) { return h * (FIG[figura] || FIG.pie).w; }
+function makePersona(o, wallH) {
+  const it = Object.assign({ id: uid('p'), tipo: 'persona', nombre: 'Persona', figura: 'pie', x: 0, y: 0, h: 170, w: 0, bloqueado: false, oculto: false }, o);
+  if (!FIG[it.figura]) it.figura = 'pie';
+  it.h = Math.max(30, Math.min(260, num(it.h, 170)));
+  it.w = personaW(it.h, it.figura);
+  it.y = num(wallH, 300) - it.h;
+  return it;
+}
+function groundPersonas(doc) {
+  for (const it of doc.items) if (it.tipo === 'persona') { it.w = personaW(it.h, it.figura); it.y = doc.wall.h - it.h; }
+}
+function ojos(it) { return it.h * (FIG[it.figura] || FIG.pie).ojos; }
+// cambia estatura, figura o posición (centro) sin despegarla del piso
+function setPersona(doc, it, campo, val) {
+  const cx = it.x + it.w / 2;
+  if (campo === 'h') it.h = Math.max(30, Math.min(260, num(val, it.h)));
+  else if (campo === 'figura') it.figura = FIG[val] ? val : 'pie';
+  else if (campo === 'cx') { it.x = num(val, cx) - it.w / 2; return; }
+  it.w = personaW(it.h, it.figura); it.y = doc.wall.h - it.h; it.x = cx - it.w / 2;
+}
+function makeMedida(o) {
+  return Object.assign({ id: uid('m'), tipo: 'medida', nombre: 'Medida', x1: 0, y1: 0, x2: 0, y2: 0, bloqueado: false, oculto: false }, o);
+}
+
+// ---------- geometría ----------
+function frameW(it) { return it.tipo === 'obra' ? Math.max(0, num(it.marco, 0)) + Math.max(0, num(it.pp, 0)) : 0; }
+function outer(it) {
+  if (it.tipo === 'medida') {
+    return { x: Math.min(it.x1, it.x2), y: Math.min(it.y1, it.y2), w: Math.abs(it.x2 - it.x1), h: Math.abs(it.y2 - it.y1) };
+  }
+  const f = frameW(it);
+  return { x: it.x, y: it.y, w: it.w + 2 * f, h: it.h + 2 * f };
+}
+function bbox(rects) {
+  if (!rects.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const r of rects) {
+    x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y);
+    x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h);
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+const wallRect = (doc) => ({ x: 0, y: 0, w: doc.wall.w, h: doc.wall.h });
+function normRect(a, b) { return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) }; }
+function intersects(a, b) { return a.x <= b.x + b.w && b.x <= a.x + a.w && a.y <= b.y + b.h && b.y <= a.y + a.h; }
+function distSeg(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+  let t = L ? ((px - x1) * dx + (py - y1) * dy) / L : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+function moveItem(it, dx, dy) {
+  if (it.tipo === 'medida') { it.x1 += dx; it.y1 += dy; it.x2 += dx; it.y2 += dy; }
+  else if (it.tipo === 'persona') it.x += dx; // no se despega del piso
+  else { it.x += dx; it.y += dy; }
+}
+function applyDeltas(doc, deltas) {
+  for (const it of doc.items) { const d = deltas[it.id]; if (d) moveItem(it, d.dx, d.dy); }
+}
+
+// ---------- lecturas museográficas ----------
+function info(doc, it) {
+  const o = outer(it), H = doc.wall.h;
+  return {
+    izq: o.x, der: doc.wall.w - (o.x + o.w),
+    inf: H - (o.y + o.h), centro: H - (o.y + o.h / 2), sup: H - o.y,
+    extW: o.w, extH: o.h,
+    clavo: it.tipo === 'obra' ? H - o.y - Math.max(0, num(it.caida, 0)) : null,
+    len: it.tipo === 'medida' ? Math.hypot(it.x2 - it.x1, it.y2 - it.y1) : null,
+    ojos: it.tipo === 'persona' ? ojos(it) : null, cx: o.x + o.w / 2,
+  };
+}
+// fija una lectura (en cm desde el piso o desde la izquierda) moviendo el elemento
+function setPos(doc, it, campo, val) {
+  const o = outer(it), H = doc.wall.h;
+  let nx = o.x, ny = o.y;
+  if (campo === 'izq') nx = val;
+  else if (campo === 'inf') ny = H - val - o.h;
+  else if (campo === 'centro') ny = H - val - o.h / 2;
+  else if (campo === 'sup') ny = H - val;
+  else if (campo === 'clavo') ny = H - val - Math.max(0, num(it.caida, 0));
+  moveItem(it, nx - o.x, ny - o.y);
+}
+// cambia ancho/alto de la obra (sin marco). Con lock, conserva la proporción actual.
+function setObraDim(it, campo, val) {
+  val = Math.max(0.1, num(val, 0.1));
+  if (it.tipo !== 'obra') { it[campo] = val; return; }
+  const r = it.w / it.h;
+  if (campo === 'w') { it.w = val; if (it.lock) it.h = val / r; }
+  else { it.h = val; if (it.lock) it.w = val * r; }
+}
+// cambia marco/paspartú creciendo hacia afuera (el centro de la obra no se mueve)
+function setFrame(it, campo, val) {
+  const before = frameW(it);
+  it[campo] = Math.max(0, num(val, 0));
+  const d = frameW(it) - before;
+  it.x -= d; it.y -= d;
+}
+function rotate90(it) {
+  if (it.tipo === 'medida') return;
+  const o = outer(it), cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+  const t = it.w; it.w = it.h; it.h = t;
+  if (it.tipo === 'obra') {
+    it.rot = (num(it.rot, 0) + 90) % 360;
+  }
+  const n = outer(it);
+  it.x += cx - (n.x + n.w / 2); it.y += cy - (n.y + n.h / 2);
+}
+// proporción visible de la imagen según su giro
+function imgAspect(it) {
+  if (!it.imgRatio) return null;
+  return (num(it.rot, 0) % 180) ? 1 / it.imgRatio : it.imgRatio;
+}
+
+// ---------- alinear / distribuir ----------
+function align(items, mode, ref) {
+  const out = {};
+  for (const it of items) {
+    const o = outer(it);
+    let x = o.x, y = o.y;
+    if (mode === 'left') x = ref.x;
+    else if (mode === 'hcenter') x = ref.x + ref.w / 2 - o.w / 2;
+    else if (mode === 'right') x = ref.x + ref.w - o.w;
+    else if (mode === 'top') y = ref.y;
+    else if (mode === 'vmiddle') y = ref.y + ref.h / 2 - o.h / 2;
+    else if (mode === 'bottom') y = ref.y + ref.h - o.h;
+    out[it.id] = { dx: x - o.x, dy: y - o.y };
+  }
+  return out;
+}
+// axis 'h' | 'v'. gap = null → espaciado igual entre extremos (≥3); número → separación fija (≥2)
+function distribute(items, axis, gap) {
+  const X = axis === 'h';
+  const list = items.map((it) => ({ it, o: outer(it) }))
+    .sort((a, b) => (X ? a.o.x - b.o.x : a.o.y - b.o.y) || (a.it.id < b.it.id ? -1 : 1));
+  const deltas = {};
+  const pos = (e) => (X ? e.o.x : e.o.y), size = (e) => (X ? e.o.w : e.o.h);
+  if (list.length < 2) return { deltas, gap: null };
+  let g = gap;
+  if (g == null) {
+    if (list.length < 3) return { deltas, gap: null };
+    const first = list[0], last = list[list.length - 1];
+    const span = pos(last) + size(last) - pos(first);
+    const tot = list.reduce((s, e) => s + size(e), 0);
+    g = (span - tot) / (list.length - 1);
+  }
+  let cur = pos(list[0]);
+  for (const e of list) {
+    const d = cur - pos(e);
+    deltas[e.it.id] = X ? { dx: d, dy: 0 } : { dx: 0, dy: d };
+    cur += size(e) + g;
+  }
+  return { deltas, gap: g };
+}
+// cada elemento con su centro sobre el eje visual
+function centerOnEye(doc, items) {
+  const yEye = doc.wall.h - doc.wall.eje, out = {};
+  for (const it of items) { const o = outer(it); out[it.id] = { dx: 0, dy: yEye - (o.y + o.h / 2) }; }
+  return out;
+}
+// el conjunto centrado horizontalmente en el muro (mueve el grupo en bloque)
+function centerGroupH(doc, items) {
+  const b = bbox(items.map(outer)), out = {};
+  if (!b) return out;
+  const dx = doc.wall.w / 2 - (b.x + b.w / 2);
+  for (const it of items) out[it.id] = { dx, dy: 0 };
+  return out;
+}
+
+// ---------- cotas ----------
+function overlap(a0, a1, b0, b1) { return Math.min(a1, b1) - Math.max(a0, b0); }
+function midOverlap(a0, a1, b0, b1) { return (Math.max(a0, b0) + Math.min(a1, b1)) / 2; }
+function neighbors(r, rects) {
+  let L = null, R = null, U = null, D = null;
+  for (const q of rects) {
+    if (overlap(r.y, r.y + r.h, q.y, q.y + q.h) > EPS) {
+      if (q.x + q.w <= r.x + EPS) { if (!L || q.x + q.w > L.x + L.w) L = q; }
+      else if (q.x >= r.x + r.w - EPS) { if (!R || q.x < R.x) R = q; }
+    }
+    if (overlap(r.x, r.x + r.w, q.x, q.x + q.w) > EPS) {
+      if (q.y + q.h <= r.y + EPS) { if (!U || q.y + q.h > U.y + U.h) U = q; }
+      else if (q.y >= r.y + r.h - EPS) { if (!D || q.y < D.y) D = q; }
+    }
+  }
+  return { L, R, U, D };
+}
+// tamaño: ancho arriba y alto al costado con más espacio libre (hasta la vecina o el borde del muro)
+function sizeCotas(r, nb, W, pad) {
+  const gapL = r.x - (nb.L ? nb.L.x + nb.L.w : 0), gapR = (nb.R ? nb.R.x : W) - (r.x + r.w);
+  const right = gapR >= gapL, hx = right ? r.x + r.w + pad : r.x - pad;
+  return [
+    { x1: r.x, y1: r.y - pad, x2: r.x + r.w, y2: r.y - pad, v: r.w, k: 'size' },
+    { x1: hx, y1: r.y, x2: hx, y2: r.y + r.h, v: r.h, k: 'size', out: right ? 1 : -1 },
+  ];
+}
+// cotas completas de un rectángulo (selección). pad en cm.
+function cotasFull(r, obst, wall, pad) {
+  const out = [], nb = neighbors(r, obst), W = wall.w, H = wall.h;
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const gapL = r.x - (nb.L ? nb.L.x + nb.L.w : 0), gapR = (nb.R ? nb.R.x : W) - (r.x + r.w);
+  const tight = Math.max(gapL, gapR) < 3 * pad; // vecinas muy cerca a ambos lados: la altura del centro va como rótulo
+  const cxl = gapR >= gapL ? r.x - pad : r.x + r.w + pad;
+  out.push(...sizeCotas(r, nb, W, pad));
+  { const a = nb.L ? nb.L.x + nb.L.w : 0, y = nb.L ? midOverlap(r.y, r.y + r.h, nb.L.y, nb.L.y + nb.L.h) : cy;
+    if (Math.abs(r.x - a) > EPS) out.push({ x1: a, y1: y, x2: r.x, y2: y, v: r.x - a, k: nb.L ? 'gap' : 'wall' }); }
+  { const b = nb.R ? nb.R.x : W, y = nb.R ? midOverlap(r.y, r.y + r.h, nb.R.y, nb.R.y + nb.R.h) : cy, d = b - (r.x + r.w);
+    if (Math.abs(d) > EPS) out.push({ x1: r.x + r.w, y1: y, x2: b, y2: y, v: d, k: nb.R ? 'gap' : 'wall' }); }
+  { const a = nb.U ? nb.U.y + nb.U.h : 0, x = nb.U ? midOverlap(r.x, r.x + r.w, nb.U.x, nb.U.x + nb.U.w) : cx;
+    if (Math.abs(r.y - a) > EPS) out.push({ x1: x, y1: a, x2: x, y2: r.y, v: r.y - a, k: nb.U ? 'gap' : 'wall' }); }
+  { const b = nb.D ? nb.D.y : H, x = nb.D ? midOverlap(r.x, r.x + r.w, nb.D.x, nb.D.x + nb.D.w) : cx, d = b - (r.y + r.h);
+    if (Math.abs(d) > EPS) out.push({ x1: x, y1: r.y + r.h, x2: x, y2: b, v: d, k: nb.D ? 'gap' : 'floor' }); }
+  const otherGap = gapR >= gapL ? gapL : gapR; // lado libre para la línea de altura del centro
+  if (tight || otherGap < 2.5 * pad) out.push({ x1: r.x + r.w / 2, y1: r.y + r.h, x2: r.x + r.w / 2, y2: r.y + r.h, v: H - cy, k: 'label', id: '__sel' });
+  else out.push({ x1: cxl, y1: cy, x2: cxl, y2: H, v: H - cy, k: 'center', side: gapR >= gapL ? 'left' : 'right' });
+  return out;
+}
+// cotas de cada obra para "todas": tamaño, separación a la derecha (o al muro), muro izq. si no hay vecino,
+// distancia al piso si no hay nada debajo, y altura del centro como rótulo
+function cotasRow(r, obst, wall, pad, id) {
+  const out = [], nb = neighbors(r, obst), W = wall.w, H = wall.h, cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  out.push(...sizeCotas(r, nb, W, pad));
+  { const b = nb.R ? nb.R.x : W, y = nb.R ? midOverlap(r.y, r.y + r.h, nb.R.y, nb.R.y + nb.R.h) : cy, d = b - (r.x + r.w);
+    if (Math.abs(d) > EPS) out.push({ x1: r.x + r.w, y1: y, x2: b, y2: y, v: d, k: nb.R ? 'gap' : 'wall' }); }
+  if (!nb.L && Math.abs(r.x) > EPS) out.push({ x1: 0, y1: cy, x2: r.x, y2: cy, v: r.x, k: 'wall' });
+  if (!nb.D) { const d = H - (r.y + r.h); if (d > EPS) out.push({ x1: cx + pad * 0.6, y1: r.y + r.h, x2: cx + pad * 0.6, y2: H, v: d, k: 'floor' }); }
+  out.push({ x1: cx, y1: r.y + r.h, x2: cx, y2: r.y + r.h, v: H - cy, k: 'label', id });
+  return out;
+}
+
+// ---------- ajuste (snap) ----------
+// contexto: rectángulos destino + líneas verticales (v) y horizontales (h) + paso de cuadrícula
+function snapContext(doc, exclude, o) {
+  const W = doc.wall.w, H = doc.wall.h, rects = [], v = [0, W / 2, W], h = [0, H];
+  if (doc.opts.showEje) h.push(H - doc.wall.eje);
+  if (o.obj) for (const it of doc.items) {
+    if (it.oculto || it.tipo === 'medida' || it.tipo === 'persona' || exclude.has(it.id)) continue;
+    rects.push(outer(it));
+  }
+  if (o.guides && doc.opts.showGuides) { v.push(...doc.guides.v); h.push(...doc.guides.h); }
+  return { rects, v, h, grid: o.grid ? Math.max(0.1, num(doc.opts.grid, 10)) : 0 };
+}
+function bestSnap(ms, ts, thr) {
+  let bd = Infinity;
+  for (const m of ms) for (const t of ts) { const d = t - m; if (Math.abs(d) <= thr && Math.abs(d) < Math.abs(bd) - EPS) bd = d; }
+  if (bd === Infinity) return null;
+  const lines = new Set();
+  for (const m of ms) for (const t of ts) if (Math.abs(t - m - bd) < 1e-4) lines.add(t);
+  return { d: bd, lines: [...lines] };
+}
+function gridNear(vals, g) { return g ? vals.map((m) => Math.round(m / g) * g) : []; }
+function targetsX(c) { const xs = c.v.slice(); for (const q of c.rects) xs.push(q.x, q.x + q.w / 2, q.x + q.w); return xs; }
+function targetsY(c) { const ys = c.h.slice(); for (const q of c.rects) ys.push(q.y, q.y + q.h / 2, q.y + q.h); return ys; }
+function snapRect(r, c, thr) {
+  const mx = [r.x, r.x + r.w / 2, r.x + r.w], my = [r.y, r.y + r.h / 2, r.y + r.h];
+  const bx = bestSnap(mx, targetsX(c).concat(gridNear([r.x, r.x + r.w], c.grid)), thr);
+  const by = bestSnap(my, targetsY(c).concat(gridNear([r.y, r.y + r.h], c.grid)), thr);
+  return { dx: bx ? bx.d : 0, dy: by ? by.d : 0, gx: bx ? bx.lines : [], gy: by ? by.lines : [] };
+}
+function snapPoint(p, c, thr) {
+  const bx = bestSnap([p.x], targetsX(c).concat(gridNear([p.x], c.grid)), thr);
+  const by = bestSnap([p.y], targetsY(c).concat(gridNear([p.y], c.grid)), thr);
+  return { x: p.x + (bx ? bx.d : 0), y: p.y + (by ? by.d : 0), gx: bx ? bx.lines : [], gy: by ? by.lines : [] };
+}
+
+// ---------- selección ----------
+function hitTest(doc, x, y, tol) {
+  for (let i = doc.items.length - 1; i >= 0; i--) {
+    const it = doc.items[i];
+    if (it.oculto || it.bloqueado || (it.tipo === 'persona' && doc.opts.showHuman === false)) continue;
+    if (it.tipo === 'medida') { if (distSeg(x, y, it.x1, it.y1, it.x2, it.y2) <= tol) return it; continue; }
+    const o = outer(it);
+    if (x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h) return it;
+  }
+  return null;
+}
+function idsInRect(doc, r) {
+  const out = [];
+  for (const it of doc.items) if (!it.oculto && !it.bloqueado && !(it.tipo === 'persona' && doc.opts.showHuman === false) && intersects(outer(it), r)) out.push(it.id);
+  return out;
+}
+// redimensión desde una esquina; keep = conservar proporción de la obra (sin marco); f = ancho de marco+paspartú
+function resizeRect(orig, corner, px, py, keep, f, min) {
+  const west = corner.indexOf('w') >= 0, north = corner.indexOf('n') >= 0;
+  const ax = west ? orig.x + orig.w : orig.x, ay = north ? orig.y + orig.h : orig.y;
+  const lo = 2 * f + (min || 1);
+  let w = Math.max(lo, west ? ax - px : px - ax), h = Math.max(lo, north ? ay - py : py - ay);
+  if (keep) {
+    const r = (orig.w - 2 * f) / (orig.h - 2 * f);
+    let iw = w - 2 * f, ih = h - 2 * f;
+    if (iw / ih > r) ih = iw / r; else iw = ih * r;
+    w = iw + 2 * f; h = ih + 2 * f;
+  }
+  return { x: west ? ax - w : ax, y: north ? ay - h : ay, w, h };
+}
+function reorder(items, sel, mode) {
+  const a = items.slice();
+  if (mode === 'front') return a.filter((i) => !sel.has(i.id)).concat(a.filter((i) => sel.has(i.id)));
+  if (mode === 'back') return a.filter((i) => sel.has(i.id)).concat(a.filter((i) => !sel.has(i.id)));
+  if (mode === 'up') { for (let i = a.length - 2; i >= 0; i--) if (sel.has(a[i].id) && !sel.has(a[i + 1].id)) { const t = a[i]; a[i] = a[i + 1]; a[i + 1] = t; } }
+  if (mode === 'down') { for (let i = 1; i < a.length; i++) if (sel.has(a[i].id) && !sel.has(a[i - 1].id)) { const t = a[i]; a[i] = a[i - 1]; a[i - 1] = t; } }
+  return a;
+}
+
+// ---------- historial y archivo ----------
+function snapshot(doc) { return JSON.stringify(Object.assign({}, doc, { images: undefined, opts: undefined })); }
+function restore(str, cur) { const d = JSON.parse(str); d.images = cur.images; d.opts = cur.opts; return d; }
+function serialize(doc) {
+  const used = {};
+  for (const it of doc.items) if (it.imgId && doc.images[it.imgId]) used[it.imgId] = doc.images[it.imgId];
+  return JSON.stringify(Object.assign({}, doc, { version: 2, images: used }));
+}
+function normalize(src) {
+  const d = newDoc();
+  d.titulo = typeof src.titulo === 'string' ? src.titulo : d.titulo;
+  const w = src.wall || {};
+  d.wall = { w: Math.max(1, num(w.w, 500)), h: Math.max(1, num(w.h, 300)), color: /^#[0-9a-f]{6}$/i.test(w.color) ? w.color : '#ffffff', eje: num(w.eje, 150) };
+  d.opts = Object.assign(d.opts, src.opts || {});
+  d.opts.exp = Object.assign(defaultExp(), (src.opts && src.opts.exp) || {});
+  const g = src.guides || {};
+  d.guides = { v: (g.v || []).map(Number).filter(isFinite), h: (g.h || []).map(Number).filter(isFinite) };
+  d.images = src.images && typeof src.images === 'object' ? src.images : {};
+  d.items = (src.items || []).map((it) => {
+    if (it.tipo === 'vano') return makeVano(it);
+    if (it.tipo === 'medida') return makeMedida(it);
+    if (it.tipo === 'persona') return makePersona(it, d.wall.h);
+    const o = makeObra(it); o.ficha = Object.assign(makeObra({}).ficha, it.ficha || {}); return o;
+  }).filter((it) => ['x', 'y', 'w', 'h'].every((k) => it.tipo === 'medida' || isFinite(it[k]))
+    && (it.tipo !== 'medida' || ['x1', 'y1', 'x2', 'y2'].every((k) => isFinite(it[k]))));
+  const so = src.opts || {};
+  if (!d.items.some((i) => i.tipo === 'persona') && so.humanH != null) { // proyecto de la fase 1: una sola figura en opciones
+    const h = num(so.humanH, 170);
+    d.items.unshift(makePersona({ nombre: 'Persona ' + fmt(h), h, x: num(so.humanX, -60) - personaW(h, 'pie') / 2 }, d.wall.h));
+  }
+  delete d.opts.humanH; delete d.opts.humanX;
+  groundPersonas(d);
+  return d;
+}
+// versión 1 (MuseoDraft/Konva): píxeles de escenario a 10 px/cm; muro arriba en y=50 px.
+// La x del muro dependía del ancho de la ventana y no se guardaba: se centra el conjunto.
+function migrateV1(s) {
+  const d = newDoc(), SC = num(s.scale, 10) || 10;
+  d.wall.w = Math.max(1, num(s.wall && s.wall.width, 500));
+  d.wall.h = Math.max(1, num(s.wall && s.wall.height, 300));
+  const items = Array.isArray(s.items) ? s.items : [], meas = Array.isArray(s.measurements) ? s.measurements : [];
+  let minx = Infinity, maxx = -Infinity;
+  for (const it of items) { minx = Math.min(minx, it.x); maxx = Math.max(maxx, it.x + num(it.realWidth, 0) * SC); }
+  for (const m of meas) { minx = Math.min(minx, m.x1, m.x2); maxx = Math.max(maxx, m.x1, m.x2); }
+  if (!isFinite(minx)) { minx = 0; maxx = 0; }
+  const x0 = (d.wall.w - (maxx - minx) / SC) / 2;
+  const toX = (px) => (px - minx) / SC + x0, toY = (py) => (py - 50) / SC;
+  for (const it of items) {
+    const imgId = it.src ? uid('i') : null;
+    if (imgId) d.images[imgId] = it.src;
+    const w = Math.max(0.1, num(it.realWidth, 50)), h = Math.max(0.1, num(it.realHeight, 50));
+    d.items.push(makeObra({ nombre: String(it.name || 'Obra'), x: toX(it.x), y: toY(it.y), w, h, imgId, imgRatio: num(it.ratio, w / h) }));
+  }
+  for (const m of meas) d.items.push(makeMedida({ x1: toX(m.x1), y1: toY(m.y1), x2: toX(m.x2), y2: toY(m.y2) }));
+  groundPersonas(d);
+  return d;
+}
+function parseProject(text) {
+  let s;
+  try { s = JSON.parse(text); } catch (e) { throw new Error('El archivo no es JSON válido.'); }
+  if (!s || typeof s !== 'object') throw new Error('El archivo no es un proyecto de MuseoDraft.');
+  if (s.version === 2 && s.wall && Array.isArray(s.items)) return { doc: normalize(s), migrated: false };
+  if (s.wall && s.wall.width != null && Array.isArray(s.items)) return { doc: migrateV1(s), migrated: true };
+  throw new Error('El archivo no es un proyecto de MuseoDraft.');
+}
+function csvCell(v) { const s = v == null ? '' : String(v); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function toCSV(doc) {
+  const head = ['orden', 'tipo', 'nombre', 'titulo', 'autor', 'anio', 'tecnica', 'inventario',
+    'ancho_obra_cm', 'alto_obra_cm', 'marco_cm', 'paspartu_cm', 'ancho_ext_cm', 'alto_ext_cm',
+    'desde_izquierda_cm', 'piso_a_borde_inf_cm', 'piso_a_centro_cm', 'piso_a_borde_sup_cm', 'caida_cm', 'altura_clavo_cm'];
+  const rows = [head];
+  const els = doc.items.filter((it) => it.tipo === 'obra' || it.tipo === 'vano').slice().sort((a, b) => outer(a).x - outer(b).x);
+  els.forEach((it, i) => {
+    const n = info(doc, it), f = it.ficha || {}, o = it.tipo === 'obra';
+    rows.push([i + 1, it.tipo, it.nombre, f.titulo, f.autor, f.anio, f.tecnica, f.inv,
+      fmt(it.w), fmt(it.h), o ? fmt(num(it.marco, 0)) : '', o ? fmt(num(it.pp, 0)) : '', fmt(n.extW), fmt(n.extH),
+      fmt(n.izq), fmt(n.inf), fmt(n.centro), fmt(n.sup), o ? fmt(num(it.caida, 0)) : '', o ? fmt(n.clavo) : '']);
+  });
+  return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
+}
+
+// ---------- exportación ----------
+const MAX_AREA = 16e6, MAX_SIDE = 16384; // bajo el límite de Safari (16 777 216 px)
+function exportBounds(doc, o) {
+  const rects = [wallRect(doc)], sh = o.show || {};
+  for (const it of doc.items) {
+    if (it.oculto) continue;
+    if (it.tipo === 'persona' && !o.human) continue;
+    if (it.tipo === 'vano' && sh.vanos === false) continue;
+    if (it.tipo === 'medida' && sh.medidas === false) continue;
+    rects.push(outer(it));
+  }
+  const b = bbox(rects), m = Math.max(0, num(o.margen, 40));
+  if (sh.muro) { const e = Math.max(12, b.w * 0.045); const L = Math.min(b.x, -e), T = Math.min(b.y, -e); b.w += b.x - L; b.h += b.y - T; b.x = L; b.y = T; }
+  const pie = (o.pie || o.escala || o.rotulo) ? Math.max(30, b.w * 0.08) : 0;
+  return { x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m + pie };
+}
+function maxPxCm(bounds) {
+  return Math.min(Math.sqrt(MAX_AREA / (bounds.w * bounds.h)), MAX_SIDE / bounds.w, MAX_SIDE / bounds.h);
+}
+function exportFrame(doc, o) {
+  const bounds = exportBounds(doc, o);
+  const s = Math.max(0.1, Math.min(num(o.pxcm, 10), maxPxCm(bounds)));
+  const W = Math.max(1, Math.round(bounds.w * s)), H = Math.max(1, Math.round(bounds.h * s));
+  return { bounds, s, W, H, view: { s, ox: -bounds.x * s, oy: -bounds.y * s }, u: Math.max(1, W / 1200), capped: s < num(o.pxcm, 10) - 1e-9 };
+}
+
+// ---------- pintores (misma escena para pantalla, PNG y SVG) ----------
+function canvasPainter(ctx, getImage) {
+  function st(o) {
+    ctx.setLineDash(o.dash || []);
+    if (o.lw) ctx.lineWidth = o.lw;
+    if (o.stroke) ctx.strokeStyle = o.stroke;
+    if (o.fill) ctx.fillStyle = o.fill;
+  }
+  return {
+    rect(x, y, w, h, o = {}) { st(o); if (o.fill) ctx.fillRect(x, y, w, h); if (o.stroke) ctx.strokeRect(x, y, w, h); },
+    line(x1, y1, x2, y2, o = {}) { st(o); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); },
+    poly(pts, o = {}) {
+      st(o); ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+      ctx.closePath(); if (o.fill) ctx.fill(); if (o.stroke) ctx.stroke();
+    },
+    circle(cx, cy, r, o = {}) { st(o); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); if (o.fill) ctx.fill(); if (o.stroke) ctx.stroke(); },
+    text(s, x, y, o = {}) {
+      ctx.save(); ctx.setLineDash([]);
+      const size = o.size || 11;
+      ctx.font = (o.weight || 400) + ' ' + size + 'px ' + FONT;
+      ctx.textAlign = o.align || 'left';
+      ctx.textBaseline = { top: 'top', middle: 'middle', bottom: 'bottom' }[o.base] || 'alphabetic';
+      if (o.rot) { ctx.translate(x, y); ctx.rotate(o.rot * Math.PI / 180); x = 0; y = 0; }
+      if (o.halo) { ctx.lineWidth = size * 0.4; ctx.strokeStyle = o.haloColor || '#fff'; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y); }
+      ctx.fillStyle = o.fill || COL.ink; ctx.fillText(s, x, y);
+      ctx.restore();
+    },
+    image(id, x, y, w, h, rot) {
+      const img = getImage(id); if (!img) return false;
+      const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h;
+      ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(r * Math.PI / 180);
+      ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh); ctx.restore();
+      return true;
+    },
+  };
+}
+function svgPainter(images) {
+  const parts = [];
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const n = (v) => Math.round(v * 100) / 100;
+  const sty = (o) => ' fill="' + (o.fill || 'none') + '"' + (o.stroke ? ' stroke="' + o.stroke + '" stroke-width="' + n(o.lw || 1) + '"' : '')
+    + (o.dash && o.dash.length ? ' stroke-dasharray="' + o.dash.map(n).join(' ') + '"' : '');
+  return {
+    rect(x, y, w, h, o = {}) { parts.push('<rect x="' + n(x) + '" y="' + n(y) + '" width="' + n(w) + '" height="' + n(h) + '"' + sty(o) + '/>'); },
+    line(x1, y1, x2, y2, o = {}) { parts.push('<line x1="' + n(x1) + '" y1="' + n(y1) + '" x2="' + n(x2) + '" y2="' + n(y2) + '"' + sty(Object.assign({}, o, { fill: null })) + '/>'); },
+    poly(pts, o = {}) { parts.push('<polygon points="' + pts.map((p) => n(p[0]) + ',' + n(p[1])).join(' ') + '"' + sty(o) + '/>'); },
+    circle(cx, cy, r, o = {}) { parts.push('<circle cx="' + n(cx) + '" cy="' + n(cy) + '" r="' + n(r) + '"' + sty(o) + '/>'); },
+    text(s, x, y, o = {}) {
+      const anchor = { left: 'start', center: 'middle', right: 'end' }[o.align] || 'start';
+      const dy = { top: '0.8em', middle: '0.35em', bottom: '-0.25em' }[o.base] || '0';
+      const size = o.size || 11;
+      const halo = o.halo ? ' stroke="' + (o.haloColor || '#fff') + '" stroke-width="' + n(size * 0.4) + '" stroke-linejoin="round" paint-order="stroke"' : '';
+      parts.push('<text x="' + n(x) + '" y="' + n(y) + '" dy="' + dy + '" font-family="' + esc(FONT) + '" font-size="' + n(size) + '" font-weight="' + (o.weight || 400)
+        + '" text-anchor="' + anchor + '" fill="' + (o.fill || COL.ink) + '"' + halo + (o.rot ? ' transform="rotate(' + o.rot + ' ' + n(x) + ' ' + n(y) + ')"' : '') + '>' + esc(s) + '</text>');
+    },
+    image(id, x, y, w, h, rot) {
+      const src = images[id]; if (!src) return false;
+      const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h, cx = x + w / 2, cy = y + h / 2;
+      parts.push('<image href="' + src + '" xlink:href="' + src + '" x="' + n(cx - sw / 2) + '" y="' + n(cy - sh / 2) + '" width="' + n(sw) + '" height="' + n(sh)
+        + '" preserveAspectRatio="none"' + (r ? ' transform="rotate(' + r + ' ' + n(cx) + ' ' + n(cy) + ')"' : '') + '/>');
+      return true;
+    },
+    toString(w, h, bg) {
+      return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + w + '" height="' + h
+        + '" viewBox="0 0 ' + w + ' ' + h + '">\n' + (bg ? '<rect width="' + w + '" height="' + h + '" fill="' + bg + '"/>\n' : '') + parts.join('\n') + '\n</svg>\n';
+    },
+  };
+}
+// rayado 45° dentro de un rectángulo (en px)
+function hatch(x, y, w, h, step) {
+  const segs = [];
+  for (let d = step; d < w + h; d += step) {
+    const p1 = d <= w ? [x + d, y] : [x + w, y + d - w];
+    const p2 = d <= h ? [x, y + d] : [x + d - h, y + h];
+    segs.push([p1[0], p1[1], p2[0], p2[1]]);
+  }
+  return segs;
+}
+function niceLen(maxCm) {
+  const c = [10, 20, 50, 100, 200, 500, 1000, 2000];
+  let best = c[0]; for (const v of c) if (v <= maxCm) best = v;
+  return best;
+}
+
+// o: { ui, sel:Set, handles, cotas:'none'|'sel'|'all', eje, human, grid, guides:{v,h}|null,
+//      snap:{gx,gy}|null, marquee, tempMed, floorRange:[x0,x1], vw, vh, pie, bounds }
+function drawScene(P, doc, v, o) {
+  const s = v.s, u = o.ui || 1;
+  const X = (x) => v.ox + x * s, Y = (y) => v.oy + y * s, L = (l) => l * s;
+  const W = doc.wall.w, H = doc.wall.h;
+  const sel = o.sel || new Set();
+  const show = Object.assign({ imagenes: true, vanos: true, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, muro: false, fichas: false }, o.show || {});
+  const KIND = { size: 'dims', gap: 'gaps', wall: 'bordes', floor: 'bordes', center: 'centro', label: 'centro', medida: 'medidas', muro: 'muro' };
+  const vis = doc.items.filter((it) => !it.oculto && (it.tipo !== 'vano' || show.vanos) && (it.tipo !== 'persona' || o.human));
+  const labeled = new Set();
+
+  // piso
+  const fr = o.floorRange || [-100, W + 100];
+  P.rect(X(fr[0]), Y(H), L(fr[1] - fr[0]), 10 * u, { fill: '#dcdad2' });
+  P.line(X(fr[0]), Y(H), X(fr[1]), Y(H), { stroke: COL.ink, lw: 1.5 * u });
+  // muro
+  P.rect(X(0), Y(0), L(W), L(H), { fill: doc.wall.color || '#fff', stroke: COL.ink, lw: u });
+  // cuadrícula
+  if (o.grid) {
+    const g = Math.max(0.1, num(doc.opts.grid, 10));
+    if (g * s >= 5) {
+      const gs = { stroke: 'rgba(17,17,17,0.08)', lw: u };
+      for (let x = g; x < W - EPS; x += g) P.line(X(x), Y(0), X(x), Y(H), gs);
+      for (let y = H - g; y > EPS; y -= g) P.line(X(0), Y(y), X(W), Y(y), gs);
+    }
+  }
+  // eje visual
+  if (o.eje) {
+    const ye = Y(H - doc.wall.eje);
+    P.line(X(0), ye, X(W), ye, { stroke: COL.mossD, lw: u, dash: [6 * u, 4 * u] });
+  }
+  // elementos
+  for (const it of vis) {
+    if (it.tipo === 'medida') continue;
+    if (it.tipo === 'persona') { drawPersona(it); continue; }
+    const r = outer(it), x = X(r.x), y = Y(r.y), w = L(r.w), h = L(r.h);
+    if (it.tipo === 'vano') {
+      P.rect(x, y, w, h, { fill: COL.vano });
+      for (const g of hatch(x, y, w, h, 9 * u)) P.line(g[0], g[1], g[2], g[3], { stroke: COL.hatch, lw: u });
+      P.rect(x, y, w, h, { stroke: '#8a8a84', lw: u, dash: [4 * u, 3 * u] });
+      if (w > 30 * u && h > 16 * u) P.text(it.nombre || 'Vano', x + w / 2, y + h / 2, { size: 10 * u, fill: '#55554f', align: 'center', base: 'middle', halo: true, haloColor: COL.vano });
+      continue;
+    }
+    const m = Math.max(0, num(it.marco, 0)), pp = Math.max(0, num(it.pp, 0));
+    if (m > 0) P.rect(x, y, w, h, { fill: COL.marco });
+    if (pp > 0) P.rect(X(r.x + m), Y(r.y + m), L(r.w - 2 * m), L(r.h - 2 * m), { fill: COL.pp });
+    const ix = X(it.x + m + pp), iy = Y(it.y + m + pp), iw = L(it.w), ih = L(it.h);
+    const drawn = it.imgId && show.imagenes ? P.image(it.imgId, ix, iy, iw, ih, it.rot) : false;
+    if (!drawn) {
+      P.rect(ix, iy, iw, ih, { fill: COL.ph });
+      P.line(ix, iy, ix + iw, iy + ih, { stroke: '#cfcdc5', lw: u });
+      P.line(ix + iw, iy, ix, iy + ih, { stroke: '#cfcdc5', lw: u });
+      if (iw > 40 * u && ih > 14 * u) P.text(it.nombre || 'Obra', ix + iw / 2, iy + ih / 2, { size: 10 * u, fill: '#55554f', align: 'center', base: 'middle', halo: true, haloColor: COL.ph });
+    }
+    P.rect(x, y, w, h, { stroke: 'rgba(17,17,17,0.55)', lw: u });
+  }
+  // encima de obras y vanos: rótulo del eje y medidas
+  if (o.eje) P.text('eje ' + fmt(doc.wall.eje), X(0) + 5 * u, Y(H - doc.wall.eje) - 3 * u, { size: 10 * u, fill: COL.mossD, base: 'bottom', halo: true });
+  if (show.medidas) for (const it of vis) if (it.tipo === 'medida') drawMedida(it, COL.orange);
+  // altura de ojos de las personas
+  if (o.ojos) for (const it of vis) {
+    if (it.tipo !== 'persona') continue;
+    const ye = Y(H - ojos(it)), xr = X(it.x + it.w);
+    P.line(X(it.x) - 3 * u, ye, xr + 10 * u, ye, { stroke: COL.steel, lw: u, dash: [2 * u, 2 * u] });
+    P.text('ojos ' + fmt(ojos(it)), xr + 12 * u, ye, { size: 9 * u, fill: COL.steel, base: 'middle', halo: true });
+  }
+  // cotas
+  const pad = (16 * u) / s;
+  const solid = vis.filter((it) => it.tipo === 'obra' || it.tipo === 'vano');
+  if (o.cotas === 'all') {
+    for (const it of solid) {
+      if (sel.has(it.id)) continue;
+      const r = outer(it), obst = solid.filter((q) => q !== it).map(outer);
+      for (const g of cotasRow(r, obst, doc.wall, pad, it.id)) drawDim(g, COL.steel);
+    }
+  }
+  if (o.cotas !== 'none' && sel.size) {
+    const ss = solid.filter((it) => sel.has(it.id));
+    if (ss.length) {
+      const r = bbox(ss.map(outer)), obst = solid.filter((q) => !sel.has(q.id)).map(outer);
+      for (const g of cotasFull(r, obst, doc.wall, pad)) drawDim(g, COL.steel);
+    }
+  }
+  // tamaño total del muro: ancho arriba, alto a la izquierda
+  if (show.muro) {
+    const pm = (26 * u) / s;
+    drawDim({ x1: 0, y1: -pm, x2: W, y2: -pm, v: W, k: 'muro' }, COL.ink);
+    drawDim({ x1: -pm, y1: 0, x2: -pm, y2: H, v: H, k: 'muro', out: -1 }, COL.ink);
+  }
+  // fichas bajo cada obra (desplazadas si ya hay rótulo de altura)
+  if (show.fichas) {
+    for (const it of vis) {
+      if (it.tipo !== 'obra') continue;
+      const f = it.ficha || {}, r = outer(it);
+      const lines = [f.titulo || '', [f.autor, f.anio].filter(Boolean).join(', '), f.tecnica || ''].filter(Boolean);
+      let y0 = Y(r.y + r.h) + 5 * u + (labeled.has(it.id) || (labeled.has('__sel') && sel.has(it.id)) ? 15 * u : 0);
+      if (!lines.length) continue;
+      // fondo tipo cédula (tipografía monoespaciada: ancho ≈ 0,6 em por carácter)
+      const bw = Math.max(...lines.map((t, i) => t.length * (i ? 9.5 : 10.5) * 0.61)) * u + 6 * u, bh = lines.length * 13 * u + 4 * u;
+      P.rect(X(r.x) - 3 * u, y0 - 2 * u, bw, bh, { fill: doc.wall.color || '#fff' });
+      lines.forEach((t, i) => P.text(t, X(r.x), y0 + i * 13 * u, { size: (i ? 9.5 : 10.5) * u, fill: i ? '#44443f' : COL.ink, weight: i ? 400 : 600, base: 'top' }));
+    }
+  }
+  // pie: escala gráfica y rótulo (exportación)
+  const escala = o.escala != null ? o.escala : o.pie, rotulo = o.rotulo != null ? o.rotulo : o.pie;
+  if ((escala || rotulo) && o.bounds) {
+    const b = o.bounds, yb = Y(b.y + b.h) - 22 * u;
+    if (escala) {
+    const len = niceLen(Math.min(W, b.w) * 0.3), segs = 4, sw = L(len) / segs, x0 = X(0);
+    for (let i = 0; i < segs; i++) P.rect(x0 + i * sw, yb, sw, 6 * u, { fill: i % 2 ? '#fff' : COL.ink, stroke: COL.ink, lw: u });
+    P.text('0', x0, yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
+    P.text(fmt(len / 2), x0 + L(len / 2), yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
+    P.text(fmt(len) + ' cm', x0 + L(len), yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
+    }
+    if (rotulo) {
+    const tit = (doc.titulo || 'Muro') + ' — ' + fmt(W) + ' × ' + fmt(H) + ' cm' + (o.eje ? ', eje visual ' + fmt(doc.wall.eje) + ' cm' : '');
+    P.text(tit, X(W), yb + 6 * u, { size: 11 * u, align: 'right', base: 'bottom', weight: 600 });
+    }
+  }
+  // guías del usuario
+  if (o.guides) {
+    const gs = { stroke: COL.moss, lw: u };
+    for (const g of o.guides.v) P.line(X(g), 0, X(g), o.vh, gs);
+    for (const g of o.guides.h) P.line(0, Y(g), o.vw, Y(g), gs);
+  }
+  // guías inteligentes
+  if (o.snap) {
+    const ss = { stroke: COL.orange, lw: 1, dash: [3, 3] };
+    for (const g of o.snap.gx) P.line(X(g), 0, X(g), o.vh, ss);
+    for (const g of o.snap.gy) P.line(0, Y(g), o.vw, Y(g), ss);
+  }
+  // selección
+  for (const it of vis) {
+    if (!sel.has(it.id)) continue;
+    if (it.tipo === 'medida') { drawMedida(it, COL.mossD, 2.5); continue; }
+    const r = outer(it);
+    P.rect(X(r.x) - 1, Y(r.y) - 1, L(r.w) + 2, L(r.h) + 2, { stroke: COL.mossD, lw: 2, dash: it.bloqueado ? [4, 3] : null });
+  }
+  if (o.handles && sel.size === 1) {
+    const it = vis.find((q) => sel.has(q.id));
+    if (it && it.tipo !== 'medida' && !it.bloqueado) {
+      const r = outer(it);
+      for (const c of corners(r)) if (it.tipo !== 'persona' || c[2][0] === 'n') P.rect(X(c[0]) - 4, Y(c[1]) - 4, 8, 8, { fill: '#fff', stroke: COL.mossD, lw: 1.5 });
+    }
+  }
+  if (o.marquee) {
+    const m = o.marquee;
+    P.rect(X(m.x), Y(m.y), L(m.w), L(m.h), { fill: 'rgba(88,106,69,0.08)', stroke: COL.mossD, lw: 1, dash: [3, 3] });
+  }
+  if (o.tempMed) drawMedida(o.tempMed, COL.orange, 1.5);
+
+  function drawPersona(it) {
+    const cx = it.x + it.w / 2, base = it.y + it.h, st = { fill: 'rgba(79,107,130,0.18)', stroke: COL.steel, lw: u };
+    if (it.figura === 'silla') { // silla de ruedas vista de perfil, normalizada a 130 de alto
+      const k = it.h / 130, Q = (x, y) => [X(cx + x * k), Y(base - y * k)];
+      P.circle(Q(-8, 30)[0], Q(-8, 30)[1], L(29 * k), { stroke: COL.steel, lw: 1.4 * u });
+      P.circle(Q(-8, 30)[0], Q(-8, 30)[1], L(3 * k), { fill: COL.steel });
+      P.circle(Q(28, 6)[0], Q(28, 6)[1], L(6 * k), { stroke: COL.steel, lw: 1.2 * u });
+      P.line(...Q(-26, 38), ...Q(24, 38), { stroke: COL.steel, lw: 1.4 * u });
+      P.line(...Q(-26, 38), ...Q(-30, 88), { stroke: COL.steel, lw: 1.4 * u });
+      P.line(...Q(-30, 88), ...Q(-38, 88), { stroke: COL.steel, lw: 1.4 * u });
+      P.line(...Q(24, 38), ...Q(28, 12), { stroke: COL.steel, lw: 1.2 * u });
+      P.poly([Q(-24, 104), Q(-6, 104), Q(-2, 50), Q(26, 50), Q(30, 44), Q(30, 16), Q(38, 14), Q(38, 9), Q(22, 9), Q(22, 40), Q(-24, 40)], st);
+      P.circle(Q(-14, 117)[0], Q(-14, 117)[1], L(12 * k), st);
+    } else {
+      const k = it.h / 170;
+      const pts = [[-10, 0], [-2, 0], [0, 78], [2, 0], [10, 0], [12, 90], [20, 96], [24, 140], [9, 144], [-9, 144], [-24, 140], [-20, 96], [-12, 90]]
+        .map((p) => [X(cx + p[0] * k), Y(base - p[1] * k)]);
+      P.poly(pts, st);
+      P.circle(X(cx), Y(base - 157 * k), L(12 * k), st);
+    }
+    P.text(fmt(it.h), X(cx), Y(it.y) - 4 * u, { size: 9 * u, fill: COL.steel, align: 'center', base: 'bottom', halo: true });
+  }
+  function drawMedida(m, col, lw) {
+    const len = Math.hypot(m.x2 - m.x1, m.y2 - m.y1);
+    drawDim({ x1: m.x1, y1: m.y1, x2: m.x2, y2: m.y2, v: len, k: 'medida' }, col, lw);
+  }
+  function drawDim(g, col, lwMul) {
+    if (KIND[g.k] && !show[KIND[g.k]]) return;
+    if (g.k === 'label' && g.id) labeled.add(g.id);
+    const lw = (lwMul || 1) * u;
+    const x1 = X(g.x1), y1 = Y(g.y1), x2 = X(g.x2), y2 = Y(g.y2);
+    if (g.k === 'label') { P.text('c ' + fmt(g.v), x1, y1 + 4 * u, { size: 10 * u, fill: col, align: 'center', base: 'top', halo: true }); return; }
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 2) return;
+    if (show.lineas || g.k === 'medida') {
+      P.line(x1, y1, x2, y2, { stroke: col, lw, dash: g.k === 'center' ? [2 * u, 3 * u] : null });
+      const nx = -(y2 - y1) / len, ny = (x2 - x1) / len, t = 4 * u;
+      P.line(x1 - nx * t, y1 - ny * t, x1 + nx * t, y1 + ny * t, { stroke: col, lw });
+      P.line(x2 - nx * t, y2 - ny * t, x2 + nx * t, y2 + ny * t, { stroke: col, lw });
+    }
+    const strong = g.k === 'medida' || g.k === 'muro';
+    const label = g.t || ((g.k === 'center' ? 'c ' : '') + fmt(g.v) + (strong ? ' cm' : ''));
+    const size = (strong ? 11 : 10) * u, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const txt = { size, fill: col, halo: true, weight: strong ? 600 : 400 };
+    if (g.k === 'center') P.text(label, g.side === 'right' ? x1 + 4 * u : x1 - 4 * u, y1 + 2 * u, Object.assign(txt, { align: g.side === 'right' ? 'left' : 'right', base: 'top' }));
+    else if (Math.abs(x2 - x1) >= Math.abs(y2 - y1)) P.text(label, mx, my - 3 * u, Object.assign(txt, { align: 'center', base: 'bottom' }));
+    else if (g.k === 'medida') P.text(label, mx + 5 * u, my, Object.assign(txt, { align: 'left', base: 'middle' }));
+    else { const out = g.out || 1; P.text(label, mx + out * 4 * u, my, Object.assign(txt, { align: 'center', base: out > 0 ? 'top' : 'bottom', rot: -90 })); }
+  }
+}
+function corners(r) { return [[r.x, r.y, 'nw'], [r.x + r.w, r.y, 'ne'], [r.x, r.y + r.h, 'sw'], [r.x + r.w, r.y + r.h, 'se']]; }
+
+return {
+  VERSION: 2, COL, FONT, EPS, fmt, uid, clone, num, defaultExp, EXP_PRESETS,
+  newDoc, makeObra, makeVano, makeMedida, makePersona, groundPersonas, setPersona, personaW, ojos,
+  frameW, outer, bbox, wallRect, normRect, intersects, distSeg, corners,
+  moveItem, applyDeltas, info, setPos, setObraDim, setFrame, rotate90, imgAspect,
+  align, distribute, centerOnEye, centerGroupH,
+  neighbors, cotasFull, cotasRow,
+  snapContext, snapRect, snapPoint,
+  hitTest, idsInRect, resizeRect, reorder,
+  snapshot, restore, serialize, normalize, migrateV1, parseProject, toCSV,
+  MAX_AREA, MAX_SIDE, exportBounds, maxPxCm, exportFrame,
+  canvasPainter, svgPainter, hatch, drawScene,
+};
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = MD;
+
+</script>
+<script>
+(() => {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d'), work = $('work');
+const RULER = 20;
+const fmt = MD.fmt;
+
+// ---------- estado ----------
+let doc = MD.newDoc();
+let view = { s: 1, ox: 0, oy: 0 };
+let sel = new Set();
+let tool = 'select', space = false;
+let drag = null, snapVis = null, marquee = null, tempMed = null, hover = null;
+let dirty = false;
+const imgCache = new Map();
+const pointers = new Map();
+const DEF_CALIB = 96 / 2.54;
+let calib = DEF_CALIB;
+try { const c = parseFloat(localStorage.getItem('museodraft.calib')); if (c > 5 && c < 200) calib = c; } catch (e) {}
+
+// ---------- historial ----------
+const hist = { undo: [], redo: [], last: MD.snapshot(doc) };
+let commitT = 0;
+function commit() {
+  clearTimeout(commitT); commitT = 0;
+  const s = MD.snapshot(doc);
+  if (s === hist.last) return;
+  hist.undo.push(hist.last); if (hist.undo.length > 200) hist.undo.shift();
+  hist.last = s; hist.redo = []; dirty = true; syncUndo();
+}
+function commitSoon() { clearTimeout(commitT); commitT = setTimeout(commit, 400); }
+function undo() {
+  if (commitT) commit();
+  if (!hist.undo.length) return;
+  hist.redo.push(hist.last); hist.last = hist.undo.pop();
+  doc = MD.restore(hist.last, doc); dirty = true; afterDocChange(); msg('Deshecho.');
+}
+function redo() {
+  if (!hist.redo.length) return;
+  hist.undo.push(hist.last); hist.last = hist.redo.pop();
+  doc = MD.restore(hist.last, doc); dirty = true; afterDocChange(); msg('Rehecho.');
+}
+function syncUndo() { $('b-undo').disabled = !hist.undo.length && !commitT; $('b-redo').disabled = !hist.redo.length; }
+function resetHistory() { hist.undo = []; hist.redo = []; hist.last = MD.snapshot(doc); syncUndo(); }
+
+// ---------- utilidades ----------
+const getItem = (id) => doc.items.find((i) => i.id === id);
+const selItems = () => doc.items.filter((i) => sel.has(i.id));
+const solidSel = () => selItems().filter((i) => (i.tipo === 'obra' || i.tipo === 'vano') && !i.bloqueado);
+const X = (x) => view.ox + x * view.s, Y = (y) => view.oy + y * view.s;
+const toCm = (px, py) => ({ x: (px - view.ox) / view.s, y: (py - view.oy) / view.s });
+function evPos(e) { const r = cv.getBoundingClientRect(); return { px: e.clientX - r.left, py: e.clientY - r.top }; }
+const clampS = (s) => Math.max(0.03, Math.min(400, s));
+let msgT = 0;
+function msg(t) { $('st-msg').textContent = t || ''; clearTimeout(msgT); if (t) msgT = setTimeout(() => { $('st-msg').textContent = ''; }, 6000); }
+function download(blob, name) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+const slug = (s) => (s || 'muro').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'muro';
+
+// ---------- imágenes ----------
+function getImage(id) {
+  if (!id) return null;
+  let e = imgCache.get(id);
+  if (!e) {
+    const src = doc.images[id]; if (!src) return null;
+    const img = new Image(); e = { img, ok: false, bad: false };
+    img.onload = () => { e.ok = true; requestRender(); };
+    img.onerror = () => { e.bad = true; };
+    img.src = src; imgCache.set(id, e);
+  }
+  return e.ok ? e.img : null;
+}
+function preloadImages() {
+  const ids = [...new Set(doc.items.filter((i) => i.imgId && !i.oculto).map((i) => i.imgId))];
+  return Promise.all(ids.map((id) => new Promise((res) => {
+    getImage(id); const e = imgCache.get(id);
+    if (!e || e.ok || e.bad) return res();
+    e.img.addEventListener('load', res, { once: true }); e.img.addEventListener('error', res, { once: true });
+  })));
+}
+function readImage(file, max) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) return rej(new Error('vacía'));
+      const k = Math.min(1, max / Math.max(w, h)), cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+      const g = c.getContext('2d'), alpha = /png|gif|webp|svg/.test(file.type);
+      if (!alpha) { g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch); }
+      g.drawImage(img, 0, 0, cw, ch);
+      try { res({ dataURL: c.toDataURL(alpha ? 'image/png' : 'image/jpeg', 0.9), w, h }); } catch (err) { rej(err); }
     };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('formato')); };
+    img.src = url;
+  });
+}
 
-    // --- 2. CONFIGURACIÓN DEL MOTOR GRÁFICO (KONVA) ---
-    const container = document.getElementById('canvasContainer');
-    const stage = new Konva.Stage({
-      container: 'canvasContainer',
-      width: container.offsetWidth,
-      height: container.offsetHeight,
-      draggable: true // El paneo del lienzo
-    });
+// ---------- vista ----------
+function workSize() { return { w: work.clientWidth, h: work.clientHeight }; }
+function fitRect(b) {
+  const { w, h } = workSize(), m = 44;
+  const aw = Math.max(40, w - RULER - 2 * m), ah = Math.max(40, h - RULER - 2 * m);
+  const s = clampS(Math.min(aw / b.w, ah / b.h));
+  view.s = s; view.ox = RULER + m + (aw - b.w * s) / 2 - b.x * s; view.oy = RULER + m + (ah - b.h * s) / 2 - b.y * s;
+  afterView();
+}
+function fitView() {
+  const rects = [MD.wallRect(doc)];
+  for (const it of doc.items) if (!it.oculto && (it.tipo !== 'persona' || doc.opts.showHuman)) rects.push(MD.outer(it));
+  const b = MD.bbox(rects); b.y -= 12; b.h += 22; // aire para rótulos y piso
+  fitRect(b);
+}
+function zoomAt(f, px, py) {
+  const ns = clampS(view.s * f); if (ns === view.s) return;
+  view.ox = px - (px - view.ox) * ns / view.s; view.oy = py - (py - view.oy) * ns / view.s; view.s = ns; afterView();
+}
+function zoomCenter(f) { const { w, h } = workSize(); zoomAt(f, (w + RULER) / 2, (h + RULER) / 2); }
+function zoomTo(s) { zoomCenter(clampS(s) / view.s); }
+function centerOn(b) {
+  const { w, h } = workSize();
+  view.ox = (w + RULER) / 2 - (b.x + b.w / 2) * view.s; view.oy = (h + RULER) / 2 - (b.y + b.h / 2) * view.s; afterView();
+}
+function centerView() {
+  const ss = selItems();
+  centerOn(ss.length ? MD.bbox(ss.map(MD.outer)) : MD.wallRect(doc));
+}
+function afterView() { $('zoomv').value = fmt(view.s / calib * 100, view.s / calib < 0.1 ? 1 : 0) + ' %'; requestRender(); }
 
-    // Separamos el fondo (muro) de los elementos interactivos
-    const bgLayer = new Konva.Layer();
-    const mainLayer = new Konva.Layer();
-    stage.add(bgLayer);
-    stage.add(mainLayer);
+// ---------- dibujo ----------
+let raf = 0;
+function requestRender() { if (!raf) raf = requestAnimationFrame(draw); }
+function draw() {
+  raf = 0;
+  const dpr = window.devicePixelRatio || 1, { w, h } = workSize();
+  const bw = Math.max(1, Math.round(w * dpr)), bh = Math.max(1, Math.round(h * dpr));
+  if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = MD.COL.paste; ctx.fillRect(0, 0, w, h);
+  const P = MD.canvasPainter(ctx, getImage);
+  MD.drawScene(P, doc, view, {
+    ui: 1, sel, handles: tool === 'select', cotas: doc.opts.cotas, eje: doc.opts.showEje, human: doc.opts.showHuman,
+    ojos: doc.opts.showOjos, show: { fichas: !!doc.opts.showFichas, muro: !!doc.opts.showMuro },
+    grid: doc.opts.showGrid, guides: doc.opts.showGuides ? doc.guides : null, snap: snapVis, marquee, tempMed,
+    floorRange: [(0 - view.ox) / view.s, (w - view.ox) / view.s], vw: w, vh: h,
+  });
+  drawRulers(w, h);
+  if (panelDirty) { panelDirty = false; renderPanel(); }
+  if (layersDirty) renderLayers();
+  $('empty').style.display = doc.items.some((i) => i.tipo !== 'persona') ? 'none' : '';
+}
+function niceStep(s) { for (const v of [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]) if (v * s >= 56) return v; return 10000; }
+function drawRulers(w, h) {
+  const s = view.s, H = doc.wall.h, step = niceStep(s);
+  const minor = step * s / 10 >= 5 ? step / 10 : step / 5 * s >= 5 ? step / 5 : step / 2;
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, RULER); ctx.fillRect(0, 0, RULER, h);
+  // extensión del muro en las reglas
+  ctx.fillStyle = 'rgba(143,166,118,0.22)';
+  ctx.fillRect(Math.max(RULER, X(0)), 0, Math.max(0, Math.min(w, X(doc.wall.w)) - Math.max(RULER, X(0))), RULER);
+  ctx.fillRect(0, Math.max(RULER, Y(0)), RULER, Math.max(0, Math.min(h, Y(H)) - Math.max(RULER, Y(0))));
+  ctx.strokeStyle = MD.COL.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, RULER + 0.5); ctx.lineTo(w, RULER + 0.5); ctx.moveTo(RULER + 0.5, 0); ctx.lineTo(RULER + 0.5, h); ctx.stroke();
+  ctx.font = '9px ' + MD.FONT; ctx.fillStyle = '#6b6b64'; ctx.strokeStyle = '#9a9a92';
+  // horizontal: cm desde la izquierda del muro
+  const x0 = (RULER - view.ox) / s, x1 = (w - view.ox) / s;
+  ctx.beginPath(); ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  for (let v = Math.floor(x0 / minor) * minor; v <= x1; v += minor) {
+    const px = Math.round(X(v)) + 0.5; if (px < RULER) continue;
+    const major = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+    ctx.moveTo(px, RULER); ctx.lineTo(px, major ? 4 : RULER - 5);
+    if (major) ctx.fillText(fmt(v), px + 2, 2);
+  }
+  ctx.stroke();
+  // vertical: altura desde el piso
+  const hA = H - (h - view.oy) / s, hB = H - (RULER - view.oy) / s;
+  ctx.beginPath();
+  for (let v = Math.floor(hA / minor) * minor; v <= hB; v += minor) {
+    const py = Math.round(Y(H - v)) + 0.5; if (py < RULER) continue;
+    const major = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+    ctx.moveTo(RULER, py); ctx.lineTo(major ? 4 : RULER - 5, py);
+    if (major) { ctx.save(); ctx.translate(2, py - 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = 'top'; ctx.fillText(fmt(v), 0, 0); ctx.restore(); }
+  }
+  ctx.stroke();
+  // cursor
+  if (hover) {
+    ctx.strokeStyle = MD.COL.orange; ctx.beginPath();
+    const hx = Math.round(X(hover.x)) + 0.5, hy = Math.round(Y(hover.y)) + 0.5;
+    if (hx > RULER) { ctx.moveTo(hx, 0); ctx.lineTo(hx, RULER); }
+    if (hy > RULER) { ctx.moveTo(0, hy); ctx.lineTo(RULER, hy); }
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, RULER, RULER);
+  ctx.fillStyle = '#6b6b64'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('cm', RULER / 2, RULER / 2);
+}
 
-    // Zoom
-    stage.on('wheel', (e) => {
-      e.evt.preventDefault();
-      const scaleBy = 1.1;
-      const oldScale = stage.scaleX();
-      const pointer = stage.getPointerPosition();
-      const mousePointTo = {
-        x: (pointer.x - stage.x()) / oldScale,
-        y: (pointer.y - stage.y()) / oldScale,
-      };
-      const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
-      stage.scale({ x: newScale, y: newScale });
-      stage.position({
-        x: pointer.x - mousePointTo.x * newScale,
-        y: pointer.y - mousePointTo.y * newScale,
-      });
-    });
+// ---------- detección ----------
+function handleAt(px, py) {
+  if (tool !== 'select' || sel.size !== 1) return null;
+  const it = getItem([...sel][0]);
+  if (!it || it.tipo === 'medida' || it.bloqueado || it.oculto) return null;
+  for (const c of MD.corners(MD.outer(it))) if ((it.tipo !== 'persona' || c[2][0] === 'n') && Math.abs(X(c[0]) - px) <= 7 && Math.abs(Y(c[1]) - py) <= 7) return { id: it.id, corner: c[2] };
+  return null;
+}
+function guideAt(px, py) {
+  if (!doc.opts.showGuides || px < RULER || py < RULER) return null;
+  for (let i = doc.guides.v.length - 1; i >= 0; i--) if (Math.abs(X(doc.guides.v[i]) - px) <= 4) return { axis: 'v', idx: i };
+  for (let i = doc.guides.h.length - 1; i >= 0; i--) if (Math.abs(Y(doc.guides.h[i]) - py) <= 4) return { axis: 'h', idx: i };
+  return null;
+}
+function snapCtx(exclude) {
+  return MD.snapContext(doc, exclude || new Set(), { obj: doc.opts.snapObj, guides: doc.opts.snapGuides, grid: doc.opts.snapGrid });
+}
+function updateCursor(px, py) {
+  let c = 'default';
+  if (drag && drag.kind === 'pan') c = 'grabbing';
+  else if (space || tool === 'hand') c = 'grab';
+  else if (px < RULER || py < RULER) c = px < RULER && py < RULER ? 'default' : (py < RULER ? 'row-resize' : 'col-resize');
+  else if (tool === 'measure') c = 'crosshair';
+  else if (px != null) {
+    const hd = handleAt(px, py);
+    if (hd) c = (hd.corner === 'nw' || hd.corner === 'se') ? 'nwse-resize' : 'nesw-resize';
+    else { const g = guideAt(px, py); if (g) c = g.axis === 'v' ? 'col-resize' : 'row-resize';
+      else { const p = toCm(px, py); if (MD.hitTest(doc, p.x, p.y, 6 / view.s)) c = 'move'; } }
+  }
+  cv.style.cursor = c;
+}
+let lastPx = null, lastPy = null;
 
-    // Clics en el lienzo (Deselección y Medición)
-    stage.on('mousedown touchstart', (e) => {
-      if (STATE.mode === 'measure') {
-        STATE.isDrawing = true;
-        const pos = getRelativePointerPosition();
-        STATE.currentLine = { x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
-        renderCurrentLine();
-      } else {
-        // En modo mover, si hacemos clic en el escenario (o en el muro), deseleccionamos
-        if (e.target === stage || e.target.name() === 'wallRect' || e.target.name() === 'wallLabel') {
-          STATE.selectedId = null;
-          STATE.selectedType = null;
-          updateSelectionVisually();
-          renderSidebar();
-        }
+// ---------- interacción con puntero ----------
+cv.addEventListener('pointerdown', (e) => {
+  cv.focus({ preventScroll: true });
+  const { px, py } = evPos(e);
+  pointers.set(e.pointerId, { px, py });
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  if (pointers.size === 2) {
+    if (drag && drag.kind !== 'pinch') endDrag(e);
+    const [a, b] = [...pointers.values()];
+    drag = { kind: 'pinch', d0: Math.hypot(b.px - a.px, b.py - a.py) || 1, s0: view.s, m0: { px: (a.px + b.px) / 2, py: (a.py + b.py) / 2 }, ox0: view.ox, oy0: view.oy };
+    tempMed = null; marquee = null; return;
+  }
+  if (pointers.size > 2 || drag) return;
+  const p = toCm(px, py);
+  if (e.button === 1 || tool === 'hand' || space) {
+    drag = { kind: 'pan', px0: px, py0: py, ox0: view.ox, oy0: view.oy }; updateCursor(px, py); e.preventDefault(); return;
+  }
+  if (e.button !== 0) return;
+  if (px < RULER || py < RULER) {
+    if (px < RULER && py < RULER) return;
+    const axis = py < RULER ? 'h' : 'v';
+    doc.guides[axis].push(axis === 'h' ? p.y : p.x);
+    if (!doc.opts.showGuides) { doc.opts.showGuides = true; syncOpts(); }
+    drag = { kind: 'guide', axis, idx: doc.guides[axis].length - 1, remove: true };
+    return;
+  }
+  if (tool === 'measure') {
+    const q = e.ctrlKey || e.metaKey ? p : MD.snapPoint(p, snapCtx(), 7 / view.s);
+    tempMed = { x1: q.x, y1: q.y, x2: q.x, y2: q.y }; drag = { kind: 'measure' }; requestRender(); return;
+  }
+  const hd = handleAt(px, py);
+  if (hd) { const it = getItem(hd.id); drag = { kind: 'resize', id: it.id, corner: hd.corner, orig: MD.outer(it) }; return; }
+  const gh = guideAt(px, py);
+  if (gh) { drag = { kind: 'guide', axis: gh.axis, idx: gh.idx, remove: false }; return; }
+  const hit = MD.hitTest(doc, p.x, p.y, 6 / view.s);
+  if (hit) {
+    if (e.shiftKey && sel.has(hit.id)) { sel.delete(hit.id); selChanged(); return; }
+    if (e.shiftKey) sel.add(hit.id);
+    else if (!sel.has(hit.id)) sel = new Set([hit.id]);
+    if (e.altKey) { sel = new Set(duplicate([...sel], 0, 0)); }
+    const movable = selItems().filter((i) => !i.bloqueado);
+    drag = { kind: 'move', p0: p, orig: new Map(movable.map((i) => [i.id, MD.clone(i)])), moved: false, dup: e.altKey };
+    selChanged(); return;
+  }
+  if (!e.shiftKey) sel.clear();
+  drag = { kind: 'marquee', p0: p, base: new Set(sel) }; marquee = { x: p.x, y: p.y, w: 0, h: 0 };
+  selChanged();
+});
+
+cv.addEventListener('pointermove', (e) => {
+  const { px, py } = evPos(e);
+  lastPx = px; lastPy = py;
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { px, py });
+  const p = toCm(px, py);
+  hover = p; showPos(p);
+  if (!drag) { updateCursor(px, py); requestRender(); return; }
+  const noSnap = e.ctrlKey || e.metaKey;
+  switch (drag.kind) {
+    case 'pinch': {
+      if (pointers.size < 2) return;
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(b.px - a.px, b.py - a.py) || 1, m = { px: (a.px + b.px) / 2, py: (a.py + b.py) / 2 };
+      const ns = clampS(drag.s0 * d / drag.d0);
+      const cx = (drag.m0.px - drag.ox0) / drag.s0, cy = (drag.m0.py - drag.oy0) / drag.s0;
+      view.s = ns; view.ox = m.px - cx * ns; view.oy = m.py - cy * ns; afterView(); break;
+    }
+    case 'pan': view.ox = drag.ox0 + px - drag.px0; view.oy = drag.oy0 + py - drag.py0; afterView(); break;
+    case 'guide': {
+      let v = drag.axis === 'h' ? p.y : p.x;
+      if (!noSnap) {
+        const c = snapCtx(), q = MD.snapPoint(p, { rects: c.rects, v: c.v, h: c.h, grid: c.grid }, 6 / view.s);
+        v = drag.axis === 'h' ? q.y : q.x;
       }
-    });
-
-    stage.on('mousemove touchmove', () => {
-      if (STATE.mode === 'measure' && STATE.isDrawing) {
-        const pos = getRelativePointerPosition();
-        STATE.currentLine.x2 = pos.x;
-        STATE.currentLine.y2 = pos.y;
-        renderCurrentLine();
+      doc.guides[drag.axis][drag.idx] = v;
+      drag.remove = drag.axis === 'h' ? py < RULER : px < RULER;
+      showPos(p, (drag.axis === 'h' ? 'guía a ' + fmt(doc.wall.h - v) + ' del piso' : 'guía a ' + fmt(v) + ' de la izquierda'));
+      requestRender(); break;
+    }
+    case 'measure': {
+      let q = noSnap ? p : MD.snapPoint(p, snapCtx(), 7 / view.s);
+      if (e.shiftKey) { if (Math.abs(q.x - tempMed.x1) >= Math.abs(q.y - tempMed.y1)) q = { x: q.x, y: tempMed.y1 }; else q = { x: tempMed.x1, y: q.y }; }
+      tempMed.x2 = q.x; tempMed.y2 = q.y;
+      snapVis = q.gx ? { gx: q.gx, gy: q.gy } : null;
+      showPos(p, 'medida ' + fmt(Math.hypot(tempMed.x2 - tempMed.x1, tempMed.y2 - tempMed.y1)) + ' cm');
+      requestRender(); break;
+    }
+    case 'resize': {
+      const it = getItem(drag.id); if (!it) return;
+      let q = p; snapVis = null;
+      if (!noSnap) { q = MD.snapPoint(p, snapCtx(new Set([it.id])), 7 / view.s); snapVis = { gx: [], gy: q.gy }; }
+      if (it.tipo === 'persona') {
+        MD.setPersona(doc, it, 'h', Math.round((doc.wall.h - q.y) * 10) / 10);
+        showPos(p, 'estatura ' + fmt(it.h) + ' cm, ojos a ' + fmt(MD.ojos(it))); panelDirty = true; requestRender(); break;
       }
-    });
-
-    stage.on('mouseup touchend', () => {
-      if (STATE.mode === 'measure' && STATE.isDrawing) {
-        STATE.isDrawing = false;
-        
-        const dx = STATE.currentLine.x2 - STATE.currentLine.x1;
-        const dy = STATE.currentLine.y2 - STATE.currentLine.y1;
-        const pxLength = Math.sqrt(dx * dx + dy * dy);
-        const cmLength = pxLength / STATE.scale;
-
-        if (cmLength > 1) { // Ignorar clics accidentales sin recorrido
-            const newMeasurement = {
-                id: 'm_' + Date.now(),
-                x1: STATE.currentLine.x1,
-                y1: STATE.currentLine.y1,
-                x2: STATE.currentLine.x2,
-                y2: STATE.currentLine.y2,
-                lengthCm: cmLength
-            };
-            STATE.measurements.push(newMeasurement);
-            drawMeasurementLine(newMeasurement);
-        }
-        
-        // Limpiar la línea temporal
-        const tempNode = mainLayer.findOne('#tempLine');
-        if (tempNode) tempNode.destroy();
-        STATE.currentLine = null;
-        
-        setMode('move'); // Volver a modo mover automáticamente
+      if (!noSnap) snapVis.gx = q.gx;
+      const f = MD.frameW(it), keep = (it.tipo === 'obra' ? !!it.lock : false) !== e.shiftKey;
+      const r = MD.resizeRect(drag.orig, drag.corner, q.x, q.y, keep, f, 1);
+      it.x = r.x; it.y = r.y; it.w = r.w - 2 * f; it.h = r.h - 2 * f;
+      showPos(p, fmt(it.w) + ' × ' + fmt(it.h) + ' cm'); panelDirty = true; requestRender(); break;
+    }
+    case 'move': {
+      let dx = p.x - drag.p0.x, dy = p.y - drag.p0.y;
+      if (!drag.moved && Math.hypot(dx, dy) * view.s < 3) return;
+      drag.moved = true;
+      const axis = e.shiftKey ? (Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v') : null;
+      if (axis === 'h') dy = 0; else if (axis === 'v') dx = 0;
+      snapVis = null;
+      const origs = [...drag.orig.values()];
+      if (!noSnap && origs.length) {
+        const rb = MD.bbox(origs.map(MD.outer));
+        const sn = MD.snapRect({ x: rb.x + dx, y: rb.y + dy, w: rb.w, h: rb.h }, snapCtx(new Set(drag.orig.keys())), 7 / view.s);
+        if (axis !== 'v') dx += sn.dx;
+        if (axis !== 'h') dy += sn.dy;
+        snapVis = { gx: axis === 'v' ? [] : sn.gx, gy: axis === 'h' ? [] : sn.gy };
       }
-    });
-
-    function getRelativePointerPosition() {
-      const transform = stage.getAbsoluteTransform().copy();
-      transform.invert();
-      return transform.point(stage.getPointerPosition());
-    }
-
-    // --- 3. GESTIÓN DEL RENDERIZADO (MUTACIÓN, NO DESTRUCCIÓN) ---
-
-    // Dibuja o actualiza el muro
-    function updateWall() {
-      let wallGroup = bgLayer.findOne('#wallGroup');
-      const w = STATE.wall.width * STATE.scale;
-      const h = STATE.wall.height * STATE.scale;
-      const x = stage.width() / 2 - w / 2;
-      const y = 50;
-
-      if (!wallGroup) {
-        wallGroup = new Konva.Group({ id: 'wallGroup', x, y });
-        wallGroup.add(new Konva.Rect({
-          id: 'wallRect', name: 'wallRect',
-          fill: '#ffffff', shadowColor: 'black', shadowBlur: 10, shadowOpacity: 0.1
-        }));
-        wallGroup.add(new Konva.Text({
-          id: 'wallLabel', name: 'wallLabel',
-          x: 10, y: -25, fontSize: 16, fill: '#666'
-        }));
-        bgLayer.add(wallGroup);
+      for (const [id, o] of drag.orig) {
+        const it = getItem(id); if (!it) continue;
+        if (it.tipo === 'medida') { it.x1 = o.x1; it.y1 = o.y1; it.x2 = o.x2; it.y2 = o.y2; } else { it.x = o.x; it.y = o.y; }
+        MD.moveItem(it, dx, dy);
       }
-
-      wallGroup.position({ x, y });
-      wallGroup.findOne('#wallRect').size({ width: w, height: h });
-      wallGroup.findOne('#wallLabel').text(`Muro Base: ${STATE.wall.width}cm x ${STATE.wall.height}cm`);
-      bgLayer.batchDraw();
-    }
-
-    // Crea un nodo de imagen por primera vez y lo añade al lienzo
-    function renderNewImage(item) {
-      const pWidth = item.realWidth * STATE.scale;
-      const pHeight = item.realHeight * STATE.scale;
-
-      const group = new Konva.Group({
-        id: item.id,
-        name: 'artworkGroup',
-        x: item.x,
-        y: item.y,
-        draggable: STATE.mode === 'move'
-      });
-
-      // ARQUITECTURA CLAVE: Bloqueamos el burbujeo para que el lienzo no se arrastre
-      group.on('mousedown touchstart', (e) => {
-        if (STATE.mode === 'move') {
-          e.cancelBubble = true; // <-- ESTO SOLUCIONA TU PROBLEMA DE ARRASTRE
-          STATE.selectedId = item.id;
-          STATE.selectedType = 'image';
-          updateSelectionVisually();
-          renderSidebar();
-        }
-      });
-
-      group.on('dragend', (e) => {
-        item.x = e.target.x();
-        item.y = e.target.y();
-      });
-
-      const konvaImg = new Konva.Image({
-        name: 'coreImage',
-        width: pWidth, height: pHeight,
-        stroke: '#ccc', strokeWidth: 1,
-        shadowColor: 'black', shadowBlur: 5, shadowOpacity: 0.3, shadowOffset: { x: 2, y: 2 }
-      });
-      group.add(konvaImg);
-
-      // Cargar imagen de forma asíncrona pero sin re-renderizar todo
-      const imageObj = new window.Image();
-      imageObj.onload = () => {
-        konvaImg.image(imageObj);
-        mainLayer.batchDraw();
-      };
-      imageObj.src = item.src;
-
-      mainLayer.add(group);
-      
-      // Dibujar cotas iniciales
-      updateArtworkDimensionsVisuals(item.id);
-    }
-
-    // Actualiza las cotas (líneas y texto) y el tamaño de un grupo existente
-    function updateArtworkDimensionsVisuals(id) {
-      const item = STATE.items.find(i => i.id === id);
-      const group = mainLayer.findOne(`#${id}`);
-      if (!item || !group) return;
-
-      const pWidth = item.realWidth * STATE.scale;
-      const pHeight = item.realHeight * STATE.scale;
-
-      // Actualizar imagen principal
-      const konvaImg = group.findOne('.coreImage');
-      konvaImg.size({ width: pWidth, height: pHeight });
-
-      // Limpiar cotas viejas
-      const oldLines = group.find('.dimensionLine');
-      oldLines.forEach(l => l.destroy());
-
-      // Dibujar cotas nuevas
-      const offset = 20; 
-      const lineProps = { stroke: '#94a3b8', strokeWidth: 1, name: 'dimensionLine' };
-      const textProps = { fill: '#64748b', fontSize: 12, fontFamily: 'sans-serif', align: 'center', name: 'dimensionLine' };
-
-      // Superior
-      group.add(new Konva.Line({ points: [0, -offset, pWidth, -offset], ...lineProps })); 
-      group.add(new Konva.Line({ points: [0, -offset-5, 0, -offset+5], ...lineProps })); 
-      group.add(new Konva.Line({ points: [pWidth, -offset-5, pWidth, -offset+5], ...lineProps })); 
-      group.add(new Konva.Text({ x: 0, y: -offset - 16, width: pWidth, text: `${item.realWidth.toFixed(1)}`, ...textProps }));
-      // Lateral
-      group.add(new Konva.Line({ points: [pWidth + offset, 0, pWidth + offset, pHeight], ...lineProps })); 
-      group.add(new Konva.Line({ points: [pWidth + offset - 5, 0, pWidth + offset + 5, 0], ...lineProps })); 
-      group.add(new Konva.Line({ points: [pWidth + offset - 5, pHeight, pWidth + offset + 5, pHeight], ...lineProps })); 
-      group.add(new Konva.Text({ x: pWidth + offset + 8, y: (pHeight / 2) - 6, text: `${item.realHeight.toFixed(1)}`, ...textProps }));
-
-      mainLayer.batchDraw();
-    }
-
-    // Dibuja una línea de medición manual (fija o temporal)
-    function drawMeasurementLine(m, isTemp = false) {
-      const isSelected = STATE.selectedId === m.id && !isTemp;
-      const color = isTemp ? '#f59e0b' : (isSelected ? '#2563eb' : '#e11d48');
-      
-      let group = mainLayer.findOne(`#${isTemp ? 'tempLine' : m.id}`);
-      if (group) group.destroy(); // Si ya existe la recreamos (barato para líneas simples)
-
-      group = new Konva.Group({
-          id: isTemp ? 'tempLine' : m.id,
-          name: isTemp ? 'tempLineGroup' : 'measurementGroup',
-          draggable: STATE.mode === 'move' && !isTemp
-      });
-
-      if (!isTemp) {
-        group.on('mousedown touchstart', (e) => {
-            if (STATE.mode === 'move') {
-                e.cancelBubble = true;
-                STATE.selectedId = m.id;
-                STATE.selectedType = 'measurement';
-                updateSelectionVisually();
-                renderSidebar();
-            }
-        });
-        group.on('dragend', (e) => {
-            m.x1 += e.target.x();
-            m.y1 += e.target.y();
-            m.x2 += e.target.x();
-            m.y2 += e.target.y();
-            e.target.position({x: 0, y: 0});
-            drawMeasurementLine(m); // Redibujar en nueva pos absoluta
-        });
+      if (origs.length === 1 && origs[0].tipo !== 'medida') {
+        const n = MD.info(doc, getItem(origs[0].id));
+        showPos(p, 'izq ' + fmt(n.izq) + ', piso a centro ' + fmt(n.centro));
       }
-
-      group.add(new Konva.Line({ points: [m.x1, m.y1, m.x2, m.y2], stroke: color, strokeWidth: 2, hitStrokeWidth: 10 }));
-
-      // Topes
-      const angle = Math.atan2(m.y2 - m.y1, m.x2 - m.x1);
-      const pAngle = angle + (Math.PI / 2);
-      const cap = 5;
-      group.add(new Konva.Line({ points: [m.x1 + Math.cos(pAngle)*cap, m.y1 + Math.sin(pAngle)*cap, m.x1 - Math.cos(pAngle)*cap, m.y1 - Math.sin(pAngle)*cap], stroke: color, strokeWidth: 2 }));
-      group.add(new Konva.Line({ points: [m.x2 + Math.cos(pAngle)*cap, m.y2 + Math.sin(pAngle)*cap, m.x2 - Math.cos(pAngle)*cap, m.y2 - Math.sin(pAngle)*cap], stroke: color, strokeWidth: 2 }));
-
-      // Texto
-      let deg = angle * (180 / Math.PI);
-      if (deg > 90 || deg < -90) deg += 180;
-      group.add(new Konva.Text({
-          x: (m.x1 + m.x2) / 2, y: (m.y1 + m.y2) / 2,
-          text: `${m.lengthCm.toFixed(1)} cm`,
-          fill: color, fontSize: 14, fontStyle: 'bold',
-          rotation: deg, offsetY: 20, offsetX: 20,
-          shadowColor: 'white', shadowBlur: 2, shadowOpacity: 1
-      }));
-
-      mainLayer.add(group);
-      mainLayer.batchDraw();
+      panelDirty = true; requestRender(); break;
     }
-
-    function renderCurrentLine() {
-      if (!STATE.currentLine) return;
-      const dx = STATE.currentLine.x2 - STATE.currentLine.x1;
-      const dy = STATE.currentLine.y2 - STATE.currentLine.y1;
-      const cm = (Math.sqrt(dx*dx + dy*dy) / STATE.scale);
-      drawMeasurementLine({ id: 'temp', x1: STATE.currentLine.x1, y1: STATE.currentLine.y1, x2: STATE.currentLine.x2, y2: STATE.currentLine.y2, lengthCm: cm }, true);
+    case 'marquee': {
+      marquee = MD.normRect(drag.p0, p);
+      sel = new Set([...drag.base, ...MD.idsInRect(doc, marquee)]);
+      panelDirty = true; layersDirty = true; requestRender(); break;
     }
+  }
+});
 
-    // Actualiza SOLO LOS BORDES de los objetos según la selección actual (Súper rápido)
-    function updateSelectionVisually() {
-      // Restablecer todas las imágenes
-      const artworks = mainLayer.find('.artworkGroup');
-      artworks.forEach(grp => {
-        const img = grp.findOne('.coreImage');
-        if (img) {
-          if (grp.id() === STATE.selectedId) {
-            img.stroke('#2563eb'); img.strokeWidth(3); grp.moveToTop();
-          } else {
-            img.stroke('#ccc'); img.strokeWidth(1);
-          }
-        }
-      });
-      // Restablecer medidas
-      STATE.measurements.forEach(m => drawMeasurementLine(m));
-      mainLayer.batchDraw();
-    }
-
-    // --- 4. CARGA DE ARCHIVOS Y DRAG & DROP ---
-    container.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
-    container.addEventListener('drop', (e) => {
-      e.preventDefault();
-      const file = e.dataTransfer.files[0];
-      if (!file || !file.type.startsWith('image/')) return;
-      stage.setPointersPositions(e);
-      const pos = getRelativePointerPosition();
-      processImageFile(file, pos.x, pos.y);
-    });
-
-    document.getElementById('uploadImage').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) { processImageFile(file); e.target.value = ''; }
-    });
-
-    function processImageFile(file, dropX = null, dropY = null) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const src = event.target.result;
-        const img = new Image();
-        img.onload = () => {
-          const ratio = img.naturalWidth / img.naturalHeight;
-          let defaultWidth = 50; 
-          let defaultHeight = defaultWidth / ratio;
-          if (defaultHeight > 70) { defaultHeight = 50; defaultWidth = defaultHeight * ratio; }
-
-          const finalX = dropX !== null ? dropX : stage.width() / 2 - (defaultWidth * STATE.scale)/2 - stage.x();
-          const finalY = dropY !== null ? dropY : 50 + ((STATE.wall.height * STATE.scale) / 2) - ((defaultHeight * STATE.scale) / 2) - stage.y();
-
-          const newItem = {
-            id: 'img_' + Date.now().toString(),
-            name: file.name, src: src,
-            x: finalX, y: finalY,
-            realWidth: defaultWidth, realHeight: defaultHeight, ratio: ratio 
-          };
-
-          STATE.items.push(newItem);
-          renderNewImage(newItem);
-          
-          STATE.selectedId = newItem.id;
-          STATE.selectedType = 'image';
-          setMode('move'); 
-        };
-        img.src = src;
-      };
-      reader.readAsDataURL(file);
-    }
-
-    // --- 5. INTERFAZ Y EVENTOS LATERALES ---
-    const ui = {
-      btnMove: document.getElementById('toolMove'), btnMeasure: document.getElementById('toolMeasure'),
-      wallW: document.getElementById('wallWidth'), wallH: document.getElementById('wallHeight'),
-      propPanel: document.getElementById('propertiesPanel'), propName: document.getElementById('propName'),
-      imgProps: document.getElementById('imageProps'), propW: document.getElementById('propWidth'),
-      propH: document.getElementById('propHeight'), lockRatio: document.getElementById('lockRatio')
-    };
-
-    function setMode(mode) {
-      STATE.mode = mode;
-      
-      // UI Styling
-      ui.btnMove.className = mode === 'move' ? "flex-1 bg-blue-100 text-blue-800 border border-blue-300 py-1.5 rounded text-xs font-bold transition-colors" : "flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors";
-      ui.btnMeasure.className = mode === 'measure' ? "flex-1 bg-red-100 text-red-800 border border-red-300 py-1.5 rounded text-xs font-bold transition-colors" : "flex-1 bg-gray-100 text-gray-600 border border-gray-300 py-1.5 rounded text-xs font-bold hover:bg-gray-200 transition-colors";
-      
-      container.classList.remove('mode-move', 'mode-measure');
-      container.classList.add(`mode-${mode}`);
-      
-      // Comportamiento del Motor
-      stage.draggable(mode === 'move'); // Bloquear el fondo en medición
-      
-      const artworks = mainLayer.find('.artworkGroup');
-      artworks.forEach(grp => grp.draggable(mode === 'move'));
-      
-      const measures = mainLayer.find('.measurementGroup');
-      measures.forEach(grp => grp.draggable(mode === 'move'));
-
-      if (mode === 'measure') {
-        STATE.selectedId = null;
-        STATE.selectedType = null;
+function endDrag() {
+  if (!drag) return;
+  const d = drag; drag = null; snapVis = null;
+  switch (d.kind) {
+    case 'move': if (d.moved || d.dup) commit(); break;
+    case 'resize': commit(); break;
+    case 'guide': if (d.remove) doc.guides[d.axis].splice(d.idx, 1); commit(); break;
+    case 'measure': {
+      const m = tempMed; tempMed = null;
+      if (m && Math.hypot(m.x2 - m.x1, m.y2 - m.y1) * view.s >= 4) {
+        const len = Math.hypot(m.x2 - m.x1, m.y2 - m.y1);
+        const it = MD.makeMedida(Object.assign({}, m, { nombre: 'Medida ' + fmt(len) + ' cm' }));
+        doc.items.push(it); sel = new Set([it.id]); commit();
+        msg('Medida de ' + fmt(len) + ' cm añadida. Supr la elimina.');
       }
-      
-      updateSelectionVisually();
-      renderSidebar();
+      break;
     }
+    case 'marquee': marquee = null; break;
+  }
+  selChanged();
+}
+function pointerEnd(e) {
+  pointers.delete(e.pointerId);
+  if (drag && drag.kind === 'pinch') { if (pointers.size < 2) drag = null; return; }
+  if (pointers.size === 0) endDrag();
+  const { px, py } = evPos(e); updateCursor(px, py);
+}
+cv.addEventListener('pointerup', pointerEnd);
+cv.addEventListener('pointercancel', pointerEnd);
+cv.addEventListener('pointerleave', () => { if (!drag) { hover = null; showPos(null); requestRender(); } });
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+cv.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const { px, py } = evPos(e), k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+  if (e.ctrlKey || e.metaKey || e.altKey) zoomAt(Math.max(0.5, Math.min(2, Math.exp(-e.deltaY * k * 0.0025))), px, py);
+  else {
+    let dx = e.deltaX * k, dy = e.deltaY * k;
+    if (e.shiftKey && !dx) { dx = dy; dy = 0; }
+    view.ox -= dx; view.oy -= dy; afterView();
+  }
+}, { passive: false });
 
-    ui.btnMove.addEventListener('click', () => setMode('move'));
-    ui.btnMeasure.addEventListener('click', () => setMode('measure'));
+function showPos(p, extra) {
+  $('st-pos').textContent = p ? 'x ' + fmt(p.x) + '   piso ' + fmt(doc.wall.h - p.y) + (extra ? '   ' + extra : '') : '';
+}
 
-    function renderSidebar() {
-      ui.wallW.value = STATE.wall.width; ui.wallH.value = STATE.wall.height;
+// ---------- teclado ----------
+window.addEventListener('keydown', (e) => {
+  if (document.querySelector('dialog[open]')) return;
+  const t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+  const mod = e.ctrlKey || e.metaKey, k = e.key;
+  if (mod && (k === 'z' || k === 'Z')) { if (typing) return; e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && (k === 'y' || k === 'Y')) { if (typing) return; e.preventDefault(); redo(); return; }
+  if (mod && (k === 's' || k === 'S')) { e.preventDefault(); saveProject(); return; }
+  if (mod && (k === 'o' || k === 'O')) { e.preventDefault(); $('file-json').click(); return; }
+  if (mod && (k === 'e' || k === 'E')) { e.preventDefault(); openExport(); return; }
+  if (mod && k === '0') { e.preventDefault(); fitView(); return; }
+  if (mod && (k === '=' || k === '+')) { e.preventDefault(); zoomCenter(1.25); return; }
+  if (mod && (k === '-' || k === '_')) { e.preventDefault(); zoomCenter(0.8); return; }
+  if (typing) return;
+  if (e.code === 'Space') { e.preventDefault(); if (!space) { space = true; updateCursor(lastPx, lastPy); } return; }
+  if (mod && (k === 'a' || k === 'A')) { e.preventDefault(); sel = new Set(doc.items.filter((i) => !i.oculto && !i.bloqueado).map((i) => i.id)); selChanged(); return; }
+  if (mod && (k === 'd' || k === 'D')) { e.preventDefault(); dupSel(); return; }
+  if (mod && (e.code === 'BracketRight' || k === ']' || k === '}')) { e.preventDefault(); reorderSel(e.shiftKey ? 'front' : 'up'); return; }
+  if (mod && (e.code === 'BracketLeft' || k === '[' || k === '{')) { e.preventDefault(); reorderSel(e.shiftKey ? 'back' : 'down'); return; }
+  if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); deleteSel(); return; }
+  if (k === 'Escape') { if (drag && drag.kind === 'measure') { tempMed = null; drag = null; snapVis = null; } sel.clear(); selChanged(); return; }
+  if (k.startsWith('Arrow')) {
+    e.preventDefault();
+    const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
+    const dx = k === 'ArrowLeft' ? -step : k === 'ArrowRight' ? step : 0, dy = k === 'ArrowUp' ? -step : k === 'ArrowDown' ? step : 0;
+    const its = selItems().filter((i) => !i.bloqueado);
+    if (!its.length) return;
+    its.forEach((i) => MD.moveItem(i, dx, dy)); commitSoon(); syncUndo(); panelDirty = true; requestRender(); return;
+  }
+  if (e.shiftKey && !mod && e.code === 'Digit1') { e.preventDefault(); fitView(); return; }
+  if (e.shiftKey && !mod && e.code === 'Digit0') { e.preventDefault(); zoomTo(calib); return; }
+  if (e.shiftKey && !mod && e.code === 'Digit2') { e.preventDefault(); centerView(); return; }
+  if (k === '?') { openHelp(); return; }
+  if (!mod && !e.altKey) {
+    const l = k.toLowerCase();
+    if (l === 'v') setTool('select'); else if (l === 'h') setTool('hand'); else if (l === 'm') setTool('measure');
+  }
+});
+window.addEventListener('keyup', (e) => { if (e.code === 'Space') { space = false; updateCursor(lastPx, lastPy); } });
+window.addEventListener('blur', () => { space = false; });
 
-      if (STATE.selectedId) {
-        ui.propPanel.classList.remove('hidden');
-        if (STATE.selectedType === 'image') {
-          const selected = STATE.items.find(i => i.id === STATE.selectedId);
-          ui.propName.textContent = `🖼️ ${selected.name}`;
-          ui.imgProps.classList.remove('hidden');
-          if (document.activeElement !== ui.propW) ui.propW.value = selected.realWidth.toFixed(1);
-          if (document.activeElement !== ui.propH) ui.propH.value = selected.realHeight.toFixed(1);
-        } else {
-          const selected = STATE.measurements.find(m => m.id === STATE.selectedId);
-          ui.propName.textContent = `📏 Medida: ${selected.lengthCm.toFixed(1)} cm`;
-          ui.imgProps.classList.add('hidden');
-        }
-      } else {
-        ui.propPanel.classList.add('hidden');
-      }
+function setTool(t) {
+  tool = t;
+  $('t-select').setAttribute('aria-pressed', t === 'select');
+  $('t-hand').setAttribute('aria-pressed', t === 'hand');
+  $('t-measure').setAttribute('aria-pressed', t === 'measure');
+  if (t === 'measure') msg('Arrastra entre dos puntos. Los extremos se ajustan a bordes; Shift fija horizontal o vertical.');
+  updateCursor(lastPx, lastPy); requestRender();
+}
+$('t-select').onclick = () => setTool('select');
+$('t-hand').onclick = () => setTool('hand');
+$('t-measure').onclick = () => setTool('measure');
+
+// ---------- acciones sobre la selección ----------
+function duplicate(ids, dx, dy) {
+  const out = [], set = new Set(ids);
+  for (const it of doc.items.slice()) {
+    if (!set.has(it.id)) continue;
+    const c = MD.clone(it);
+    c.id = MD.uid(it.tipo[0]); c.nombre = (it.nombre || '') + ' copia'; c.bloqueado = false;
+    MD.moveItem(c, dx, dy); doc.items.push(c); out.push(c.id);
+  }
+  return out;
+}
+function dupSel() {
+  if (!sel.size) return;
+  sel = new Set(duplicate([...sel], 5, 5)); commit(); selChanged(); msg('Duplicado.');
+}
+function deleteSel() {
+  const del = selItems().filter((i) => !i.bloqueado);
+  if (!del.length) { if (sel.size) msg('Los elementos bloqueados no se eliminan. Desbloquéalos en Capas.'); return; }
+  const ids = new Set(del.map((i) => i.id));
+  doc.items = doc.items.filter((i) => !ids.has(i.id));
+  sel = new Set([...sel].filter((id) => !ids.has(id))); commit(); selChanged();
+  msg(del.length === 1 ? 'Elemento eliminado. Ctrl/⌘ Z lo recupera.' : del.length + ' elementos eliminados. Ctrl/⌘ Z los recupera.');
+}
+function reorderSel(mode) { if (!sel.size) return; doc.items = MD.reorder(doc.items, sel, mode); commit(); selChanged(); }
+function applyAndCommit(deltas, note) { MD.applyDeltas(doc, deltas); commit(); selChanged(); if (note) msg(note); }
+
+document.querySelectorAll('[data-al]').forEach((b) => b.addEventListener('click', () => {
+  const its = solidSel();
+  if (!its.length) { msg('Selecciona una o más obras para alinear.'); return; }
+  const toWall = $('al-ref').value === 'wall' || its.length === 1;
+  const ref = toWall ? MD.wallRect(doc) : MD.bbox(its.map(MD.outer));
+  applyAndCommit(MD.align(its, b.dataset.al, ref), toWall && $('al-ref').value !== 'wall' ? 'Con un solo elemento se alinea respecto al muro.' : '');
+}));
+function dist(axis, fixed) {
+  const its = solidSel();
+  let gap = null;
+  if (fixed) { gap = parseFloat($('d-gap').value); if (!isFinite(gap) || gap < 0) { msg('Escribe una separación válida en cm.'); return; } }
+  if (its.length < (fixed ? 2 : 3)) { msg(fixed ? 'Selecciona al menos 2 obras.' : 'Selecciona al menos 3 obras para igualar separaciones.'); return; }
+  const r = MD.distribute(its, axis, gap);
+  applyAndCommit(r.deltas, 'Separación entre obras: ' + fmt(r.gap) + ' cm.');
+}
+$('d-eqh').onclick = () => dist('h', false);
+$('d-eqv').onclick = () => dist('v', false);
+$('d-gaph').onclick = () => dist('h', true);
+$('d-gapv').onclick = () => dist('v', true);
+$('c-eye').onclick = () => { const its = solidSel(); if (!its.length) return msg('Selecciona obras para centrarlas en el eje.'); applyAndCommit(MD.centerOnEye(doc, its), 'Centro en el eje visual (' + fmt(doc.wall.eje) + ' cm).'); };
+$('c-wall').onclick = () => { const its = solidSel(); if (!its.length) return msg('Selecciona obras para centrar el conjunto.'); applyAndCommit(MD.centerGroupH(doc, its), 'Conjunto centrado en el muro.'); };
+$('o-front').onclick = () => reorderSel('front');
+$('o-back').onclick = () => reorderSel('back');
+
+// ---------- añadir ----------
+function placeNew(it, at) {
+  const o = MD.outer(it);
+  if (at) it.x = at.x - o.w / 2;
+  else {
+    const obras = doc.items.filter((i) => i.tipo === 'obra' && !i.oculto);
+    it.x = obras.length ? (MD.bbox(obras.map(MD.outer)).x + MD.bbox(obras.map(MD.outer)).w + 10) : (doc.wall.w - o.w) / 2;
+  }
+  it.y = doc.wall.h - doc.wall.eje - o.h / 2;
+}
+async function addImageFiles(files, at) {
+  const list = [...files].filter((f) => /^image\//.test(f.type));
+  if (!list.length) { msg('Ninguno de los archivos es una imagen.'); return; }
+  const added = [], fails = [];
+  msg('Cargando ' + list.length + (list.length === 1 ? ' imagen…' : ' imágenes…'));
+  let nextX = at ? at.x : null;
+  for (const f of list) {
+    try {
+      const r = await readImage(f, 1600);
+      const imgId = MD.uid('i'); doc.images[imgId] = r.dataURL;
+      const ratio = r.w / r.h, big = 60;
+      const it = MD.makeObra({ nombre: f.name.replace(/\.[^.]+$/, ''), w: ratio >= 1 ? big : big * ratio, h: ratio >= 1 ? big / ratio : big, imgId, imgRatio: ratio });
+      placeNew(it, null);
+      if (at) { const o = MD.outer(it); it.x = added.length ? nextX : at.x - o.w / 2; nextX = it.x + o.w + 10; }
+      doc.items.push(it); added.push(it.id);
+    } catch (err) { fails.push(f.name); }
+  }
+  if (added.length) {
+    sel = new Set(added); commit(); selChanged();
+    msg((added.length === 1 ? 'Obra añadida con 60 cm en su lado mayor: escribe sus medidas reales en Selección.' : added.length + ' obras añadidas.')
+      + (fails.length ? ' No se pudo leer: ' + fails.join(', ') + ' (prueba con JPG o PNG).' : ''));
+  } else msg('No se pudo leer ' + fails.join(', ') + '. Prueba con JPG o PNG.');
+}
+$('a-img').onclick = () => $('file-img').click();
+$('file-img').addEventListener('change', (e) => { addImageFiles(e.target.files); e.target.value = ''; });
+$('a-blank').onclick = () => {
+  const n = doc.items.filter((i) => i.tipo === 'obra').length + 1;
+  const it = MD.makeObra({ nombre: 'Obra ' + n, w: 50, h: 70 }); placeNew(it);
+  doc.items.push(it); sel = new Set([it.id]); commit(); selChanged(); msg('Obra sin imagen añadida.');
+};
+$('a-vano').onclick = () => {
+  const it = MD.makeVano({ nombre: 'Puerta', x: 20, y: doc.wall.h - 210 });
+  doc.items.push(it); sel = new Set([it.id]); commit(); selChanged(); msg('Vano añadido: cambia su nombre y medidas en Selección.');
+};
+$('a-persona').onclick = () => {
+  const ps = doc.items.filter((i) => i.tipo === 'persona' && !i.oculto);
+  const x = ps.length ? MD.bbox(ps.map(MD.outer)).x - 15 - MD.personaW(170, 'pie') : -75;
+  const it = MD.makePersona({ nombre: 'Persona 170', h: 170, x }, doc.wall.h);
+  doc.items.push(it);
+  if (!doc.opts.showHuman) { doc.opts.showHuman = true; syncOpts(); }
+  sel = new Set([it.id]); commit(); selChanged();
+  msg('Persona añadida. Cambia su estatura o figura en Selección; arrástrala a lo largo del piso.');
+};
+$('file-replace').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  const it = getItem([...sel][0]); if (!f || !it || it.tipo !== 'obra') return;
+  try {
+    const r = await readImage(f, 1600), id = MD.uid('i');
+    doc.images[id] = r.dataURL; it.imgId = id; it.imgRatio = r.w / r.h; it.rot = 0;
+    const c = MD.outer(it), cy = c.y + c.h / 2; it.h = it.w / it.imgRatio; const n = MD.outer(it); it.y = cy - n.h / 2;
+    commit(); selChanged(); msg('Imagen reemplazada; se conservó el ancho.');
+  } catch (err) { msg('No se pudo leer esa imagen.'); }
+});
+
+// arrastrar y soltar
+let dragDepth = 0;
+work.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; work.classList.add('drop'); });
+work.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; });
+work.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; work.classList.remove('drop'); } });
+work.addEventListener('drop', (e) => {
+  e.preventDefault(); dragDepth = 0; work.classList.remove('drop');
+  const files = [...(e.dataTransfer ? e.dataTransfer.files : [])];
+  const json = files.find((f) => /\.json$/i.test(f.name) || f.type === 'application/json');
+  if (json) { openProjectFile(json); return; }
+  const { px, py } = evPos(e);
+  addImageFiles(files, toCm(px, py));
+});
+
+// ---------- panel de selección ----------
+let panelSig = '', panelDirty = false, layersDirty = false;
+function selChanged() { panelDirty = true; layersDirty = true; renderPanel(); renderLayers(); requestRender(); syncUndo(); }
+const NUM = (key, label, extra) => '<label class="f">' + label + '<input type="number" step="0.1" data-b="' + key + '"' + (extra || '') + '></label>';
+const TXT = (key, label) => '<label class="f">' + label + '<input type="text" data-b="' + key + '"></label>';
+function renderPanel() {
+  const box = $('sel-body'), its = selItems();
+  const sig = its.map((i) => i.id + ':' + i.tipo).join(',');
+  if (sig !== panelSig) {
+    panelSig = sig;
+    if (!its.length) box.innerHTML = '<p class="muted" style="margin:4px 0">Nada seleccionado. Haz clic en una obra, o arrastra en un área vacía para seleccionar varias.</p>';
+    else if (its.length > 1) box.innerHTML =
+      '<div class="kv"><span>Elementos</span><b data-o="n"></b></div><div class="kv"><span>Conjunto (ext.)</span><b class="out" data-o="bb"></b></div>'
+      + '<div class="kv"><span>Desde la izquierda</span><b class="out" data-o="bx"></b></div><div class="kv"><span>Piso a centro del conjunto</span><b class="out" data-o="bc"></b></div>'
+      + '<p class="note">Alinea y distribuye desde Disposición. Las flechas mueven el conjunto.</p>'
+      + '<div class="g2" style="margin-top:8px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
+    else {
+      const it = its[0];
+      if (it.tipo === 'obra') box.innerHTML =
+        TXT('nombre', 'Nombre en capas')
+        + '<h4>Ficha</h4><div class="stack">' + TXT('f.titulo', 'Título') + '<div class="g2">' + TXT('f.autor', 'Autor') + TXT('f.anio', 'Año') + TXT('f.tecnica', 'Técnica') + TXT('f.inv', 'N.º de inventario') + '</div></div>'
+        + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho obra', ' min="0.1"') + NUM('h', 'Alto obra', ' min="0.1"') + NUM('marco', 'Marco', ' min="0"') + NUM('pp', 'Paspartú', ' min="0"') + '</div>'
+        + '<label class="c"><input type="checkbox" data-b="lock"> Mantener proporción</label>'
+        + '<div class="kv"><span>Exterior</span><b class="out" data-o="ext"></b></div>'
+        + '<h4>Posición (cm)</h4><div class="g2">' + NUM('izq', 'Desde la izquierda') + NUM('centro', 'Piso a centro') + NUM('inf', 'Piso a borde inf.') + NUM('sup', 'Piso a borde sup.') + '</div>'
+        + '<h4>Colgado (cm)</h4><div class="g2">' + NUM('caida', 'Caída del gancho', ' min="0" title="Del borde superior del marco al punto de apoyo del alambre tenso o la argolla"') + NUM('clavo', 'Altura del clavo', ' title="Desde el piso. Editarla mueve la obra."') + '</div>'
+        + '<p class="note">Caída: distancia del borde superior al punto donde apoya el alambre tenso o la argolla.</p>'
+        + '<div class="g2" style="margin-top:10px"><button class="pbtn" data-act="eye">Centrar en el eje</button><button class="pbtn" data-act="rot">Girar 90°</button>'
+        + '<button class="pbtn" data-act="img">' + (it.imgId ? 'Cambiar imagen' : 'Poner imagen') + '</button><button class="pbtn" data-act="ratio"' + (it.imgRatio ? '' : ' disabled') + ' title="Ajusta el alto a la proporción de la imagen">Proporción imagen</button>'
+        + '<button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
+      else if (it.tipo === 'persona') box.innerHTML =
+        TXT('nombre', 'Nombre')
+        + '<label class="f" style="margin-top:6px">Figura<select data-b="figura"><option value="pie">De pie</option><option value="silla">En silla de ruedas</option></select></label>'
+        + '<div class="g2" style="margin-top:6px">' + NUM('ph', it.figura === 'silla' ? 'Altura total (cm)' : 'Estatura (cm)', ' min="30" max="260" step="1"') + NUM('pcx', 'Centro desde la izq.') + '</div>'
+        + '<div class="kv" style="margin-top:6px"><span>Altura de ojos</span><b class="out" data-o="ojos"></b></div>'
+        + '<h4>Preajustes</h4><div class="g3">'
+        + [['185', 185, 'pie'], ['170', 170, 'pie'], ['155', 155, 'pie'], ['Infancia 115', 115, 'pie'], ['Silla 130', 130, 'silla']]
+          .map((pp) => '<button class="pbtn" data-act="pp" data-h="' + pp[1] + '" data-f="' + pp[2] + '">' + pp[0] + '</button>').join('') + '</div>'
+        + '<p class="note">Las personas se apoyan siempre en el piso. La altura de ojos es una estimación proporcional.</p>'
+        + '<div class="g2" style="margin-top:10px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
+      else if (it.tipo === 'vano') box.innerHTML =
+        TXT('nombre', 'Nombre') + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho', ' min="0.1"') + NUM('h', 'Alto', ' min="0.1"') + '</div>'
+        + '<h4>Posición (cm)</h4><div class="g2">' + NUM('izq', 'Desde la izquierda') + NUM('inf', 'Piso a borde inf.') + '</div>'
+        + '<p class="note">Úsalo para puertas, ventanas, enchufes, extintores, rejillas o señalética.</p>'
+        + '<div class="g2" style="margin-top:10px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
+      else box.innerHTML =
+        TXT('nombre', 'Nombre') + '<div class="kv" style="margin-top:8px"><span>Longitud</span><b class="out" data-o="len"></b></div>'
+        + '<div class="kv"><span>Horizontal · vertical</span><b class="out" data-o="dxy"></b></div>'
+        + '<div class="g2" style="margin-top:10px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
     }
-
-    ui.wallW.addEventListener('input', (e) => { STATE.wall.width = Number(e.target.value) || 10; updateWall(); });
-    ui.wallH.addEventListener('input', (e) => { STATE.wall.height = Number(e.target.value) || 10; updateWall(); });
-
-    ui.propW.addEventListener('input', (e) => {
-      if (STATE.selectedType !== 'image') return;
-      const selected = STATE.items.find(i => i.id === STATE.selectedId);
-      if (selected && e.target.value) {
-        selected.realWidth = parseFloat(e.target.value);
-        if (ui.lockRatio.checked) {
-            selected.realHeight = selected.realWidth / selected.ratio; 
-            ui.propH.value = selected.realHeight.toFixed(1); 
-        } else { selected.ratio = selected.realWidth / selected.realHeight; }
-        updateArtworkDimensionsVisuals(selected.id);
-      }
+  }
+  fillPanel();
+}
+function getB(it, k) {
+  if (k === 'nombre') return it.nombre;
+  if (it.tipo === 'persona') return k === 'figura' ? it.figura : k === 'ph' ? it.h : k === 'pcx' ? it.x + it.w / 2 : undefined;
+  if (k.startsWith('f.')) return (it.ficha || {})[k.slice(2)];
+  if (['w', 'h', 'marco', 'pp', 'caida', 'lock'].includes(k)) return it[k];
+  return MD.info(doc, it)[k];
+}
+function fillPanel() {
+  const box = $('sel-body'), its = selItems();
+  if (!its.length) return;
+  if (its.length === 1) {
+    const it = its[0], n = MD.info(doc, it);
+    box.querySelectorAll('[data-b]').forEach((el) => {
+      if (el === document.activeElement) return;
+      const v = getB(it, el.dataset.b);
+      if (el.type === 'checkbox') el.checked = !!v;
+      else el.value = typeof v === 'number' ? fmt(v, 2) : (v == null ? '' : v);
     });
-
-    ui.propH.addEventListener('input', (e) => {
-      if (STATE.selectedType !== 'image') return;
-      const selected = STATE.items.find(i => i.id === STATE.selectedId);
-      if (selected && e.target.value) {
-        selected.realHeight = parseFloat(e.target.value);
-        if (ui.lockRatio.checked) {
-            selected.realWidth = selected.realHeight * selected.ratio; 
-            ui.propW.value = selected.realWidth.toFixed(1); 
-        } else { selected.ratio = selected.realWidth / selected.realHeight; }
-        updateArtworkDimensionsVisuals(selected.id);
-      }
+    box.querySelectorAll('[data-o]').forEach((el) => {
+      const k = el.dataset.o;
+      el.textContent = k === 'ojos' ? fmt(n.ojos) + ' cm' : k === 'ext' ? fmt(n.extW) + ' × ' + fmt(n.extH) + ' cm' : k === 'len' ? fmt(n.len) + ' cm'
+        : k === 'dxy' ? fmt(Math.abs(it.x2 - it.x1)) + ' · ' + fmt(Math.abs(it.y2 - it.y1)) + ' cm' : '';
     });
+  } else {
+    const b = MD.bbox(its.map(MD.outer));
+    const o = { n: String(its.length), bb: fmt(b.w) + ' × ' + fmt(b.h) + ' cm', bx: fmt(b.x) + ' cm', bc: fmt(doc.wall.h - (b.y + b.h / 2)) + ' cm' };
+    box.querySelectorAll('[data-o]').forEach((el) => { el.textContent = o[el.dataset.o] || ''; });
+  }
+}
+function setB(it, k, el) {
+  if (el.type === 'checkbox') { it[k] = el.checked; return true; }
+  if (k === 'nombre') { it.nombre = el.value; layersDirty = true; return true; }
+  if (k.startsWith('f.')) { it.ficha = it.ficha || {}; it.ficha[k.slice(2)] = el.value; return true; }
+  if (it.tipo === 'persona') {
+    if (k === 'figura') { MD.setPersona(doc, it, 'figura', el.value); panelSig = ''; renderPanel(); return true; }
+    const pv = parseFloat(String(el.value).replace(',', '.')); if (!isFinite(pv)) return false;
+    if (k === 'ph') { if (pv < 30) return false; MD.setPersona(doc, it, 'h', pv); }
+    else if (k === 'pcx') MD.setPersona(doc, it, 'cx', pv);
+    return true;
+  }
+  const v = parseFloat(String(el.value).replace(',', '.'));
+  if (!isFinite(v)) return false;
+  if (k === 'w' || k === 'h') {
+    if (v <= 0) return false;
+    const c = MD.outer(it), cx = c.x + c.w / 2, cy = c.y + c.h / 2; // cambia el tamaño alrededor del centro
+    MD.setObraDim(it, k, v);
+    const n = MD.outer(it); it.x = cx - n.w / 2; it.y = cy - n.h / 2;
+  } else if (k === 'marco' || k === 'pp') MD.setFrame(it, k, Math.max(0, v));
+  else if (k === 'caida') it.caida = Math.max(0, v);
+  else MD.setPos(doc, it, k, v);
+  return true;
+}
+$('sel-body').addEventListener('input', (e) => {
+  const el = e.target; if (!el.dataset || !el.dataset.b) return;
+  const it = selItems()[0]; if (!it) return;
+  if (setB(it, el.dataset.b, el)) { fillPanel(); if (layersDirty) renderLayers(); requestRender(); commitSoon(); syncUndo(); }
+});
+$('sel-body').addEventListener('change', (e) => { if (e.target.dataset && e.target.dataset.b) { commit(); fillPanel(); } });
+$('sel-body').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, it = selItems()[0];
+  if (act === 'dup') return dupSel();
+  if (act === 'del') return deleteSel();
+  if (!it) return;
+  if (act === 'pp' && it.tipo === 'persona') {
+    MD.setPersona(doc, it, 'figura', b.dataset.f); MD.setPersona(doc, it, 'h', +b.dataset.h);
+    if (/^(Persona|Silla|Infancia)/.test(it.nombre || '')) it.nombre = b.dataset.f === 'silla' ? 'Silla de ruedas ' + b.dataset.h : (+b.dataset.h < 140 ? 'Infancia ' : 'Persona ') + b.dataset.h;
+    panelSig = ''; commit(); selChanged(); return;
+  }
+  if (act === 'eye') { applyAndCommit(MD.centerOnEye(doc, [it]), 'Centro en el eje visual.'); }
+  else if (act === 'rot') { MD.rotate90(it); commit(); selChanged(); }
+  else if (act === 'img') $('file-replace').click();
+  else if (act === 'ratio') {
+    const a = MD.imgAspect(it); if (!a) return;
+    const c = MD.outer(it), cy = c.y + c.h / 2; it.h = it.w / a; const n = MD.outer(it); it.y = cy - n.h / 2;
+    commit(); selChanged(); msg('Alto ajustado a la proporción de la imagen.');
+  }
+});
 
-    function deleteSelected() {
-      if (!STATE.selectedId) return;
-      const node = mainLayer.findOne(`#${STATE.selectedId}`);
-      if (node) node.destroy();
+// ---------- capas ----------
+const ICON = {
+  eye: '<svg viewBox="0 0 16 16"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>',
+  eyeOff: '<svg viewBox="0 0 16 16"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.3"/></svg>',
+  lock: '<svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" fill="currentColor"/><path d="M5 7V5a3 3 0 016 0v2" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>',
+  unlock: '<svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5 7V5a3 3 0 016 0" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+  up: '<svg viewBox="0 0 16 16"><path d="M4 10l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
+  down: '<svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
+};
+const TYPE = { obra: '▭', vano: '▨', medida: '↔', persona: '▯' };
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function renderLayers() {
+  layersDirty = false;
+  const ul = $('layers');
+  if (!doc.items.length) { ul.innerHTML = '<li class="muted" style="cursor:default">Sin elementos todavía.</li>'; return; }
+  ul.innerHTML = doc.items.slice().reverse().map((it) =>
+    '<li data-id="' + it.id + '" class="' + (sel.has(it.id) ? 'on ' : '') + (it.oculto ? 'hid' : '') + '">'
+    + '<button data-l="vis" title="' + (it.oculto ? 'Mostrar' : 'Ocultar') + '" class="' + (it.oculto ? '' : 'act') + '">' + (it.oculto ? ICON.eyeOff : ICON.eye) + '</button>'
+    + '<button data-l="lock" title="' + (it.bloqueado ? 'Desbloquear' : 'Bloquear') + '" class="' + (it.bloqueado ? 'act' : '') + '">' + (it.bloqueado ? ICON.lock : ICON.unlock) + '</button>'
+    + '<span class="ty">' + TYPE[it.tipo] + '</span><span class="nm">' + esc(it.nombre || it.tipo) + '</span>'
+    + '<button data-l="up" title="Subir">' + ICON.up + '</button><button data-l="down" title="Bajar">' + ICON.down + '</button></li>').join('');
+}
+$('layers').addEventListener('click', (e) => {
+  const li = e.target.closest('li[data-id]'); if (!li) return;
+  const id = li.dataset.id, it = getItem(id); if (!it) return;
+  const b = e.target.closest('[data-l]');
+  if (b) {
+    const l = b.dataset.l;
+    if (l === 'vis') { it.oculto = !it.oculto; if (it.oculto) sel.delete(id); }
+    else if (l === 'lock') it.bloqueado = !it.bloqueado;
+    else doc.items = MD.reorder(doc.items, new Set([id]), l);
+    commit(); selChanged(); return;
+  }
+  if (e.shiftKey) { sel.has(id) ? sel.delete(id) : sel.add(id); }
+  else sel = new Set([id]);
+  if (it.oculto) sel.delete(id);
+  selChanged();
+});
+$('layers').addEventListener('dblclick', (e) => {
+  const li = e.target.closest('li[data-id]'); if (!li || e.target.closest('[data-l]')) return;
+  sel = new Set([li.dataset.id]); selChanged(); centerView();
+});
 
-      if (STATE.selectedType === 'image') STATE.items = STATE.items.filter(i => i.id !== STATE.selectedId);
-      if (STATE.selectedType === 'measurement') STATE.measurements = STATE.measurements.filter(m => m.id !== STATE.selectedId);
-      
-      STATE.selectedId = null; STATE.selectedType = null;
-      mainLayer.batchDraw();
-      renderSidebar();
-    }
+// ---------- muro y opciones ----------
+function syncWall() {
+  $('w-title').value = doc.titulo || ''; $('w-w').value = fmt(doc.wall.w, 2); $('w-h').value = fmt(doc.wall.h, 2);
+  $('w-eje').value = fmt(doc.wall.eje, 2); $('w-color').value = doc.wall.color || '#ffffff';
+}
+function wallNum(id, key, min) {
+  $(id).addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (isFinite(v) && v >= min) { doc.wall[key] = v; MD.groundPersonas(doc); panelDirty = true; requestRender(); commitSoon(); syncUndo(); } });
+  $(id).addEventListener('change', () => { commit(); syncWall(); });
+}
+wallNum('w-w', 'w', 1); wallNum('w-h', 'h', 1); wallNum('w-eje', 'eje', 0);
+$('w-title').addEventListener('input', (e) => { doc.titulo = e.target.value; commitSoon(); });
+$('w-title').addEventListener('change', commit);
+$('w-color').addEventListener('input', (e) => { doc.wall.color = e.target.value; requestRender(); commitSoon(); });
+$('w-color').addEventListener('change', commit);
 
-    document.getElementById('deleteBtn').addEventListener('click', deleteSelected);
-    window.addEventListener('keydown', (e) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && STATE.selectedId) {
-        if (document.activeElement.tagName === 'INPUT') return; 
-        deleteSelected();
-      }
-    });
+const OPT = [['o-eje', 'showEje'], ['o-muro', 'showMuro'], ['o-human', 'showHuman'], ['o-ojos', 'showOjos'], ['o-fichas', 'showFichas'], ['o-grid', 'showGrid'], ['o-guides', 'showGuides'], ['s-obj', 'snapObj'], ['s-guides', 'snapGuides'], ['s-grid', 'snapGrid']];
+function syncOpts() {
+  const o = doc.opts;
+  $('o-cotas').value = o.cotas; OPT.forEach(([id, k]) => { $(id).checked = !!o[k]; });
+  $('o-gridstep').value = fmt(o.grid, 2);
+}
+OPT.forEach(([id, k]) => $(id).addEventListener('change', (e) => {
+  doc.opts[k] = e.target.checked;
+  if (k === 'showHuman' && !e.target.checked) { sel = new Set([...sel].filter((id2) => { const i = getItem(id2); return i && i.tipo !== 'persona'; })); selChanged(); }
+  requestRender();
+}));
+$('o-cotas').addEventListener('change', (e) => { doc.opts.cotas = e.target.value; requestRender(); });
+[['o-gridstep', 'grid', 0.5]].forEach(([id, k, min]) =>
+  $(id).addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (isFinite(v) && v >= min) { doc.opts[k] = v; requestRender(); } }));
+$('o-clearguides').onclick = () => { if (!doc.guides.v.length && !doc.guides.h.length) return msg('No hay guías.'); doc.guides = { v: [], h: [] }; commit(); requestRender(); msg('Guías borradas.'); };
 
-    // --- 6. IMPORTAR / EXPORTAR ---
-    function fullRebuildFromState() {
-      mainLayer.destroyChildren(); // Limpieza profunda al cargar proyecto entero
-      STATE.items.forEach(item => renderNewImage(item));
-      STATE.measurements.forEach(m => drawMeasurementLine(m));
-      updateWall();
-      updateSelectionVisually();
-      setMode('move');
-    }
+// ---------- archivo ----------
+function afterDocChange() {
+  sel = new Set([...sel].filter((id) => getItem(id)));
+  panelSig = ''; syncWall(); syncOpts(); selChanged();
+}
+function saveProject() {
+  if (commitT) commit();
+  download(new Blob([MD.serialize(doc)], { type: 'application/json' }), slug(doc.titulo) + '.museodraft.json');
+  dirty = false; msg('Proyecto guardado.');
+}
+function openProjectFile(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const { doc: d, migrated } = MD.parseProject(String(r.result));
+      if (dirty && !confirm('Hay cambios sin guardar en el muro actual. ¿Abrir de todos modos?')) return;
+      doc = d; imgCache.clear(); sel.clear(); resetHistory(); dirty = false;
+      afterDocChange(); fitView();
+      msg(migrated ? 'Proyecto de la versión anterior convertido. Revisa la posición horizontal: el formato antiguo no la guardaba respecto al muro.' : 'Proyecto abierto.');
+    } catch (err) { msg(err.message || 'No se pudo abrir el proyecto.'); }
+  };
+  r.onerror = () => msg('No se pudo leer el archivo.');
+  r.readAsText(file);
+}
+$('f-save').onclick = saveProject;
+$('f-open').onclick = () => $('file-json').click();
+$('file-json').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) openProjectFile(f); });
+$('f-csv').onclick = () => {
+  if (!doc.items.some((i) => i.tipo !== 'medida')) return msg('No hay obras para la hoja de montaje.');
+  download(new Blob(['\ufeff' + MD.toCSV(doc)], { type: 'text/csv;charset=utf-8' }), slug(doc.titulo) + '-montaje.csv'); msg('Hoja de montaje exportada.');
+};
+$('f-new').onclick = () => {
+  if (doc.items.length && !confirm('¿Empezar un muro nuevo? Se perderán los cambios no guardados.')) return;
+  const opts = doc.opts; doc = MD.newDoc(); doc.opts = opts; imgCache.clear(); sel.clear(); resetHistory(); dirty = false; afterDocChange(); fitView();
+};
 
-    document.getElementById('loadProject').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          Object.assign(STATE, JSON.parse(event.target.result));
-          if(!STATE.measurements) STATE.measurements = [];
-          STATE.items.forEach(item => { if(!item.ratio) item.ratio = item.realWidth / item.realHeight; });
-          fullRebuildFromState();
-        } catch (error) { alert('Error leyendo JSON'); }
-      };
-      reader.readAsText(file); e.target.value = '';
-    });
+// ---------- exportar ----------
+function exOpts() {
+  const e = doc.opts.exp || MD.defaultExp();
+  return { fmt: e.fmt, pxcm: +e.pxcm || 10, margen: +e.margen || 0, scope: e.scope, human: e.human, ojos: e.ojos, eje: e.eje, grid: e.grid, guias: e.guias,
+    escala: e.escala, rotulo: e.rotulo, show: { imagenes: e.imagenes, vanos: e.vanos, dims: e.dims, gaps: e.gaps, bordes: e.bordes, centro: e.centro, lineas: e.lineas, medidas: e.medidas, muro: e.muro, fichas: e.fichas } };
+}
+function syncExport() {
+  const e = doc.opts.exp;
+  $('ex-fmt').value = e.fmt; $('ex-pxcm').value = e.pxcm; $('ex-margin').value = e.margen; $('ex-scope').value = e.scope;
+  document.querySelectorAll('[data-ex]').forEach((el) => { el.checked = !!e[el.dataset.ex]; });
+  document.querySelector('[data-ex="ojos"]').disabled = !e.human;
+  exInfo();
+}
+// opciones de escena comunes a la exportación y su vista previa
+function exFrame(o) { return MD.exportFrame(doc, o.fmt === 'svg' ? Object.assign({}, o, { pxcm: 10 }) : o); }
+function exScene(o, fr) {
+  return { ui: fr.u, sel: o.scope === 'sel' ? sel : new Set(), cotas: o.scope === 'sel' ? 'sel' : 'all', show: o.show,
+    eje: o.eje, human: o.human, ojos: o.human && o.ojos, grid: o.grid, guides: o.guias ? doc.guides : null, vw: fr.W, vh: fr.H,
+    escala: o.escala, rotulo: o.rotulo, bounds: fr.bounds, floorRange: [fr.bounds.x, fr.bounds.x + fr.bounds.w] };
+}
+let prevRaf = 0;
+function renderPreview() {
+  prevRaf = 0;
+  const dlg = $('dlg-export'); if (!dlg.open) return;
+  const o = exOpts(), fr = exFrame(o), c = $('ex-prev'), wrap = $('ex-prevwrap');
+  const big = dlg.classList.contains('big');
+  const maxW = Math.max(100, wrap.clientWidth - 22), maxH = big ? Math.max(200, window.innerHeight - 300) : Math.min(340, Math.max(160, window.innerHeight * 0.34));
+  const k = Math.min(maxW / fr.W, maxH / fr.H), w = Math.max(1, Math.round(fr.W * k)), h = Math.max(1, Math.round(fr.H * k));
+  const dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); c.style.width = w + 'px'; c.style.height = h + 'px';
+  const g = c.getContext('2d');
+  g.setTransform(dpr * k, 0, 0, dpr * k, 0, 0); // mismas coordenadas que el archivo final, reducidas
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, fr.W, fr.H);
+  MD.drawScene(MD.canvasPainter(g, getImage), doc, fr.view, exScene(o, fr));
+}
+function schedulePreview() { if (!prevRaf) prevRaf = requestAnimationFrame(renderPreview); }
+function exInfo() {
+  schedulePreview();
+  const o = exOpts(), f = exFrame(o);
+  $('ex-pxcm').disabled = o.fmt === 'svg';
+  const noSel = o.scope === 'sel' && !sel.size ? ' <span class="warn">No hay nada seleccionado: no saldrán cotas.</span>' : '';
+  if (o.fmt === 'svg') { $('ex-info').innerHTML = 'SVG vectorial de ' + fmt(f.bounds.w) + ' × ' + fmt(f.bounds.h) + ' cm; las imágenes se incrustan con la resolución cargada (máx. 1600 px por lado).' + noSel; return; }
+  $('ex-info').innerHTML = f.W.toLocaleString('es') + ' × ' + f.H.toLocaleString('es') + ' px (' + fmt(f.W * f.H / 1e6) + ' Mpx).'
+    + (f.capped ? ' <span class="warn">Se reduce a ' + fmt(f.s) + ' px/cm para no superar el límite de los navegadores.</span>' : '') + noSel;
+}
+function openExport() {
+  doc.opts.exp = Object.assign(MD.defaultExp(), doc.opts.exp || {});
+  if (doc.opts.exp.scope === 'sel' && !sel.size) doc.opts.exp.scope = 'all';
+  syncExport(); $('dlg-export').showModal(); schedulePreview();
+  preloadImages().then(schedulePreview);
+}
+function togglePreviewSize() { const d = $('dlg-export'); d.classList.toggle('big'); $('ex-zoom').textContent = d.classList.contains('big') ? 'Reducir' : 'Ampliar'; schedulePreview(); }
+$('ex-zoom').onclick = togglePreviewSize;
+$('ex-prev').onclick = togglePreviewSize;
+window.addEventListener('resize', () => { if ($('dlg-export').open) schedulePreview(); });
+$('ex-fmt').addEventListener('change', (e) => { doc.opts.exp.fmt = e.target.value; exInfo(); });
+$('ex-scope').addEventListener('change', (e) => { doc.opts.exp.scope = e.target.value; exInfo(); });
+$('ex-pxcm').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v > 0) { doc.opts.exp.pxcm = v; exInfo(); } });
+$('ex-margin').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v >= 0) { doc.opts.exp.margen = v; exInfo(); } });
+document.querySelectorAll('[data-ex]').forEach((el) => el.addEventListener('change', () => { doc.opts.exp[el.dataset.ex] = el.checked; dirty = true; syncExport(); }));
+document.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => {
+  Object.assign(doc.opts.exp, MD.EXP_PRESETS[b.dataset.preset]); dirty = true; syncExport();
+}));
+$('f-export').onclick = openExport;
+$('ex-cancel').onclick = () => $('dlg-export').close();
+$('ex-go').onclick = async () => {
+  const o = exOpts(); $('dlg-export').close();
+  msg('Exportando…');
+  await preloadImages();
+  const fr = exFrame(o), so = exScene(o, fr);
+  const name = slug(doc.titulo);
+  if (o.fmt === 'svg') {
+    const P = MD.svgPainter(doc.images); MD.drawScene(P, doc, fr.view, so);
+    download(new Blob([P.toString(fr.W, fr.H, '#ffffff')], { type: 'image/svg+xml' }), name + '.svg'); msg('SVG exportado.'); return;
+  }
+  const c = document.createElement('canvas'); c.width = fr.W; c.height = fr.H;
+  const g = c.getContext('2d');
+  if (!g) { msg('El navegador no pudo crear un lienzo de ese tamaño. Baja la resolución.'); return; }
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, fr.W, fr.H);
+  MD.drawScene(MD.canvasPainter(g, getImage), doc, fr.view, so);
+  c.toBlob((b) => {
+    if (!b) { msg('El navegador no pudo generar el PNG. Baja la resolución.'); return; }
+    download(b, name + '-' + fmt(fr.s) + 'pxcm.png'); msg('PNG exportado: ' + fr.W + ' × ' + fr.H + ' px.');
+  }, 'image/png');
+};
 
-    function dataURItoBlob(dataURI) {
-      const byteString = atob(dataURI.split(',')[1]);
-      const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) { ia[i] = byteString.charCodeAt(i); }
-      return new Blob([ab], {type: mimeString});
-    }
+// ---------- calibración ----------
+function calibShow(v) { $('calib-box').style.width = (v * 8.56) + 'px'; $('calib-box').style.height = (v * 5.398) + 'px'; $('calib-v').textContent = fmt(v, 1) + ' px de pantalla por cm'; }
+$('o-calib').onclick = () => { $('calib-r').value = calib; calibShow(calib); $('dlg-calib').showModal(); };
+$('calib-r').addEventListener('input', (e) => calibShow(+e.target.value));
+$('calib-reset').onclick = () => { $('calib-r').value = DEF_CALIB; calibShow(DEF_CALIB); };
+$('calib-cancel').onclick = () => $('dlg-calib').close();
+$('calib-ok').onclick = () => {
+  calib = +$('calib-r').value; try { localStorage.setItem('museodraft.calib', String(calib)); } catch (e) {}
+  $('dlg-calib').close(); afterView(); msg('Calibración guardada en este navegador.');
+};
 
-    document.getElementById('exportWallBtn').addEventListener('click', () => {
-      let activeSel = STATE.selectedId;
-      STATE.selectedId = null; updateSelectionVisually();
+// ---------- ayuda y barra ----------
+function openHelp() { $('dlg-help').showModal(); }
+$('b-help').onclick = openHelp;
+$('help-ok').onclick = () => $('dlg-help').close();
+$('brand').onclick = () => location.reload();
+$('b-undo').onclick = undo; $('b-redo').onclick = redo;
+$('b-zin').onclick = () => zoomCenter(1.25); $('b-zout').onclick = () => zoomCenter(0.8);
+$('b-fit').onclick = fitView; $('b-100').onclick = () => zoomTo(calib); $('b-center').onclick = centerView;
+$('zoomv').addEventListener('change', (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (isFinite(v) && v > 0) zoomTo(calib * v / 100); else afterView(); });
+$('zoomv').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
 
-      const wallRect = bgLayer.findOne('#wallRect');
-      if (!wallRect) return;
-      const box = bgLayer.findOne('#wallGroup').getClientRect({ skipTransform: false });
+window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+new ResizeObserver(() => requestRender()).observe(work);
 
-      const oldScale = stage.scaleX(); const oldPos = stage.position();
-      stage.scale({x: 1, y: 1}); stage.position({x: 0, y: 0}); stage.draw();
-
-      const safePixelRatio = (box.width > 3000 || box.height > 3000) ? 1 : 2;
-
-      try {
-        const dataURL = stage.toDataURL({ x: box.x - 60, y: box.y - 60, width: box.width + 120, height: box.height + 120, pixelRatio: safePixelRatio });
-        const url = URL.createObjectURL(dataURItoBlob(dataURL));
-        const link = document.createElement('a'); link.download = 'mesa-dibujo.png'; link.href = url;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-      } catch (e) { alert("Área muy grande. Reduce el muro antes de exportar."); }
-
-      stage.scale({x: oldScale, y: oldScale}); stage.position(oldPos);
-      STATE.selectedId = activeSel; updateSelectionVisually();
-    });
-
-    document.getElementById('saveProjectBtn').addEventListener('click', () => {
-      const link = document.createElement('a'); link.download = "proyecto-museo.json";
-      link.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(STATE));
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    });
-
-    window.addEventListener('resize', () => { stage.width(container.offsetWidth); stage.height(container.offsetHeight); });
-
-    // Inicializar
-    updateWall();
-    setMode('move');
-  </script>
+// ---------- inicio ----------
+syncWall(); syncOpts(); selChanged(); fitView();
+window.__md = { get doc() { return doc; }, get view() { return view; }, get sel() { return sel; }, set sel(v) { sel = v; selChanged(); }, commit, undo, redo, fitView, addImageFiles, exOpts, MD };
+})();
+</script>
 </body>
 </html>
