@@ -28,6 +28,11 @@ button,input,select{font-family:var(--mono);font-size:12px;color:var(--ink)}
 .tb kbd{font-family:var(--mono);font-size:10px;color:var(--dim)}
 .tb[aria-pressed="true"] kbd{color:#bbb}
 .tb svg{width:16px;height:16px;flex:none}
+.seg{display:inline-flex}
+.seg .tb{border-radius:0}
+.seg .tb:first-child{border-radius:2px 0 0 2px}
+.seg .tb:last-child{border-radius:0 2px 2px 0;margin-left:-1px}
+input[type=range]{accent-color:var(--mossD);width:100%}
 #zoomv{width:62px;text-align:right;border:1px solid var(--line);border-radius:2px;padding:4px 6px;min-height:28px}
 .grow{flex:1}
 
@@ -146,6 +151,11 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
   <button class="tb" id="b-fit" title="Encajar el muro en la ventana (Shift 1 o Ctrl/⌘ 0)">Encajar</button>
   <button class="tb" id="b-100" title="Tamaño real en pantalla (Shift 0)">100 %</button>
   <button class="tb" id="b-center" title="Centrar la vista en la selección, o en el muro si no hay selección (Shift 2)">Centrar</button>
+  <div class="sep"></div>
+  <div class="seg" role="group" aria-label="Vista">
+    <button class="tb" id="v-alz" aria-pressed="true" title="Alzado: vista frontal editable (Shift A)">Alzado</button>
+    <button class="tb" id="v-iso" aria-pressed="false" title="Vista isométrica de solo lectura (Shift I)">Isométrica</button>
+  </div>
   <div class="grow"></div>
   <button class="tb" id="b-help" title="Atajos de teclado (?)">Atajos</button>
 </header>
@@ -157,6 +167,26 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
   </div>
 
   <aside id="panel">
+    <details open id="iso-sec" hidden>
+      <summary>Isométrica</summary>
+      <div class="pb stack">
+        <label class="f">Vista desde<select id="iso-lado"><option value="der">la derecha</option><option value="izq">la izquierda</option></select></label>
+        <label class="f"><span>Giro del muro: <b class="out" id="iso-a-v"></b></span><input type="range" id="iso-a" min="0" max="45" step="1"></label>
+        <label class="f"><span>Inclinación de la profundidad: <b class="out" id="iso-b-v"></b></span><input type="range" id="iso-b" min="15" max="60" step="1"></label>
+        <div class="g3">
+          <button class="pbtn" data-iso="30,30" title="Ejes a 120°">Isométrica</button>
+          <button class="pbtn" data-iso="10,40" title="El muro casi de frente">Muro frontal</button>
+          <button class="pbtn" data-iso="40,25" title="Muro más girado">Escorzo</button>
+        </div>
+        <div class="g2">
+          <label class="f">Profundidad del piso (cm)<input id="iso-piso" type="number" min="20" step="10"></label>
+          <label class="f">Grosor del muro (cm)<input id="iso-grosor" type="number" min="0" step="1"></label>
+        </div>
+        <label class="c"><input type="checkbox" id="iso-grid"> Cuadrícula del piso cada 50 cm</label>
+        <p class="note">Vista de solo lectura: arrastra para desplazar, rueda con Ctrl/⌘ o pellizco para el zoom. Las obras se mueven en Alzado; la profundidad de obras y vanos y la distancia de las personas al muro se cambian en Selección.</p>
+      </div>
+    </details>
+
     <details open>
       <summary>Muro</summary>
       <div class="pb stack">
@@ -350,6 +380,7 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
       <tr><td>Shift + arrastrar</td><td>Mover solo en horizontal o vertical</td></tr>
       <tr><td>Ctrl/⌘ + arrastrar</td><td>Mover sin ajuste</td></tr>
       <tr><td>Esquinas</td><td>Cambiar tamaño (Shift invierte la proporción fija)</td></tr>
+      <tr><td>Shift A · Shift I</td><td>Vista en alzado · isométrica</td></tr>
       <tr><td>Personas</td><td>Se arrastran a lo largo del piso; sus esquinas superiores cambian la estatura</td></tr>
       <tr><td>Flechas</td><td>Mover 1 cm · Shift 10 cm · Alt 0,1 cm</td></tr>
       <tr><td>Ctrl/⌘ D</td><td>Duplicar</td></tr>
@@ -403,11 +434,11 @@ const num = (v, def) => { const n = +v; return isFinite(n) ? n : def; };
 function newDoc() {
   return {
     version: 2, titulo: 'Muro A',
-    wall: { w: 500, h: 300, color: '#ffffff', eje: 150 },
+    wall: { w: 500, h: 300, color: '#ffffff', eje: 150, grosor: 15 },
     items: [makePersona({ nombre: 'Persona 170', h: 170, x: -75 }, 300)], images: {}, guides: { v: [], h: [] },
     opts: {
       cotas: 'sel', showEje: true, showHuman: true, showOjos: false, showFichas: false,
-      showGrid: false, grid: 10, showGuides: true, showMuro: false,
+      showGrid: false, grid: 10, showGuides: true, showMuro: false, vista: 'alzado', iso: defaultIso(),
       snapObj: true, snapGuides: true, snapGrid: false,
       exp: defaultExp(),
     },
@@ -430,19 +461,19 @@ const EXP_PRESETS = {
 function makeObra(o) {
   return Object.assign({
     id: uid('o'), tipo: 'obra', nombre: 'Obra', x: 0, y: 0, w: 50, h: 70,
-    marco: 0, pp: 0, caida: 0, rot: 0, lock: true, bloqueado: false, oculto: false,
+    marco: 0, pp: 0, prof: 3, caida: 0, rot: 0, lock: true, bloqueado: false, oculto: false,
     imgId: null, imgRatio: null,
     ficha: { titulo: '', autor: '', anio: '', tecnica: '', inv: '' },
   }, o);
 }
 function makeVano(o) {
-  return Object.assign({ id: uid('v'), tipo: 'vano', nombre: 'Vano', x: 0, y: 0, w: 90, h: 210, bloqueado: false, oculto: false }, o);
+  return Object.assign({ id: uid('v'), tipo: 'vano', nombre: 'Vano', x: 0, y: 0, w: 90, h: 210, prof: 0, bloqueado: false, oculto: false }, o);
 }
 // persona de referencia: siempre apoyada en el piso; x = borde izquierdo, h = estatura (o altura total en silla)
 const FIG = { pie: { w: 0.29, ojos: 0.936 }, silla: { w: 0.585, ojos: 0.92 } };
 function personaW(h, figura) { return h * (FIG[figura] || FIG.pie).w; }
 function makePersona(o, wallH) {
-  const it = Object.assign({ id: uid('p'), tipo: 'persona', nombre: 'Persona', figura: 'pie', x: 0, y: 0, h: 170, w: 0, bloqueado: false, oculto: false }, o);
+  const it = Object.assign({ id: uid('p'), tipo: 'persona', nombre: 'Persona', figura: 'pie', x: 0, y: 0, h: 170, w: 0, dist: 120, bloqueado: false, oculto: false }, o);
   if (!FIG[it.figura]) it.figura = 'pie';
   it.h = Math.max(30, Math.min(260, num(it.h, 170)));
   it.w = personaW(it.h, it.figura);
@@ -757,9 +788,11 @@ function normalize(src) {
   const d = newDoc();
   d.titulo = typeof src.titulo === 'string' ? src.titulo : d.titulo;
   const w = src.wall || {};
-  d.wall = { w: Math.max(1, num(w.w, 500)), h: Math.max(1, num(w.h, 300)), color: /^#[0-9a-f]{6}$/i.test(w.color) ? w.color : '#ffffff', eje: num(w.eje, 150) };
+  d.wall = { w: Math.max(1, num(w.w, 500)), h: Math.max(1, num(w.h, 300)), color: /^#[0-9a-f]{6}$/i.test(w.color) ? w.color : '#ffffff', eje: num(w.eje, 150), grosor: Math.max(0, num(w.grosor, 15)) };
   d.opts = Object.assign(d.opts, src.opts || {});
   d.opts.exp = Object.assign(defaultExp(), (src.opts && src.opts.exp) || {});
+  d.opts.iso = Object.assign(defaultIso(), (src.opts && src.opts.iso) || {});
+  if (d.opts.vista !== 'iso') d.opts.vista = 'alzado';
   const g = src.guides || {};
   d.guides = { v: (g.v || []).map(Number).filter(isFinite), h: (g.h || []).map(Number).filter(isFinite) };
   d.images = src.images && typeof src.images === 'object' ? src.images : {};
@@ -813,14 +846,14 @@ function parseProject(text) {
 function csvCell(v) { const s = v == null ? '' : String(v); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 function toCSV(doc) {
   const head = ['orden', 'tipo', 'nombre', 'titulo', 'autor', 'anio', 'tecnica', 'inventario',
-    'ancho_obra_cm', 'alto_obra_cm', 'marco_cm', 'paspartu_cm', 'ancho_ext_cm', 'alto_ext_cm',
+    'ancho_obra_cm', 'alto_obra_cm', 'marco_cm', 'paspartu_cm', 'profundidad_cm', 'ancho_ext_cm', 'alto_ext_cm',
     'desde_izquierda_cm', 'piso_a_borde_inf_cm', 'piso_a_centro_cm', 'piso_a_borde_sup_cm', 'caida_cm', 'altura_clavo_cm'];
   const rows = [head];
   const els = doc.items.filter((it) => it.tipo === 'obra' || it.tipo === 'vano').slice().sort((a, b) => outer(a).x - outer(b).x);
   els.forEach((it, i) => {
     const n = info(doc, it), f = it.ficha || {}, o = it.tipo === 'obra';
     rows.push([i + 1, it.tipo, it.nombre, f.titulo, f.autor, f.anio, f.tecnica, f.inv,
-      fmt(it.w), fmt(it.h), o ? fmt(num(it.marco, 0)) : '', o ? fmt(num(it.pp, 0)) : '', fmt(n.extW), fmt(n.extH),
+      fmt(it.w), fmt(it.h), o ? fmt(num(it.marco, 0)) : '', o ? fmt(num(it.pp, 0)) : '', fmt(num(it.prof, 0)), fmt(n.extW), fmt(n.extH),
       fmt(n.izq), fmt(n.inf), fmt(n.centro), fmt(n.sup), o ? fmt(num(it.caida, 0)) : '', o ? fmt(n.clavo) : '']);
   });
   return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
@@ -846,7 +879,7 @@ function maxPxCm(bounds) {
   return Math.min(Math.sqrt(MAX_AREA / (bounds.w * bounds.h)), MAX_SIDE / bounds.w, MAX_SIDE / bounds.h);
 }
 function exportFrame(doc, o) {
-  const bounds = exportBounds(doc, o);
+  const bounds = o.iso ? isoBounds(doc, o) : exportBounds(doc, o);
   const s = Math.max(0.1, Math.min(num(o.pxcm, 10), maxPxCm(bounds)));
   const W = Math.max(1, Math.round(bounds.w * s)), H = Math.max(1, Math.round(bounds.h * s));
   return { bounds, s, W, H, view: { s, ox: -bounds.x * s, oy: -bounds.y * s }, u: Math.max(1, W / 1200), capped: s < num(o.pxcm, 10) - 1e-9 };
@@ -880,6 +913,13 @@ function canvasPainter(ctx, getImage) {
       ctx.fillStyle = o.fill || COL.ink; ctx.fillText(s, x, y);
       ctx.restore();
     },
+    imageM(id, m, w, h, rot) {
+      const img = getImage(id); if (!img) return false;
+      const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h;
+      ctx.save(); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); ctx.translate(w / 2, h / 2); ctx.rotate(r * Math.PI / 180);
+      ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh); ctx.restore();
+      return true;
+    },
     image(id, x, y, w, h, rot) {
       const img = getImage(id); if (!img) return false;
       const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h;
@@ -907,6 +947,14 @@ function svgPainter(images) {
       const halo = o.halo ? ' stroke="' + (o.haloColor || '#fff') + '" stroke-width="' + n(size * 0.4) + '" stroke-linejoin="round" paint-order="stroke"' : '';
       parts.push('<text x="' + n(x) + '" y="' + n(y) + '" dy="' + dy + '" font-family="' + esc(FONT) + '" font-size="' + n(size) + '" font-weight="' + (o.weight || 400)
         + '" text-anchor="' + anchor + '" fill="' + (o.fill || COL.ink) + '"' + halo + (o.rot ? ' transform="rotate(' + o.rot + ' ' + n(x) + ' ' + n(y) + ')"' : '') + '>' + esc(s) + '</text>');
+    },
+    imageM(id, m, w, h, rot) {
+      const src = images[id]; if (!src) return false;
+      const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h;
+      parts.push('<g transform="matrix(' + m.map((q) => Math.round(q * 1e4) / 1e4).join(' ') + ')">'
+        + '<image href="' + src + '" xlink:href="' + src + '" x="' + n(w / 2 - sw / 2) + '" y="' + n(h / 2 - sh / 2) + '" width="' + n(sw) + '" height="' + n(sh)
+        + '" preserveAspectRatio="none"' + (r ? ' transform="rotate(' + r + ' ' + n(w / 2) + ' ' + n(h / 2) + ')"' : '') + '/></g>');
+      return true;
     },
     image(id, x, y, w, h, rot) {
       const src = images[id]; if (!src) return false;
@@ -1090,26 +1138,8 @@ function drawScene(P, doc, v, o) {
   if (o.tempMed) drawMedida(o.tempMed, COL.orange, 1.5);
 
   function drawPersona(it) {
-    const cx = it.x + it.w / 2, base = it.y + it.h, st = { fill: 'rgba(79,107,130,0.18)', stroke: COL.steel, lw: u };
-    if (it.figura === 'silla') { // silla de ruedas vista de perfil, normalizada a 130 de alto
-      const k = it.h / 130, Q = (x, y) => [X(cx + x * k), Y(base - y * k)];
-      P.circle(Q(-8, 30)[0], Q(-8, 30)[1], L(29 * k), { stroke: COL.steel, lw: 1.4 * u });
-      P.circle(Q(-8, 30)[0], Q(-8, 30)[1], L(3 * k), { fill: COL.steel });
-      P.circle(Q(28, 6)[0], Q(28, 6)[1], L(6 * k), { stroke: COL.steel, lw: 1.2 * u });
-      P.line(...Q(-26, 38), ...Q(24, 38), { stroke: COL.steel, lw: 1.4 * u });
-      P.line(...Q(-26, 38), ...Q(-30, 88), { stroke: COL.steel, lw: 1.4 * u });
-      P.line(...Q(-30, 88), ...Q(-38, 88), { stroke: COL.steel, lw: 1.4 * u });
-      P.line(...Q(24, 38), ...Q(28, 12), { stroke: COL.steel, lw: 1.2 * u });
-      P.poly([Q(-24, 104), Q(-6, 104), Q(-2, 50), Q(26, 50), Q(30, 44), Q(30, 16), Q(38, 14), Q(38, 9), Q(22, 9), Q(22, 40), Q(-24, 40)], st);
-      P.circle(Q(-14, 117)[0], Q(-14, 117)[1], L(12 * k), st);
-    } else {
-      const k = it.h / 170;
-      const pts = [[-10, 0], [-2, 0], [0, 78], [2, 0], [10, 0], [12, 90], [20, 96], [24, 140], [9, 144], [-9, 144], [-24, 140], [-20, 96], [-12, 90]]
-        .map((p) => [X(cx + p[0] * k), Y(base - p[1] * k)]);
-      P.poly(pts, st);
-      P.circle(X(cx), Y(base - 157 * k), L(12 * k), st);
-    }
-    P.text(fmt(it.h), X(cx), Y(it.y) - 4 * u, { size: 9 * u, fill: COL.steel, align: 'center', base: 'bottom', halo: true });
+    paintPersona(P, personaGeom(it), (x, h) => [X(x), Y(H - h)], (c, r, st) => P.circle(X(c[0]), Y(H - c[1]), L(r), st), u);
+    P.text(fmt(it.h), X(it.x + it.w / 2), Y(it.y) - 4 * u, { size: 9 * u, fill: COL.steel, align: 'center', base: 'bottom', halo: true });
   }
   function drawMedida(m, col, lw) {
     const len = Math.hypot(m.x2 - m.x1, m.y2 - m.y1);
@@ -1139,6 +1169,215 @@ function drawScene(P, doc, v, o) {
     else { const out = g.out || 1; P.text(label, mx + out * 4 * u, my, Object.assign(txt, { align: 'center', base: out > 0 ? 'top' : 'bottom', rot: -90 })); }
   }
 }
+
+// ---------- personas: geometría en cm (x, altura desde el piso) ----------
+function personaGeom(it) {
+  const cx = it.x + it.w / 2, out = [];
+  if (it.figura === 'silla') { // silla de ruedas de perfil, normalizada a 130 de alto
+    const k = it.h / 130, Pt = (x, y) => [cx + x * k, y * k];
+    out.push({ t: 'circle', c: Pt(-8, 30), r: 29 * k, st: 'wheel' }, { t: 'circle', c: Pt(-8, 30), r: 3 * k, st: 'hub' },
+      { t: 'circle', c: Pt(28, 6), r: 6 * k, st: 'caster' },
+      { t: 'line', a: Pt(-26, 38), b: Pt(24, 38) }, { t: 'line', a: Pt(-26, 38), b: Pt(-30, 88) },
+      { t: 'line', a: Pt(-30, 88), b: Pt(-38, 88) }, { t: 'line', a: Pt(24, 38), b: Pt(28, 12), lw: 1.2 },
+      { t: 'poly', pts: [Pt(-24, 104), Pt(-6, 104), Pt(-2, 50), Pt(26, 50), Pt(30, 44), Pt(30, 16), Pt(38, 14), Pt(38, 9), Pt(22, 9), Pt(22, 40), Pt(-24, 40)] },
+      { t: 'circle', c: Pt(-14, 117), r: 12 * k, st: 'body' });
+  } else {
+    const k = it.h / 170, Pt = (x, y) => [cx + x * k, y * k];
+    out.push({ t: 'poly', pts: [[-10, 0], [-2, 0], [0, 78], [2, 0], [10, 0], [12, 90], [20, 96], [24, 140], [9, 144], [-9, 144], [-24, 140], [-20, 96], [-12, 90]].map((p) => Pt(p[0], p[1])) },
+      { t: 'circle', c: Pt(0, 157), r: 12 * k, st: 'body' });
+  }
+  return out;
+}
+function paintPersona(P, geom, map, circ, u) {
+  const body = { fill: 'rgba(79,107,130,0.18)', stroke: COL.steel, lw: u };
+  for (const g of geom) {
+    if (g.t === 'poly') P.poly(g.pts.map((p) => map(p[0], p[1])), body);
+    else if (g.t === 'line') { const a = map(g.a[0], g.a[1]), b = map(g.b[0], g.b[1]); P.line(a[0], a[1], b[0], b[1], { stroke: COL.steel, lw: (g.lw || 1.4) * u }); }
+    else circ(g.c, g.r, g.st === 'body' ? body : g.st === 'hub' ? { fill: COL.steel } : { stroke: COL.steel, lw: (g.st === 'wheel' ? 1.4 : 1.2) * u });
+  }
+}
+
+// ---------- vista isométrica ----------
+// Axonometría con longitudes reales sobre los tres ejes: x a lo largo del muro, y altura, z hacia el visitante.
+// a = giro del muro respecto de la horizontal; b = inclinación del eje de profundidad.
+function defaultIso() { return { a: 30, b: 30, lado: 'der', piso: 200, gridPiso: true }; }
+function isoAxes(iso) {
+  const a = num(iso.a, 30) * Math.PI / 180, b = num(iso.b, 30) * Math.PI / 180;
+  return iso.lado === 'izq'
+    ? { cx: Math.cos(a), dx: -Math.sin(a), cz: Math.cos(b), dz: Math.sin(b), right: false }
+    : { cx: Math.cos(a), dx: Math.sin(a), cz: -Math.cos(b), dz: Math.sin(b), right: true };
+}
+function isoPt(ax, x, y, z) { return [x * ax.cx + z * ax.cz, -y + x * ax.dx + z * ax.dz]; }
+function isoCfg(doc) { return Object.assign(defaultIso(), doc.opts.iso || {}); }
+function isoExtent(doc, o) {
+  const W = doc.wall.w, ps = o.human ? doc.items.filter((i) => i.tipo === 'persona' && !i.oculto) : [];
+  let x0 = 0, x1 = W, D = Math.max(20, num(isoCfg(doc).piso, 200));
+  for (const p of ps) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x + p.w); D = Math.max(D, num(p.dist, 120) + 40); }
+  return { fx0: x0 - 30, fx1: x1 + 30, D, ps };
+}
+// límites en unidades de pantalla a escala 1 (cm proyectados)
+function isoBounds(doc, o) {
+  const iso = isoCfg(doc), ax = isoAxes(iso), W = doc.wall.w, H = doc.wall.h, t = Math.max(0, num(doc.wall.grosor, 15));
+  const e = isoExtent(doc, o), sh = o.show || {}, pts = [];
+  const box = (x0, x1, y0, y1, z0, z1) => { for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) pts.push(isoPt(ax, x, y, z)); };
+  box(e.fx0, e.fx1, 0, 0, 0, e.D); box(0, W, 0, H, -t, 0);
+  for (const it of doc.items) {
+    if (it.oculto || !(it.tipo === 'obra' || (it.tipo === 'vano' && sh.vanos !== false))) continue;
+    const r = outer(it); box(r.x, r.x + r.w, H - r.y - r.h, H - r.y, 0, Math.max(0, num(it.prof, 0)));
+  }
+  for (const p of e.ps) box(p.x, p.x + p.w, 0, p.h + 14, num(p.dist, 120), num(p.dist, 120));
+  if (sh.muro) { const pad = isoMuroPad(doc, iso) + 20; box(-pad, W + pad, 0, H + pad, 0, 0); }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of pts) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }
+  const m = Math.max(0, num(o.margen, 40)), w = x1 - x0;
+  const pie = (o.escala || o.rotulo) ? Math.max(30, w * 0.08) : 0;
+  return { x: x0 - m, y: y0 - m, w: w + 2 * m, h: y1 - y0 + 2 * m + pie };
+}
+function isoMuroPad(doc, iso) { return Math.max(0, num(doc.wall.grosor, 15)) * Math.sin(num(iso.b, 30) * Math.PI / 180) + 12; }
+
+// o: { ui, sel, human, ojos, eje, show:{imagenes,vanos,fichas,muro}, escala, rotulo, bounds }
+function drawIso(P, doc, v, o) {
+  const u = o.ui || 1, s = v.s, iso = isoCfg(doc), ax = isoAxes(iso);
+  const W = doc.wall.w, H = doc.wall.h, t = Math.max(0, num(doc.wall.grosor, 15));
+  const Q = (x, y, z) => { const p = isoPt(ax, x, y, z); return [v.ox + p[0] * s, v.oy + p[1] * s]; };
+  const show = Object.assign({ imagenes: true, vanos: true, fichas: false, muro: false }, o.show || {});
+  const sel = o.sel || new Set(), e = isoExtent(doc, o), sg = ax.right ? 1 : -1;
+  const line = (a, b, st) => P.line(a[0], a[1], b[0], b[1], st);
+  const ellipse = (fn, n) => { const pts = []; for (let i = 0; i < n; i++) { const k = i / n * 2 * Math.PI; pts.push(fn(Math.cos(k), Math.sin(k))); } return pts; };
+
+  // piso
+  P.poly([Q(e.fx0, 0, 0), Q(e.fx1, 0, 0), Q(e.fx1, 0, e.D), Q(e.fx0, 0, e.D)], { fill: '#e7e5dd', stroke: '#b9b7ae', lw: u });
+  if (iso.gridPiso) {
+    const gs = { stroke: 'rgba(17,17,17,0.09)', lw: u }, st = 50;
+    for (let z = st; z < e.D - EPS; z += st) line(Q(e.fx0, 0, z), Q(e.fx1, 0, z), gs);
+    for (let x = Math.ceil(e.fx0 / st) * st; x <= e.fx1 + EPS; x += st) line(Q(x, 0, 0), Q(x, 0, e.D), gs);
+  }
+  for (const p of e.ps) { // sombra de cada persona sobre el piso
+    const cx = p.x + p.w / 2, d = num(p.dist, 120), rx = p.w * 0.55, rz = Math.min(25, p.w * 0.45);
+    P.poly(ellipse((c, sn) => Q(cx + rx * c, 0, d + rz * sn), 28), { fill: 'rgba(17,17,17,0.10)' });
+  }
+  // muro: canto visible, coronación y cara
+  const xe = ax.right ? W : 0, wl = { stroke: COL.ink, lw: u };
+  if (t > 0) {
+    P.poly([Q(xe, 0, -t), Q(xe, 0, 0), Q(xe, H, 0), Q(xe, H, -t)], Object.assign({ fill: '#d6d4cc' }, wl));
+    P.poly([Q(0, H, -t), Q(W, H, -t), Q(W, H, 0), Q(0, H, 0)], Object.assign({ fill: '#ebeae4' }, wl));
+  }
+  P.poly([Q(0, 0, 0), Q(W, 0, 0), Q(W, H, 0), Q(0, H, 0)], Object.assign({ fill: doc.wall.color || '#fff' }, wl));
+  if (o.eje) line(Q(0, doc.wall.eje, 0), Q(W, doc.wall.eje, 0), { stroke: COL.mossD, lw: u, dash: [6 * u, 4 * u] });
+
+  function ficha(it, p) { // bajo la cara frontal de la obra; una obra más cercana puede taparla
+    const f = it.ficha || {};
+    const lines = [f.titulo || '', [f.autor, f.anio].filter(Boolean).join(', '), f.tecnica || ''].filter(Boolean);
+    if (!lines.length) return;
+    const y0 = p[1] + 6 * u;
+    const bw = Math.max(...lines.map((tx, i) => tx.length * (i ? 9.5 : 10.5) * 0.61)) * u + 6 * u, bh = lines.length * 13 * u + 4 * u;
+    P.rect(p[0] - 3 * u, y0 - 2 * u, bw, bh, { fill: doc.wall.color || '#fff' });
+    lines.forEach((tx, i) => P.text(tx, p[0], y0 + i * 13 * u, { size: (i ? 9.5 : 10.5) * u, fill: i ? '#44443f' : COL.ink, weight: i ? 400 : 600, base: 'top' }));
+  }
+  // obras y vanos, del más lejano al más cercano
+  const boxes = doc.items.filter((it) => !it.oculto && (it.tipo === 'obra' || (it.tipo === 'vano' && show.vanos)))
+    .map((it) => ({ it, r: outer(it) }))
+    .sort((A, B) => (sg * (A.r.x + A.r.w / 2) + (H - A.r.y)) - (sg * (B.r.x + B.r.w / 2) + (H - B.r.y)));
+  for (const { it, r } of boxes) {
+    const x0 = r.x, x1 = r.x + r.w, y1 = H - r.y, y0 = H - r.y - r.h, dp = Math.max(0, num(it.prof, 0));
+    const obra = it.tipo === 'obra', m = obra ? Math.max(0, num(it.marco, 0)) : 0, pp = obra ? Math.max(0, num(it.pp, 0)) : 0;
+    const out = { stroke: 'rgba(17,17,17,0.55)', lw: u };
+    if (dp > 0) {
+      const side = obra ? (m > 0 ? '#1d1c19' : '#a9a79f') : '#b3b1a9', top = obra ? (m > 0 ? '#44433e' : '#cfcdc5') : '#d2d0c8';
+      const xs = ax.right ? x1 : x0;
+      P.poly([Q(xs, y0, 0), Q(xs, y0, dp), Q(xs, y1, dp), Q(xs, y1, 0)], Object.assign({ fill: side }, out));
+      P.poly([Q(x0, y1, 0), Q(x1, y1, 0), Q(x1, y1, dp), Q(x0, y1, dp)], Object.assign({ fill: top }, out));
+    }
+    const face = (a0, a1, b0, b1) => [Q(a0, b0, dp), Q(a1, b0, dp), Q(a1, b1, dp), Q(a0, b1, dp)];
+    if (!obra) {
+      P.poly(face(x0, x1, y0, y1), { fill: COL.vano });
+      for (const g of hatch(x0, -y1, r.w, r.h, (9 * u) / s)) line(Q(g[0], -g[1], dp), Q(g[2], -g[3], dp), { stroke: COL.hatch, lw: u });
+      P.poly(face(x0, x1, y0, y1), { stroke: '#8a8a84', lw: u, dash: [4 * u, 3 * u] });
+      const c = Q((x0 + x1) / 2, (y0 + y1) / 2, dp);
+      P.text(it.nombre || 'Vano', c[0], c[1], { size: 10 * u, fill: '#55554f', align: 'center', base: 'middle', halo: true, haloColor: COL.vano });
+      continue;
+    }
+    if (m > 0) P.poly(face(x0, x1, y0, y1), { fill: COL.marco });
+    if (pp > 0) P.poly(face(x0 + m, x1 - m, y0 + m, y1 - m), { fill: COL.pp });
+    const ix = it.x + m + pp, itop = H - (it.y + m + pp), org = Q(ix, itop, dp);
+    const drawn = it.imgId && show.imagenes ? P.imageM(it.imgId, [ax.cx * s, ax.dx * s, 0, s, org[0], org[1]], it.w, it.h, it.rot) : false;
+    if (!drawn) {
+      const f = face(ix, ix + it.w, itop - it.h, itop);
+      P.poly(f, { fill: COL.ph }); line(f[0], f[2], { stroke: '#cfcdc5', lw: u }); line(f[1], f[3], { stroke: '#cfcdc5', lw: u });
+    }
+    P.poly(face(x0, x1, y0, y1), out);
+    if (show.fichas) { const a = Q(x0, y0, dp), b = Q(x1, y0, dp); ficha(it, [a[0], Math.max(a[1], b[1])]); }
+  }
+  // selección
+  for (const it of doc.items) {
+    if (!sel.has(it.id) || it.oculto) continue;
+    const st = { stroke: COL.mossD, lw: 2 };
+    if (it.tipo === 'obra' || (it.tipo === 'vano' && show.vanos)) {
+      const r = outer(it), dp = Math.max(0, num(it.prof, 0));
+      P.poly([Q(r.x, H - r.y - r.h, dp), Q(r.x + r.w, H - r.y - r.h, dp), Q(r.x + r.w, H - r.y, dp), Q(r.x, H - r.y, dp)], st);
+    } else if (it.tipo === 'persona' && o.human) {
+      const d = num(it.dist, 120);
+      P.poly([Q(it.x, 0, d), Q(it.x + it.w, 0, d), Q(it.x + it.w, it.h, d), Q(it.x, it.h, d)], Object.assign({ dash: [4, 3] }, st));
+    }
+  }
+  if (o.eje) { const p = Q(0, doc.wall.eje, 0); P.text('eje ' + fmt(doc.wall.eje), p[0] + 5 * u, p[1] - 3 * u, { size: 10 * u, fill: COL.mossD, base: 'bottom', halo: true }); }
+  // personas, de la más lejana a la más cercana
+  for (const p of e.ps.slice().sort((A, B) => num(A.dist, 120) - num(B.dist, 120) || sg * (A.x - B.x))) {
+    const d = num(p.dist, 120), cx = p.x + p.w / 2;
+    paintPersona(P, personaGeom(p), (x, h) => Q(x, h, d),
+      (c, rr, st) => P.poly(ellipse((cs, sn) => Q(c[0] + rr * cs, c[1] + rr * sn, d), 28), st), u);
+    const top = Q(cx, p.h, d);
+    P.text(fmt(p.h), top[0], top[1] - 4 * u, { size: 9 * u, fill: COL.steel, align: 'center', base: 'bottom', halo: true });
+    if (o.ojos) { // línea de mirada horizontal hasta el muro
+      const eh = ojos(p), a = Q(cx, eh, d);
+      if (cx >= 0 && cx <= W) { // frente al muro: mirada perpendicular hasta la pared
+        const b = Q(cx, eh, 0);
+        line(a, b, { stroke: COL.steel, lw: u, dash: [3 * u, 3 * u] });
+        P.circle(b[0], b[1], 2.5 * u, { fill: COL.steel });
+        P.text('ojos ' + fmt(eh), b[0] + 5 * u, b[1] - 3 * u, { size: 9 * u, fill: COL.steel, base: 'bottom', halo: true });
+      } else { // fuera del ancho del muro: solo la marca a la altura de los ojos
+        const r = Q(p.x + p.w + 6, eh, d), l = Q(p.x - 6, eh, d);
+        line(l, r, { stroke: COL.steel, lw: u, dash: [2 * u, 2 * u] });
+        P.text('ojos ' + fmt(eh), r[0] + 4 * u, r[1], { size: 9 * u, fill: COL.steel, base: 'middle', halo: true });
+      }
+    }
+  }
+  // tamaño del muro
+  if (show.muro) {
+    const pad = isoMuroPad(doc, iso) + (6 * u) / s, col = { stroke: COL.ink, lw: u };
+    const dim = (a, b, label, vertical, outDir) => {
+      line(a, b, col);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / len, ny = (b[0] - a[0]) / len, tk = 4 * u;
+      line([a[0] - nx * tk, a[1] - ny * tk], [a[0] + nx * tk, a[1] + ny * tk], col); line([b[0] - nx * tk, b[1] - ny * tk], [b[0] + nx * tk, b[1] + ny * tk], col);
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, txt = { size: 11 * u, fill: COL.ink, weight: 600, halo: true };
+      if (vertical) P.text(label, mx + outDir * 4 * u, my, Object.assign(txt, { align: 'center', base: outDir > 0 ? 'top' : 'bottom', rot: -90 }));
+      else P.text(label, mx, my - 4 * u, Object.assign(txt, { align: 'center', base: 'bottom' }));
+    };
+    dim(Q(0, H + pad, 0), Q(W, H + pad, 0), fmt(W) + ' cm', false);
+    const xh = ax.right ? -((14 * u) / s) : W + (14 * u) / s;
+    dim(Q(xh, 0, 0), Q(xh, H, 0), fmt(H) + ' cm', true, ax.right ? -1 : 1);
+  }
+  // pie: escala sobre el eje del muro y rótulo
+  if ((o.escala || o.rotulo) && o.bounds) {
+    const b = o.bounds, bx = v.ox + b.x * s, by = v.oy + (b.y + b.h) * s, bw = b.w * s;
+    if (o.escala) {
+      const len = niceLen(W * 0.3), segs = 4, ux = ax.cx * s, uy = ax.dx * s, x0 = bx + 14 * u;
+      const y0 = by - 34 * u - Math.max(0, uy * len);
+      const nl = Math.hypot(ux, uy), nx = -uy / nl * 6 * u, ny = ux / nl * 6 * u;
+      for (let i = 0; i < segs; i++) {
+        const a = [x0 + ux * len * i / segs, y0 + uy * len * i / segs], c = [x0 + ux * len * (i + 1) / segs, y0 + uy * len * (i + 1) / segs];
+        P.poly([a, c, [c[0] + nx, c[1] + ny], [a[0] + nx, a[1] + ny]], { fill: i % 2 ? '#fff' : COL.ink, stroke: COL.ink, lw: u });
+      }
+      P.text('0', x0, y0 - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
+      P.text(fmt(len) + ' cm', x0 + ux * len, y0 + uy * len - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
+      P.text('medidas reales a lo largo de los tres ejes', x0, y0 + Math.max(0, uy * len) + 12 * u, { size: 9 * u, fill: '#55554f', base: 'top' });
+    }
+    if (o.rotulo) {
+      const tit = (doc.titulo || 'Muro') + ' — ' + fmt(W) + ' × ' + fmt(H) + ' cm, vista isométrica';
+      P.text(tit, bx + bw - 14 * u, by - 14 * u, { size: 11 * u, align: 'right', base: 'bottom', weight: 600 });
+    }
+  }
+}
 function corners(r) { return [[r.x, r.y, 'nw'], [r.x + r.w, r.y, 'ne'], [r.x, r.y + r.h, 'sw'], [r.x + r.w, r.y + r.h, 'se']]; }
 
 return {
@@ -1153,6 +1392,7 @@ return {
   snapshot, restore, serialize, normalize, migrateV1, parseProject, toCSV,
   MAX_AREA, MAX_SIDE, exportBounds, maxPxCm, exportFrame,
   canvasPainter, svgPainter, hatch, drawScene,
+  defaultIso, isoAxes, isoPt, isoBounds, drawIso, personaGeom,
 };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MD;
@@ -1168,7 +1408,9 @@ const fmt = MD.fmt;
 
 // ---------- estado ----------
 let doc = MD.newDoc();
-let view = { s: 1, ox: 0, oy: 0 };
+const viewAlz = { s: 1, ox: 0, oy: 0 }, viewIso = { s: 1, ox: 0, oy: 0, fitted: false };
+let view = viewAlz;
+const isIso = () => doc.opts.vista === 'iso';
 let sel = new Set();
 let tool = 'select', space = false;
 let drag = null, snapVis = null, marquee = null, tempMed = null, hover = null;
@@ -1271,6 +1513,7 @@ function fitRect(b) {
   afterView();
 }
 function fitView() {
+  if (isIso()) { fitRect(MD.isoBounds(doc, { margen: 0, human: doc.opts.showHuman, show: { muro: !!doc.opts.showMuro } })); viewIso.fitted = true; return; }
   const rects = [MD.wallRect(doc)];
   for (const it of doc.items) if (!it.oculto && (it.tipo !== 'persona' || doc.opts.showHuman)) rects.push(MD.outer(it));
   const b = MD.bbox(rects); b.y -= 12; b.h += 22; // aire para rótulos y piso
@@ -1287,6 +1530,7 @@ function centerOn(b) {
   view.ox = (w + RULER) / 2 - (b.x + b.w / 2) * view.s; view.oy = (h + RULER) / 2 - (b.y + b.h / 2) * view.s; afterView();
 }
 function centerView() {
+  if (isIso()) return fitView();
   const ss = selItems();
   centerOn(ss.length ? MD.bbox(ss.map(MD.outer)) : MD.wallRect(doc));
 }
@@ -1303,13 +1547,16 @@ function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = MD.COL.paste; ctx.fillRect(0, 0, w, h);
   const P = MD.canvasPainter(ctx, getImage);
-  MD.drawScene(P, doc, view, {
+  if (isIso()) {
+    MD.drawIso(P, doc, view, { ui: 1, sel, human: doc.opts.showHuman, ojos: doc.opts.showOjos, eje: doc.opts.showEje,
+      show: { fichas: !!doc.opts.showFichas, muro: !!doc.opts.showMuro } });
+  } else MD.drawScene(P, doc, view, {
     ui: 1, sel, handles: tool === 'select', cotas: doc.opts.cotas, eje: doc.opts.showEje, human: doc.opts.showHuman,
     ojos: doc.opts.showOjos, show: { fichas: !!doc.opts.showFichas, muro: !!doc.opts.showMuro },
     grid: doc.opts.showGrid, guides: doc.opts.showGuides ? doc.guides : null, snap: snapVis, marquee, tempMed,
     floorRange: [(0 - view.ox) / view.s, (w - view.ox) / view.s], vw: w, vh: h,
   });
-  drawRulers(w, h);
+  if (!isIso()) drawRulers(w, h);
   if (panelDirty) { panelDirty = false; renderPanel(); }
   if (layersDirty) renderLayers();
   $('empty').style.display = doc.items.some((i) => i.tipo !== 'persona') ? 'none' : '';
@@ -1379,7 +1626,7 @@ function snapCtx(exclude) {
 function updateCursor(px, py) {
   let c = 'default';
   if (drag && drag.kind === 'pan') c = 'grabbing';
-  else if (space || tool === 'hand') c = 'grab';
+  else if (space || tool === 'hand' || isIso()) c = 'grab';
   else if (px < RULER || py < RULER) c = px < RULER && py < RULER ? 'default' : (py < RULER ? 'row-resize' : 'col-resize');
   else if (tool === 'measure') c = 'crosshair';
   else if (px != null) {
@@ -1406,7 +1653,7 @@ cv.addEventListener('pointerdown', (e) => {
   }
   if (pointers.size > 2 || drag) return;
   const p = toCm(px, py);
-  if (e.button === 1 || tool === 'hand' || space) {
+  if (e.button === 1 || tool === 'hand' || space || isIso()) {
     drag = { kind: 'pan', px0: px, py0: py, ox0: view.ox, oy0: view.oy }; updateCursor(px, py); e.preventDefault(); return;
   }
   if (e.button !== 0) return;
@@ -1446,7 +1693,7 @@ cv.addEventListener('pointermove', (e) => {
   lastPx = px; lastPy = py;
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { px, py });
   const p = toCm(px, py);
-  hover = p; showPos(p);
+  hover = isIso() ? null : p; if (!isIso()) showPos(p);
   if (!drag) { updateCursor(px, py); requestRender(); return; }
   const noSnap = e.ctrlKey || e.metaKey;
   switch (drag.kind) {
@@ -1605,6 +1852,9 @@ window.addEventListener('keydown', (e) => {
   if (e.shiftKey && !mod && e.code === 'Digit0') { e.preventDefault(); zoomTo(calib); return; }
   if (e.shiftKey && !mod && e.code === 'Digit2') { e.preventDefault(); centerView(); return; }
   if (k === '?') { openHelp(); return; }
+  if (e.shiftKey && !mod && e.code === 'KeyA') { e.preventDefault(); setVista('alzado'); return; }
+  if (e.shiftKey && !mod && e.code === 'KeyI') { e.preventDefault(); setVista('iso'); return; }
+  if (isIso() && !mod && ['v', 'h', 'm'].includes(k.toLowerCase())) return;
   if (!mod && !e.altKey) {
     const l = k.toLowerCase();
     if (l === 'v') setTool('select'); else if (l === 'h') setTool('hand'); else if (l === 'm') setTool('measure');
@@ -1612,6 +1862,40 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => { if (e.code === 'Space') { space = false; updateCursor(lastPx, lastPy); } });
 window.addEventListener('blur', () => { space = false; });
+
+function setVista(m, silent) {
+  doc.opts.vista = m === 'iso' ? 'iso' : 'alzado';
+  const iso = isIso();
+  view = iso ? viewIso : viewAlz;
+  $('v-alz').setAttribute('aria-pressed', !iso); $('v-iso').setAttribute('aria-pressed', iso);
+  ['t-select', 't-hand', 't-measure'].forEach((id) => { $(id).disabled = iso; });
+  $('iso-sec').hidden = !iso;
+  drag = null; snapVis = null; marquee = null; tempMed = null; hover = null; showPos(null);
+  if (iso) syncIso();
+  if (iso && !viewIso.fitted) fitView(); else afterView();
+  if (!silent) msg(iso ? 'Vista isométrica de solo lectura. Arrastra para desplazar; edita las obras en Alzado.' : 'Vista en alzado.');
+  updateCursor(lastPx, lastPy);
+}
+$('v-alz').onclick = () => setVista('alzado');
+$('v-iso').onclick = () => setVista('iso');
+function syncIso() {
+  const c = doc.opts.iso = Object.assign(MD.defaultIso(), doc.opts.iso || {});
+  $('iso-lado').value = c.lado; $('iso-a').value = c.a; $('iso-b').value = c.b;
+  $('iso-a-v').textContent = c.a + '°'; $('iso-b-v').textContent = c.b + '°';
+  $('iso-piso').value = fmt(c.piso); $('iso-grosor').value = fmt(MD.num(doc.wall.grosor, 15)); $('iso-grid').checked = !!c.gridPiso;
+}
+function isoSet(k, v) { doc.opts.iso[k] = v; dirty = true; syncIso(); requestRender(); }
+$('iso-lado').addEventListener('change', (e) => { isoSet('lado', e.target.value); fitView(); });
+$('iso-a').addEventListener('input', (e) => isoSet('a', +e.target.value));
+$('iso-b').addEventListener('input', (e) => isoSet('b', +e.target.value));
+$('iso-a').addEventListener('change', fitView); $('iso-b').addEventListener('change', fitView);
+document.querySelectorAll('[data-iso]').forEach((b) => b.addEventListener('click', () => {
+  const [a, bb] = b.dataset.iso.split(',').map(Number); doc.opts.iso.a = a; doc.opts.iso.b = bb; dirty = true; syncIso(); fitView();
+}));
+$('iso-piso').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v >= 20) isoSet('piso', v); });
+$('iso-grid').addEventListener('change', (e) => isoSet('gridPiso', e.target.checked));
+$('iso-grosor').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v >= 0) { doc.wall.grosor = v; commitSoon(); syncUndo(); requestRender(); } });
+$('iso-grosor').addEventListener('change', commit);
 
 function setTool(t) {
   tool = t;
@@ -1774,7 +2058,7 @@ function renderPanel() {
       if (it.tipo === 'obra') box.innerHTML =
         TXT('nombre', 'Nombre en capas')
         + '<h4>Ficha</h4><div class="stack">' + TXT('f.titulo', 'Título') + '<div class="g2">' + TXT('f.autor', 'Autor') + TXT('f.anio', 'Año') + TXT('f.tecnica', 'Técnica') + TXT('f.inv', 'N.º de inventario') + '</div></div>'
-        + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho obra', ' min="0.1"') + NUM('h', 'Alto obra', ' min="0.1"') + NUM('marco', 'Marco', ' min="0"') + NUM('pp', 'Paspartú', ' min="0"') + '</div>'
+        + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho obra', ' min="0.1"') + NUM('h', 'Alto obra', ' min="0.1"') + NUM('marco', 'Marco', ' min="0"') + NUM('pp', 'Paspartú', ' min="0"') + NUM('prof', 'Profundidad', ' min="0" title="Cuánto sobresale del muro: marco, bastidor o caja. Se ve en la vista isométrica."') + '</div>'
         + '<label class="c"><input type="checkbox" data-b="lock"> Mantener proporción</label>'
         + '<div class="kv"><span>Exterior</span><b class="out" data-o="ext"></b></div>'
         + '<h4>Posición (cm)</h4><div class="g2">' + NUM('izq', 'Desde la izquierda') + NUM('centro', 'Piso a centro') + NUM('inf', 'Piso a borde inf.') + NUM('sup', 'Piso a borde sup.') + '</div>'
@@ -1786,7 +2070,7 @@ function renderPanel() {
       else if (it.tipo === 'persona') box.innerHTML =
         TXT('nombre', 'Nombre')
         + '<label class="f" style="margin-top:6px">Figura<select data-b="figura"><option value="pie">De pie</option><option value="silla">En silla de ruedas</option></select></label>'
-        + '<div class="g2" style="margin-top:6px">' + NUM('ph', it.figura === 'silla' ? 'Altura total (cm)' : 'Estatura (cm)', ' min="30" max="260" step="1"') + NUM('pcx', 'Centro desde la izq.') + '</div>'
+        + '<div class="g2" style="margin-top:6px">' + NUM('ph', it.figura === 'silla' ? 'Altura total (cm)' : 'Estatura (cm)', ' min="30" max="260" step="1"') + NUM('pcx', 'Centro desde la izq.') + NUM('pdist', 'Distancia al muro', ' min="0" step="5" title="Se ve en la vista isométrica"') + '</div>'
         + '<div class="kv" style="margin-top:6px"><span>Altura de ojos</span><b class="out" data-o="ojos"></b></div>'
         + '<h4>Preajustes</h4><div class="g3">'
         + [['185', 185, 'pie'], ['170', 170, 'pie'], ['155', 155, 'pie'], ['Infancia 115', 115, 'pie'], ['Silla 130', 130, 'silla']]
@@ -1794,7 +2078,7 @@ function renderPanel() {
         + '<p class="note">Las personas se apoyan siempre en el piso. La altura de ojos es una estimación proporcional.</p>'
         + '<div class="g2" style="margin-top:10px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
       else if (it.tipo === 'vano') box.innerHTML =
-        TXT('nombre', 'Nombre') + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho', ' min="0.1"') + NUM('h', 'Alto', ' min="0.1"') + '</div>'
+        TXT('nombre', 'Nombre') + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho', ' min="0.1"') + NUM('h', 'Alto', ' min="0.1"') + NUM('prof', 'Profundidad', ' min="0" title="0 = superficie plana; más para extintores, tableros o cajas"') + '</div>'
         + '<h4>Posición (cm)</h4><div class="g2">' + NUM('izq', 'Desde la izquierda') + NUM('inf', 'Piso a borde inf.') + '</div>'
         + '<p class="note">Úsalo para puertas, ventanas, enchufes, extintores, rejillas o señalética.</p>'
         + '<div class="g2" style="margin-top:10px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
@@ -1808,8 +2092,9 @@ function renderPanel() {
 }
 function getB(it, k) {
   if (k === 'nombre') return it.nombre;
-  if (it.tipo === 'persona') return k === 'figura' ? it.figura : k === 'ph' ? it.h : k === 'pcx' ? it.x + it.w / 2 : undefined;
+  if (it.tipo === 'persona') return k === 'figura' ? it.figura : k === 'ph' ? it.h : k === 'pcx' ? it.x + it.w / 2 : k === 'pdist' ? MD.num(it.dist, 120) : undefined;
   if (k.startsWith('f.')) return (it.ficha || {})[k.slice(2)];
+  if (k === 'prof') return MD.num(it.prof, 0);
   if (['w', 'h', 'marco', 'pp', 'caida', 'lock'].includes(k)) return it[k];
   return MD.info(doc, it)[k];
 }
@@ -1844,6 +2129,7 @@ function setB(it, k, el) {
     const pv = parseFloat(String(el.value).replace(',', '.')); if (!isFinite(pv)) return false;
     if (k === 'ph') { if (pv < 30) return false; MD.setPersona(doc, it, 'h', pv); }
     else if (k === 'pcx') MD.setPersona(doc, it, 'cx', pv);
+    else if (k === 'pdist') { if (pv < 0) return false; it.dist = pv; }
     return true;
   }
   const v = parseFloat(String(el.value).replace(',', '.'));
@@ -1855,6 +2141,7 @@ function setB(it, k, el) {
     const n = MD.outer(it); it.x = cx - n.w / 2; it.y = cy - n.h / 2;
   } else if (k === 'marco' || k === 'pp') MD.setFrame(it, k, Math.max(0, v));
   else if (k === 'caida') it.caida = Math.max(0, v);
+  else if (k === 'prof') it.prof = Math.max(0, v);
   else MD.setPos(doc, it, k, v);
   return true;
 }
@@ -1961,6 +2248,9 @@ $('o-clearguides').onclick = () => { if (!doc.guides.v.length && !doc.guides.h.l
 
 // ---------- archivo ----------
 function afterDocChange() {
+  if (doc.opts.vista === 'iso' && !$('v-iso').getAttribute('aria-pressed').includes('true')) setVista('iso', true);
+  else if (doc.opts.vista !== 'iso' && view === viewIso) setVista('alzado', true);
+  viewIso.fitted = false;
   sel = new Set([...sel].filter((id) => getItem(id)));
   panelSig = ''; syncWall(); syncOpts(); selChanged();
 }
@@ -1998,7 +2288,7 @@ $('f-new').onclick = () => {
 // ---------- exportar ----------
 function exOpts() {
   const e = doc.opts.exp || MD.defaultExp();
-  return { fmt: e.fmt, pxcm: +e.pxcm || 10, margen: +e.margen || 0, scope: e.scope, human: e.human, ojos: e.ojos, eje: e.eje, grid: e.grid, guias: e.guias,
+  return { iso: isIso(), fmt: e.fmt, pxcm: +e.pxcm || 10, margen: +e.margen || 0, scope: e.scope, human: e.human, ojos: e.ojos, eje: e.eje, grid: e.grid, guias: e.guias,
     escala: e.escala, rotulo: e.rotulo, show: { imagenes: e.imagenes, vanos: e.vanos, dims: e.dims, gaps: e.gaps, bordes: e.bordes, centro: e.centro, lineas: e.lineas, medidas: e.medidas, muro: e.muro, fichas: e.fichas } };
 }
 function syncExport() {
@@ -2006,11 +2296,17 @@ function syncExport() {
   $('ex-fmt').value = e.fmt; $('ex-pxcm').value = e.pxcm; $('ex-margin').value = e.margen; $('ex-scope').value = e.scope;
   document.querySelectorAll('[data-ex]').forEach((el) => { el.checked = !!e[el.dataset.ex]; });
   document.querySelector('[data-ex="ojos"]').disabled = !e.human;
+  // en isométrica no aplican las cotas finas, guías ni cuadrícula
+  const NOISO = ['dims', 'gaps', 'bordes', 'centro', 'lineas', 'medidas', 'guias', 'grid'];
+  NOISO.forEach((k) => { document.querySelector('[data-ex="' + k + '"]').disabled = isIso(); });
+  $('ex-scope').disabled = isIso();
+  $('dlg-export').querySelector('.dh').textContent = isIso() ? 'Exportar vista isométrica' : 'Exportar imagen';
   exInfo();
 }
 // opciones de escena comunes a la exportación y su vista previa
 function exFrame(o) { return MD.exportFrame(doc, o.fmt === 'svg' ? Object.assign({}, o, { pxcm: 10 }) : o); }
 function exScene(o, fr) {
+  if (o.iso) return { ui: fr.u, sel: new Set(), human: o.human, ojos: o.human && o.ojos, eje: o.eje, show: o.show, escala: o.escala, rotulo: o.rotulo, bounds: fr.bounds };
   return { ui: fr.u, sel: o.scope === 'sel' ? sel : new Set(), cotas: o.scope === 'sel' ? 'sel' : 'all', show: o.show,
     eje: o.eje, human: o.human, ojos: o.human && o.ojos, grid: o.grid, guides: o.guias ? doc.guides : null, vw: fr.W, vh: fr.H,
     escala: o.escala, rotulo: o.rotulo, bounds: fr.bounds, floorRange: [fr.bounds.x, fr.bounds.x + fr.bounds.w] };
@@ -2028,7 +2324,7 @@ function renderPreview() {
   const g = c.getContext('2d');
   g.setTransform(dpr * k, 0, 0, dpr * k, 0, 0); // mismas coordenadas que el archivo final, reducidas
   g.fillStyle = '#ffffff'; g.fillRect(0, 0, fr.W, fr.H);
-  MD.drawScene(MD.canvasPainter(g, getImage), doc, fr.view, exScene(o, fr));
+  (o.iso ? MD.drawIso : MD.drawScene)(MD.canvasPainter(g, getImage), doc, fr.view, exScene(o, fr));
 }
 function schedulePreview() { if (!prevRaf) prevRaf = requestAnimationFrame(renderPreview); }
 function exInfo() {
@@ -2065,16 +2361,16 @@ $('ex-go').onclick = async () => {
   msg('Exportando…');
   await preloadImages();
   const fr = exFrame(o), so = exScene(o, fr);
-  const name = slug(doc.titulo);
+  const name = slug(doc.titulo) + (o.iso ? '-isometrica' : '');
   if (o.fmt === 'svg') {
-    const P = MD.svgPainter(doc.images); MD.drawScene(P, doc, fr.view, so);
+    const P = MD.svgPainter(doc.images); (o.iso ? MD.drawIso : MD.drawScene)(P, doc, fr.view, so);
     download(new Blob([P.toString(fr.W, fr.H, '#ffffff')], { type: 'image/svg+xml' }), name + '.svg'); msg('SVG exportado.'); return;
   }
   const c = document.createElement('canvas'); c.width = fr.W; c.height = fr.H;
   const g = c.getContext('2d');
   if (!g) { msg('El navegador no pudo crear un lienzo de ese tamaño. Baja la resolución.'); return; }
   g.fillStyle = '#ffffff'; g.fillRect(0, 0, fr.W, fr.H);
-  MD.drawScene(MD.canvasPainter(g, getImage), doc, fr.view, so);
+  (o.iso ? MD.drawIso : MD.drawScene)(MD.canvasPainter(g, getImage), doc, fr.view, so);
   c.toBlob((b) => {
     if (!b) { msg('El navegador no pudo generar el PNG. Baja la resolución.'); return; }
     download(b, name + '-' + fmt(fr.s) + 'pxcm.png'); msg('PNG exportado: ' + fr.W + ' × ' + fr.H + ' px.');
@@ -2107,7 +2403,7 @@ window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault()
 new ResizeObserver(() => requestRender()).observe(work);
 
 // ---------- inicio ----------
-syncWall(); syncOpts(); selChanged(); fitView();
+syncWall(); syncOpts(); selChanged(); setVista(doc.opts.vista, true); fitView();
 window.__md = { get doc() { return doc; }, get view() { return view; }, get sel() { return sel; }, set sel(v) { sel = v; selChanged(); }, commit, undo, redo, fitView, addImageFiles, exOpts, MD };
 })();
 </script>
