@@ -260,6 +260,9 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
     <details>
       <summary>Vista y ajustes</summary>
       <div class="pb stack">
+        <label class="f">Ancho de las obras
+          <select id="o-ancho"><option value="abajo">debajo de la obra</option><option value="arriba">encima de la obra</option></select>
+        </label>
         <label class="f">Cotas
           <select id="o-cotas"><option value="sel">de la selección</option><option value="all">de todas las obras</option><option value="none">ocultas</option></select>
         </label>
@@ -316,6 +319,10 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
       <label class="f">Margen (cm)<input id="ex-margin" type="number" min="0" step="5"></label>
       <label class="f">Cotas de<select id="ex-scope"><option value="all">todas las obras</option><option value="sel">la selección</option></select></label>
     </div>
+    <div class="row">
+      <label class="f">Encuadre<select id="ex-encuadre"><option value="todo">Todo el muro</option><option value="sel">Elementos seleccionados (más el margen)</option><option value="area">Área dibujada</option></select></label>
+      <button class="pbtn" id="ex-drawarea" title="Cierra este diálogo para que arrastres un rectángulo sobre el lienzo">Dibujar área…</button>
+    </div>
     <div class="presets"><span class="muted small">Preajustes:</span>
       <button class="pbtn" data-preset="montaje" title="Todo lo necesario para colgar: cotas, fichas, eje y medidas">Plano de montaje</button>
       <button class="pbtn" data-preset="presentacion" title="Obras, fichas y personas, sin cotas">Presentación</button>
@@ -325,6 +332,7 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
       <fieldset><legend>Cotas</legend>
         <label class="c"><input type="checkbox" data-ex="muro"> Tamaño del muro</label>
         <label class="c"><input type="checkbox" data-ex="dims"> Tamaño de las obras</label>
+        <label class="f" style="margin:2px 0 4px 22px">Ancho<select id="ex-ancho"><option value="abajo">debajo de la obra</option><option value="arriba">encima de la obra</option></select></label>
         <label class="c"><input type="checkbox" data-ex="gaps"> Separaciones entre obras</label>
         <label class="c"><input type="checkbox" data-ex="bordes"> Distancias a los bordes y al piso</label>
         <label class="c"><input type="checkbox" data-ex="centro"> Altura del centro</label>
@@ -380,6 +388,7 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
       <tr><td>Shift + arrastrar</td><td>Mover solo en horizontal o vertical</td></tr>
       <tr><td>Ctrl/⌘ + arrastrar</td><td>Mover sin ajuste</td></tr>
       <tr><td>Esquinas</td><td>Cambiar tamaño (Shift invierte la proporción fija)</td></tr>
+      <tr><td>Exportar → Dibujar área</td><td>Arrastra un rectángulo para exportar solo esa zona; Esc cancela</td></tr>
       <tr><td>Shift A · Shift I</td><td>Vista en alzado · isométrica</td></tr>
       <tr><td>Personas</td><td>Se arrastran a lo largo del piso; sus esquinas superiores cambian la estatura</td></tr>
       <tr><td>Flechas</td><td>Mover 1 cm · Shift 10 cm · Alt 0,1 cm</td></tr>
@@ -438,7 +447,7 @@ function newDoc() {
     items: [makePersona({ nombre: 'Persona 170', h: 170, x: -75 }, 300)], images: {}, guides: { v: [], h: [] },
     opts: {
       cotas: 'sel', showEje: true, showHuman: true, showOjos: false, showFichas: false,
-      showGrid: false, grid: 10, showGuides: true, showMuro: false, vista: 'alzado', iso: defaultIso(),
+      showGrid: false, grid: 10, showGuides: true, showMuro: false, anchoAbajo: true, vista: 'alzado', iso: defaultIso(),
       snapObj: true, snapGuides: true, snapGrid: false,
       exp: defaultExp(),
     },
@@ -451,11 +460,12 @@ function defaultExp() {
     imagenes: true, vanos: true, human: true, ojos: false, eje: true, grid: false, guias: false,
     dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, muro: true,
     fichas: false, escala: true, rotulo: true,
+    encuadre: 'todo', area: null, areaIso: null, areaIsoSig: '',
   };
 }
 const EXP_PRESETS = {
   montaje: { muro: true, imagenes: true, vanos: true, human: false, ojos: false, eje: true, grid: false, guias: false, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, fichas: true, escala: true, rotulo: true },
-  presentacion: { muro: false, imagenes: true, vanos: true, human: true, ojos: false, eje: false, grid: false, guias: false, dims: false, gaps: false, bordes: false, centro: false, lineas: false, medidas: false, fichas: true, escala: true, rotulo: true },
+  presentacion: { muro: false, imagenes: true, vanos: true, human: true, ojos: false, eje: false, grid: false, guias: false, dims: false, gaps: false, bordes: false, centro: false, lineas: true, medidas: false, fichas: true, escala: true, rotulo: true },
   tecnico: { muro: true, imagenes: false, vanos: true, human: true, ojos: true, eje: true, grid: false, guias: true, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, fichas: false, escala: true, rotulo: true },
 };
 function makeObra(o) {
@@ -660,29 +670,31 @@ function neighbors(r, rects) {
   return { L, R, U, D };
 }
 // tamaño: ancho arriba y alto al costado con más espacio libre (hasta la vecina o el borde del muro)
-function sizeCotas(r, nb, W, pad) {
+// below = ancho debajo de la obra (número bajo la línea); si no, encima
+function sizeCotas(r, nb, W, pad, below, id) {
   const gapL = r.x - (nb.L ? nb.L.x + nb.L.w : 0), gapR = (nb.R ? nb.R.x : W) - (r.x + r.w);
-  const right = gapR >= gapL, hx = right ? r.x + r.w + pad : r.x - pad;
+  const right = gapR >= gapL, hx = right ? r.x + r.w + pad : r.x - pad, wy = below ? r.y + r.h + pad : r.y - pad;
   return [
-    { x1: r.x, y1: r.y - pad, x2: r.x + r.w, y2: r.y - pad, v: r.w, k: 'size' },
-    { x1: hx, y1: r.y, x2: hx, y2: r.y + r.h, v: r.h, k: 'size', out: right ? 1 : -1 },
+    { x1: r.x, y1: wy, x2: r.x + r.w, y2: wy, v: r.w, k: 'size', under: !!below, id },
+    { x1: hx, y1: r.y, x2: hx, y2: r.y + r.h, v: r.h, k: 'size', out: right ? 1 : -1, id },
   ];
 }
 // cotas completas de un rectángulo (selección). pad en cm.
-function cotasFull(r, obst, wall, pad) {
+function cotasFull(r, obst, wall, pad, below) {
   const out = [], nb = neighbors(r, obst), W = wall.w, H = wall.h;
   const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
   const gapL = r.x - (nb.L ? nb.L.x + nb.L.w : 0), gapR = (nb.R ? nb.R.x : W) - (r.x + r.w);
   const tight = Math.max(gapL, gapR) < 3 * pad; // vecinas muy cerca a ambos lados: la altura del centro va como rótulo
   const cxl = gapR >= gapL ? r.x - pad : r.x + r.w + pad;
-  out.push(...sizeCotas(r, nb, W, pad));
+  out.push(...sizeCotas(r, nb, W, pad, below, '__sel'));
+  const fx = below ? r.x + r.w * 0.8 : cx; // con el ancho debajo, la línea al piso se aparta del número
   { const a = nb.L ? nb.L.x + nb.L.w : 0, y = nb.L ? midOverlap(r.y, r.y + r.h, nb.L.y, nb.L.y + nb.L.h) : cy;
     if (Math.abs(r.x - a) > EPS) out.push({ x1: a, y1: y, x2: r.x, y2: y, v: r.x - a, k: nb.L ? 'gap' : 'wall' }); }
   { const b = nb.R ? nb.R.x : W, y = nb.R ? midOverlap(r.y, r.y + r.h, nb.R.y, nb.R.y + nb.R.h) : cy, d = b - (r.x + r.w);
     if (Math.abs(d) > EPS) out.push({ x1: r.x + r.w, y1: y, x2: b, y2: y, v: d, k: nb.R ? 'gap' : 'wall' }); }
   { const a = nb.U ? nb.U.y + nb.U.h : 0, x = nb.U ? midOverlap(r.x, r.x + r.w, nb.U.x, nb.U.x + nb.U.w) : cx;
     if (Math.abs(r.y - a) > EPS) out.push({ x1: x, y1: a, x2: x, y2: r.y, v: r.y - a, k: nb.U ? 'gap' : 'wall' }); }
-  { const b = nb.D ? nb.D.y : H, x = nb.D ? midOverlap(r.x, r.x + r.w, nb.D.x, nb.D.x + nb.D.w) : cx, d = b - (r.y + r.h);
+  { const b = nb.D ? nb.D.y : H, x = nb.D ? midOverlap(r.x, r.x + r.w, nb.D.x, nb.D.x + nb.D.w) : fx, d = b - (r.y + r.h);
     if (Math.abs(d) > EPS) out.push({ x1: x, y1: r.y + r.h, x2: x, y2: b, v: d, k: nb.D ? 'gap' : 'floor' }); }
   const otherGap = gapR >= gapL ? gapL : gapR; // lado libre para la línea de altura del centro
   if (tight || otherGap < 2.5 * pad) out.push({ x1: r.x + r.w / 2, y1: r.y + r.h, x2: r.x + r.w / 2, y2: r.y + r.h, v: H - cy, k: 'label', id: '__sel' });
@@ -691,13 +703,14 @@ function cotasFull(r, obst, wall, pad) {
 }
 // cotas de cada obra para "todas": tamaño, separación a la derecha (o al muro), muro izq. si no hay vecino,
 // distancia al piso si no hay nada debajo, y altura del centro como rótulo
-function cotasRow(r, obst, wall, pad, id) {
+function cotasRow(r, obst, wall, pad, id, below) {
   const out = [], nb = neighbors(r, obst), W = wall.w, H = wall.h, cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-  out.push(...sizeCotas(r, nb, W, pad));
+  out.push(...sizeCotas(r, nb, W, pad, below, id));
   { const b = nb.R ? nb.R.x : W, y = nb.R ? midOverlap(r.y, r.y + r.h, nb.R.y, nb.R.y + nb.R.h) : cy, d = b - (r.x + r.w);
     if (Math.abs(d) > EPS) out.push({ x1: r.x + r.w, y1: y, x2: b, y2: y, v: d, k: nb.R ? 'gap' : 'wall' }); }
   if (!nb.L && Math.abs(r.x) > EPS) out.push({ x1: 0, y1: cy, x2: r.x, y2: cy, v: r.x, k: 'wall' });
-  if (!nb.D) { const d = H - (r.y + r.h); if (d > EPS) out.push({ x1: cx + pad * 0.6, y1: r.y + r.h, x2: cx + pad * 0.6, y2: H, v: d, k: 'floor' }); }
+  const fx = below ? r.x + r.w * 0.8 : cx + pad * 0.6;
+  if (!nb.D) { const d = H - (r.y + r.h); if (d > EPS) out.push({ x1: fx, y1: r.y + r.h, x2: fx, y2: H, v: d, k: 'floor' }); }
   out.push({ x1: cx, y1: r.y + r.h, x2: cx, y2: r.y + r.h, v: H - cy, k: 'label', id });
   return out;
 }
@@ -878,7 +891,20 @@ function exportBounds(doc, o) {
 function maxPxCm(bounds) {
   return Math.min(Math.sqrt(MAX_AREA / (bounds.w * bounds.h)), MAX_SIDE / bounds.w, MAX_SIDE / bounds.h);
 }
+// exportar solo un área (en cm de alzado o en unidades proyectadas de la isométrica): recorta y deja una franja para el pie
+function areaFrame(doc, area, o) {
+  const pxcm = num(o.pxcm, 10), withPie = !!(o.escala || o.rotulo);
+  let extra = 0;
+  if (o.iso && o.escala) { const ax = isoAxes(isoCfg(doc)); extra = Math.abs(ax.dx) * niceLen(Math.min(doc.wall.w, area.w) * 0.3); }
+  const frame = (s) => { const u = Math.max(1, area.w * s / 1200), pie = withPie ? (70 * u) / s + extra : 0; return { u, b: { x: area.x, y: area.y, w: area.w, h: area.h + pie } }; };
+  let s = Math.max(0.1, Math.min(pxcm, maxPxCm(frame(pxcm).b)));
+  s = Math.max(0.1, Math.min(s, maxPxCm(frame(s).b)));
+  const { u, b } = frame(s);
+  const W = Math.max(1, Math.round(b.w * s)), H = Math.max(1, Math.round(b.h * s));
+  return { bounds: b, s, W, H, view: { s, ox: -b.x * s, oy: -b.y * s }, u, capped: s < pxcm - 1e-9, clip: { x: 0, y: 0, w: area.w * s, h: area.h * s } };
+}
 function exportFrame(doc, o) {
+  if (o.area && o.area.w > 0 && o.area.h > 0) return areaFrame(doc, o.area, o);
   const bounds = o.iso ? isoBounds(doc, o) : exportBounds(doc, o);
   const s = Math.max(0.1, Math.min(num(o.pxcm, 10), maxPxCm(bounds)));
   const W = Math.max(1, Math.round(bounds.w * s)), H = Math.max(1, Math.round(bounds.h * s));
@@ -913,6 +939,8 @@ function canvasPainter(ctx, getImage) {
       ctx.fillStyle = o.fill || COL.ink; ctx.fillText(s, x, y);
       ctx.restore();
     },
+    clipStart(x, y, w, h) { ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); },
+    clipEnd() { ctx.restore(); },
     imageM(id, m, w, h, rot) {
       const img = getImage(id); if (!img) return false;
       const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h;
@@ -948,6 +976,11 @@ function svgPainter(images) {
       parts.push('<text x="' + n(x) + '" y="' + n(y) + '" dy="' + dy + '" font-family="' + esc(FONT) + '" font-size="' + n(size) + '" font-weight="' + (o.weight || 400)
         + '" text-anchor="' + anchor + '" fill="' + (o.fill || COL.ink) + '"' + halo + (o.rot ? ' transform="rotate(' + o.rot + ' ' + n(x) + ' ' + n(y) + ')"' : '') + '>' + esc(s) + '</text>');
     },
+    clipStart(x, y, w, h) {
+      const id = 'recorte' + (parts.length + 1);
+      parts.push('<clipPath id="' + id + '"><rect x="' + n(x) + '" y="' + n(y) + '" width="' + n(w) + '" height="' + n(h) + '"/></clipPath><g clip-path="url(#' + id + ')">');
+    },
+    clipEnd() { parts.push('</g>'); },
     imageM(id, m, w, h, rot) {
       const src = images[id]; if (!src) return false;
       const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h;
@@ -995,8 +1028,12 @@ function drawScene(P, doc, v, o) {
   const show = Object.assign({ imagenes: true, vanos: true, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, muro: false, fichas: false }, o.show || {});
   const KIND = { size: 'dims', gap: 'gaps', wall: 'bordes', floor: 'bordes', center: 'centro', label: 'centro', medida: 'medidas', muro: 'muro' };
   const vis = doc.items.filter((it) => !it.oculto && (it.tipo !== 'vano' || show.vanos) && (it.tipo !== 'persona' || o.human));
-  const labeled = new Set();
+  const labeled = new Set(), sized = new Set();
+  const below = doc.opts.anchoAbajo !== false;
+  const drop = () => (below && show.dims ? 30 * u : 0); // espacio que ocupa el ancho bajo la obra
+  const hasWidthBelow = (id) => below && show.dims && (sized.has(id) || (sized.has('__sel') && sel.has(id)));
 
+  if (o.clip) P.clipStart(o.clip.x, o.clip.y, o.clip.w, o.clip.h);
   // piso
   const fr = o.floorRange || [-100, W + 100];
   P.rect(X(fr[0]), Y(H), L(fr[1] - fr[0]), 10 * u, { fill: '#dcdad2' });
@@ -1059,14 +1096,14 @@ function drawScene(P, doc, v, o) {
     for (const it of solid) {
       if (sel.has(it.id)) continue;
       const r = outer(it), obst = solid.filter((q) => q !== it).map(outer);
-      for (const g of cotasRow(r, obst, doc.wall, pad, it.id)) drawDim(g, COL.steel);
+      for (const g of cotasRow(r, obst, doc.wall, pad, it.id, below)) drawDim(g, COL.steel);
     }
   }
   if (o.cotas !== 'none' && sel.size) {
     const ss = solid.filter((it) => sel.has(it.id));
     if (ss.length) {
       const r = bbox(ss.map(outer)), obst = solid.filter((q) => !sel.has(q.id)).map(outer);
-      for (const g of cotasFull(r, obst, doc.wall, pad)) drawDim(g, COL.steel);
+      for (const g of cotasFull(r, obst, doc.wall, pad, below)) drawDim(g, COL.steel);
     }
   }
   // tamaño total del muro: ancho arriba, alto a la izquierda
@@ -1081,28 +1118,12 @@ function drawScene(P, doc, v, o) {
       if (it.tipo !== 'obra') continue;
       const f = it.ficha || {}, r = outer(it);
       const lines = [f.titulo || '', [f.autor, f.anio].filter(Boolean).join(', '), f.tecnica || ''].filter(Boolean);
-      let y0 = Y(r.y + r.h) + 5 * u + (labeled.has(it.id) || (labeled.has('__sel') && sel.has(it.id)) ? 15 * u : 0);
+      let y0 = Y(r.y + r.h) + 5 * u + (hasWidthBelow(it.id) ? drop() : 0) + (labeled.has(it.id) || (labeled.has('__sel') && sel.has(it.id)) ? 15 * u : 0);
       if (!lines.length) continue;
       // fondo tipo cédula (tipografía monoespaciada: ancho ≈ 0,6 em por carácter)
       const bw = Math.max(...lines.map((t, i) => t.length * (i ? 9.5 : 10.5) * 0.61)) * u + 6 * u, bh = lines.length * 13 * u + 4 * u;
       P.rect(X(r.x) - 3 * u, y0 - 2 * u, bw, bh, { fill: doc.wall.color || '#fff' });
       lines.forEach((t, i) => P.text(t, X(r.x), y0 + i * 13 * u, { size: (i ? 9.5 : 10.5) * u, fill: i ? '#44443f' : COL.ink, weight: i ? 400 : 600, base: 'top' }));
-    }
-  }
-  // pie: escala gráfica y rótulo (exportación)
-  const escala = o.escala != null ? o.escala : o.pie, rotulo = o.rotulo != null ? o.rotulo : o.pie;
-  if ((escala || rotulo) && o.bounds) {
-    const b = o.bounds, yb = Y(b.y + b.h) - 22 * u;
-    if (escala) {
-    const len = niceLen(Math.min(W, b.w) * 0.3), segs = 4, sw = L(len) / segs, x0 = X(0);
-    for (let i = 0; i < segs; i++) P.rect(x0 + i * sw, yb, sw, 6 * u, { fill: i % 2 ? '#fff' : COL.ink, stroke: COL.ink, lw: u });
-    P.text('0', x0, yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
-    P.text(fmt(len / 2), x0 + L(len / 2), yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
-    P.text(fmt(len) + ' cm', x0 + L(len), yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
-    }
-    if (rotulo) {
-    const tit = (doc.titulo || 'Muro') + ' — ' + fmt(W) + ' × ' + fmt(H) + ' cm' + (o.eje ? ', eje visual ' + fmt(doc.wall.eje) + ' cm' : '');
-    P.text(tit, X(W), yb + 6 * u, { size: 11 * u, align: 'right', base: 'bottom', weight: 600 });
     }
   }
   // guías del usuario
@@ -1136,6 +1157,23 @@ function drawScene(P, doc, v, o) {
     P.rect(X(m.x), Y(m.y), L(m.w), L(m.h), { fill: 'rgba(88,106,69,0.08)', stroke: COL.mossD, lw: 1, dash: [3, 3] });
   }
   if (o.tempMed) drawMedida(o.tempMed, COL.orange, 1.5);
+  if (o.clip) P.clipEnd();
+  // pie: escala gráfica y rótulo (exportación)
+  const escala = o.escala != null ? o.escala : o.pie, rotulo = o.rotulo != null ? o.rotulo : o.pie;
+  if ((escala || rotulo) && o.bounds) {
+    const b = o.bounds, yb = Y(b.y + b.h) - 22 * u;
+    if (escala) {
+    const len = niceLen(Math.min(W, b.w) * 0.3), segs = 4, sw = L(len) / segs, x0 = Math.max(X(0), X(b.x) + 14 * u);
+    for (let i = 0; i < segs; i++) P.rect(x0 + i * sw, yb, sw, 6 * u, { fill: i % 2 ? '#fff' : COL.ink, stroke: COL.ink, lw: u });
+    P.text('0', x0, yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
+    P.text(fmt(len / 2), x0 + L(len / 2), yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
+    P.text(fmt(len) + ' cm', x0 + L(len), yb - 4 * u, { size: 10 * u, align: 'center', base: 'bottom' });
+    }
+    if (rotulo) {
+    const tit = (doc.titulo || 'Muro') + ' — ' + fmt(W) + ' × ' + fmt(H) + ' cm' + (o.eje ? ', eje visual ' + fmt(doc.wall.eje) + ' cm' : '');
+    P.text(tit, Math.min(X(W), X(b.x + b.w) - 14 * u), yb + 6 * u, { size: 11 * u, align: 'right', base: 'bottom', weight: 600 });
+    }
+  }
 
   function drawPersona(it) {
     paintPersona(P, personaGeom(it), (x, h) => [X(x), Y(H - h)], (c, r, st) => P.circle(X(c[0]), Y(H - c[1]), L(r), st), u);
@@ -1148,9 +1186,10 @@ function drawScene(P, doc, v, o) {
   function drawDim(g, col, lwMul) {
     if (KIND[g.k] && !show[KIND[g.k]]) return;
     if (g.k === 'label' && g.id) labeled.add(g.id);
+    if (g.k === 'size' && g.id) sized.add(g.id);
     const lw = (lwMul || 1) * u;
     const x1 = X(g.x1), y1 = Y(g.y1), x2 = X(g.x2), y2 = Y(g.y2);
-    if (g.k === 'label') { P.text('c ' + fmt(g.v), x1, y1 + 4 * u, { size: 10 * u, fill: col, align: 'center', base: 'top', halo: true }); return; }
+    if (g.k === 'label') { P.text('c ' + fmt(g.v), x1, y1 + 4 * u + (g.id && hasWidthBelow(g.id) ? drop() : 0), { size: 10 * u, fill: col, align: 'center', base: 'top', halo: true }); return; }
     const len = Math.hypot(x2 - x1, y2 - y1);
     if (len < 2) return;
     if (show.lineas || g.k === 'medida') {
@@ -1164,6 +1203,7 @@ function drawScene(P, doc, v, o) {
     const size = (strong ? 11 : 10) * u, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
     const txt = { size, fill: col, halo: true, weight: strong ? 600 : 400 };
     if (g.k === 'center') P.text(label, g.side === 'right' ? x1 + 4 * u : x1 - 4 * u, y1 + 2 * u, Object.assign(txt, { align: g.side === 'right' ? 'left' : 'right', base: 'top' }));
+    else if (g.under) P.text(label, mx, my + 4 * u, Object.assign(txt, { align: 'center', base: 'top' }));
     else if (Math.abs(x2 - x1) >= Math.abs(y2 - y1)) P.text(label, mx, my - 3 * u, Object.assign(txt, { align: 'center', base: 'bottom' }));
     else if (g.k === 'medida') P.text(label, mx + 5 * u, my, Object.assign(txt, { align: 'left', base: 'middle' }));
     else { const out = g.out || 1; P.text(label, mx + out * 4 * u, my, Object.assign(txt, { align: 'center', base: out > 0 ? 'top' : 'bottom', rot: -90 })); }
@@ -1233,6 +1273,20 @@ function isoBounds(doc, o) {
   const pie = (o.escala || o.rotulo) ? Math.max(30, w * 0.08) : 0;
   return { x: x0 - m, y: y0 - m, w: w + 2 * m, h: y1 - y0 + 2 * m + pie };
 }
+function isoItemsBounds(doc, ids) {
+  const ax = isoAxes(isoCfg(doc)), H = doc.wall.h, pts = [];
+  const box = (x0, x1, y0, y1, z0, z1) => { for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) pts.push(isoPt(ax, x, y, z)); };
+  for (const it of doc.items) {
+    if (!ids.has(it.id) || it.oculto) continue;
+    if (it.tipo === 'obra' || it.tipo === 'vano') { const r = outer(it); box(r.x, r.x + r.w, H - r.y - r.h, H - r.y, 0, Math.max(0, num(it.prof, 0))); }
+    else if (it.tipo === 'persona') { const d = num(it.dist, 120); box(it.x, it.x + it.w, 0, it.h + 14, d, d); box(it.x - 10, it.x + it.w + 10, 0, 0, d - 25, d + 25); }
+  }
+  if (!pts.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of pts) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+function isoSig(doc) { const c = isoCfg(doc); return c.a + ',' + c.b + ',' + c.lado; }
 function isoMuroPad(doc, iso) { return Math.max(0, num(doc.wall.grosor, 15)) * Math.sin(num(iso.b, 30) * Math.PI / 180) + 12; }
 
 // o: { ui, sel, human, ojos, eje, show:{imagenes,vanos,fichas,muro}, escala, rotulo, bounds }
@@ -1245,6 +1299,7 @@ function drawIso(P, doc, v, o) {
   const line = (a, b, st) => P.line(a[0], a[1], b[0], b[1], st);
   const ellipse = (fn, n) => { const pts = []; for (let i = 0; i < n; i++) { const k = i / n * 2 * Math.PI; pts.push(fn(Math.cos(k), Math.sin(k))); } return pts; };
 
+  if (o.clip) P.clipStart(o.clip.x, o.clip.y, o.clip.w, o.clip.h);
   // piso
   P.poly([Q(e.fx0, 0, 0), Q(e.fx1, 0, 0), Q(e.fx1, 0, e.D), Q(e.fx0, 0, e.D)], { fill: '#e7e5dd', stroke: '#b9b7ae', lw: u });
   if (iso.gridPiso) {
@@ -1357,11 +1412,12 @@ function drawIso(P, doc, v, o) {
     const xh = ax.right ? -((14 * u) / s) : W + (14 * u) / s;
     dim(Q(xh, 0, 0), Q(xh, H, 0), fmt(H) + ' cm', true, ax.right ? -1 : 1);
   }
+  if (o.clip) P.clipEnd();
   // pie: escala sobre el eje del muro y rótulo
   if ((o.escala || o.rotulo) && o.bounds) {
     const b = o.bounds, bx = v.ox + b.x * s, by = v.oy + (b.y + b.h) * s, bw = b.w * s;
     if (o.escala) {
-      const len = niceLen(W * 0.3), segs = 4, ux = ax.cx * s, uy = ax.dx * s, x0 = bx + 14 * u;
+      const len = niceLen(Math.min(W, b.w) * 0.3), segs = 4, ux = ax.cx * s, uy = ax.dx * s, x0 = bx + 14 * u;
       const y0 = by - 34 * u - Math.max(0, uy * len);
       const nl = Math.hypot(ux, uy), nx = -uy / nl * 6 * u, ny = ux / nl * 6 * u;
       for (let i = 0; i < segs; i++) {
@@ -1392,7 +1448,7 @@ return {
   snapshot, restore, serialize, normalize, migrateV1, parseProject, toCSV,
   MAX_AREA, MAX_SIDE, exportBounds, maxPxCm, exportFrame,
   canvasPainter, svgPainter, hatch, drawScene,
-  defaultIso, isoAxes, isoPt, isoBounds, drawIso, personaGeom,
+  defaultIso, isoAxes, isoPt, isoBounds, drawIso, personaGeom, isoItemsBounds, isoSig, areaFrame,
 };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MD;
@@ -1414,6 +1470,7 @@ const isIso = () => doc.opts.vista === 'iso';
 let sel = new Set();
 let tool = 'select', space = false;
 let drag = null, snapVis = null, marquee = null, tempMed = null, hover = null;
+let areaMode = false, areaRect = null; // herramienta temporal para marcar el área a exportar
 let dirty = false;
 const imgCache = new Map();
 const pointers = new Map();
@@ -1556,6 +1613,20 @@ function draw() {
     grid: doc.opts.showGrid, guides: doc.opts.showGuides ? doc.guides : null, snap: snapVis, marquee, tempMed,
     floorRange: [(0 - view.ox) / view.s, (w - view.ox) / view.s], vw: w, vh: h,
   });
+  const showArea = areaMode ? areaRect : (doc.opts.exp && doc.opts.exp.encuadre === 'area' ? storedArea() : null);
+  if (showArea) {
+    const ax = X(showArea.x), ay = Y(showArea.y), aw = showArea.w * view.s, ah = showArea.h * view.s;
+    ctx.save();
+    if (areaMode) { // oscurece lo que queda fuera
+      ctx.fillStyle = 'rgba(17,17,17,0.18)'; ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(ax, ay, aw, ah); ctx.fill('evenodd');
+    }
+    ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5; ctx.strokeStyle = MD.COL.orange; ctx.strokeRect(ax, ay, aw, ah);
+    ctx.setLineDash([]); ctx.font = '11px ' + MD.FONT; ctx.fillStyle = MD.COL.orange; ctx.textBaseline = 'bottom';
+    ctx.fillText('Área de exportación' + (isIso() ? '' : ': ' + fmt(showArea.w) + ' × ' + fmt(showArea.h) + ' cm'), ax + 2, ay - 3);
+    ctx.restore();
+  } else if (areaMode) {
+    ctx.save(); ctx.fillStyle = 'rgba(17,17,17,0.10)'; ctx.fillRect(0, 0, w, h); ctx.restore();
+  }
   if (!isIso()) drawRulers(w, h);
   if (panelDirty) { panelDirty = false; renderPanel(); }
   if (layersDirty) renderLayers();
@@ -1626,6 +1697,7 @@ function snapCtx(exclude) {
 function updateCursor(px, py) {
   let c = 'default';
   if (drag && drag.kind === 'pan') c = 'grabbing';
+  else if (areaMode) c = 'crosshair';
   else if (space || tool === 'hand' || isIso()) c = 'grab';
   else if (px < RULER || py < RULER) c = px < RULER && py < RULER ? 'default' : (py < RULER ? 'row-resize' : 'col-resize');
   else if (tool === 'measure') c = 'crosshair';
@@ -1653,6 +1725,9 @@ cv.addEventListener('pointerdown', (e) => {
   }
   if (pointers.size > 2 || drag) return;
   const p = toCm(px, py);
+  if (areaMode && e.button === 0 && !space) {
+    drag = { kind: 'area', p0: p }; areaRect = { x: p.x, y: p.y, w: 0, h: 0 }; return;
+  }
   if (e.button === 1 || tool === 'hand' || space || isIso()) {
     drag = { kind: 'pan', px0: px, py0: py, ox0: view.ox, oy0: view.oy }; updateCursor(px, py); e.preventDefault(); return;
   }
@@ -1765,6 +1840,11 @@ cv.addEventListener('pointermove', (e) => {
       }
       panelDirty = true; requestRender(); break;
     }
+    case 'area': {
+      areaRect = MD.normRect(drag.p0, p);
+      if (!isIso()) showPos(p, 'área ' + fmt(areaRect.w) + ' × ' + fmt(areaRect.h) + ' cm');
+      requestRender(); break;
+    }
     case 'marquee': {
       marquee = MD.normRect(drag.p0, p);
       sel = new Set([...drag.base, ...MD.idsInRect(doc, marquee)]);
@@ -1791,6 +1871,11 @@ function endDrag() {
       break;
     }
     case 'marquee': marquee = null; break;
+    case 'area': {
+      const r = areaRect;
+      if (r && r.w * view.s >= 8 && r.h * view.s >= 8) { endArea(r); return; }
+      areaRect = null; msg('El área es demasiado pequeña: vuelve a arrastrar, o Esc para cancelar.'); requestRender(); return;
+    }
   }
   selChanged();
 }
@@ -1839,6 +1924,7 @@ window.addEventListener('keydown', (e) => {
   if (mod && (e.code === 'BracketRight' || k === ']' || k === '}')) { e.preventDefault(); reorderSel(e.shiftKey ? 'front' : 'up'); return; }
   if (mod && (e.code === 'BracketLeft' || k === '[' || k === '{')) { e.preventDefault(); reorderSel(e.shiftKey ? 'back' : 'down'); return; }
   if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); deleteSel(); return; }
+  if (k === 'Escape' && areaMode) { areaMode = false; areaRect = null; drag = null; msg('Dibujo de área cancelado.'); updateCursor(lastPx, lastPy); requestRender(); e.preventDefault(); setTimeout(openExport, 0); return; }
   if (k === 'Escape') { if (drag && drag.kind === 'measure') { tempMed = null; drag = null; snapVis = null; } sel.clear(); selChanged(); return; }
   if (k.startsWith('Arrow')) {
     e.preventDefault();
@@ -2235,12 +2321,16 @@ function syncOpts() {
   const o = doc.opts;
   $('o-cotas').value = o.cotas; OPT.forEach(([id, k]) => { $(id).checked = !!o[k]; });
   $('o-gridstep').value = fmt(o.grid, 2);
+  $('o-ancho').value = o.anchoAbajo === false ? 'arriba' : 'abajo';
 }
 OPT.forEach(([id, k]) => $(id).addEventListener('change', (e) => {
   doc.opts[k] = e.target.checked;
   if (k === 'showHuman' && !e.target.checked) { sel = new Set([...sel].filter((id2) => { const i = getItem(id2); return i && i.tipo !== 'persona'; })); selChanged(); }
   requestRender();
 }));
+function setAncho(v) { doc.opts.anchoAbajo = v !== 'arriba'; dirty = true; syncOpts(); if ($('dlg-export').open) { $('ex-ancho').value = v; exInfo(); } requestRender(); }
+$('o-ancho').addEventListener('change', (e) => setAncho(e.target.value));
+$('ex-ancho').addEventListener('change', (e) => setAncho(e.target.value));
 $('o-cotas').addEventListener('change', (e) => { doc.opts.cotas = e.target.value; requestRender(); });
 [['o-gridstep', 'grid', 0.5]].forEach(([id, k, min]) =>
   $(id).addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (isFinite(v) && v >= min) { doc.opts[k] = v; requestRender(); } }));
@@ -2286,13 +2376,32 @@ $('f-new').onclick = () => {
 };
 
 // ---------- exportar ----------
+function storedArea() {
+  const e = doc.opts.exp || {};
+  if (isIso()) return e.areaIso && e.areaIsoSig === MD.isoSig(doc) ? e.areaIso : null;
+  return e.area || null;
+}
+// rectángulo a exportar según el encuadre (null = todo el muro)
+function exArea() {
+  const e = doc.opts.exp || {}, m = Math.max(0, +e.margen || 0);
+  if (e.encuadre === 'area') return storedArea();
+  if (e.encuadre === 'sel') {
+    const its = selItems().filter((i) => !i.oculto && (i.tipo !== 'persona' || e.human));
+    if (!its.length) return null;
+    const b = isIso() ? MD.isoItemsBounds(doc, new Set(its.map((i) => i.id))) : MD.bbox(its.map(MD.outer));
+    return b ? { x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m } : null;
+  }
+  return null;
+}
 function exOpts() {
   const e = doc.opts.exp || MD.defaultExp();
-  return { iso: isIso(), fmt: e.fmt, pxcm: +e.pxcm || 10, margen: +e.margen || 0, scope: e.scope, human: e.human, ojos: e.ojos, eje: e.eje, grid: e.grid, guias: e.guias,
+  return { iso: isIso(), area: exArea(), encuadre: e.encuadre, fmt: e.fmt, pxcm: +e.pxcm || 10, margen: +e.margen || 0, scope: e.scope, human: e.human, ojos: e.ojos, eje: e.eje, grid: e.grid, guias: e.guias,
     escala: e.escala, rotulo: e.rotulo, show: { imagenes: e.imagenes, vanos: e.vanos, dims: e.dims, gaps: e.gaps, bordes: e.bordes, centro: e.centro, lineas: e.lineas, medidas: e.medidas, muro: e.muro, fichas: e.fichas } };
 }
 function syncExport() {
   const e = doc.opts.exp;
+  $('ex-encuadre').value = e.encuadre || 'todo';
+  $('ex-ancho').value = doc.opts.anchoAbajo === false ? 'arriba' : 'abajo'; $('ex-ancho').disabled = isIso();
   $('ex-fmt').value = e.fmt; $('ex-pxcm').value = e.pxcm; $('ex-margin').value = e.margen; $('ex-scope').value = e.scope;
   document.querySelectorAll('[data-ex]').forEach((el) => { el.checked = !!e[el.dataset.ex]; });
   document.querySelector('[data-ex="ojos"]').disabled = !e.human;
@@ -2306,10 +2415,10 @@ function syncExport() {
 // opciones de escena comunes a la exportación y su vista previa
 function exFrame(o) { return MD.exportFrame(doc, o.fmt === 'svg' ? Object.assign({}, o, { pxcm: 10 }) : o); }
 function exScene(o, fr) {
-  if (o.iso) return { ui: fr.u, sel: new Set(), human: o.human, ojos: o.human && o.ojos, eje: o.eje, show: o.show, escala: o.escala, rotulo: o.rotulo, bounds: fr.bounds };
+  if (o.iso) return { ui: fr.u, sel: new Set(), human: o.human, ojos: o.human && o.ojos, eje: o.eje, show: o.show, escala: o.escala, rotulo: o.rotulo, bounds: fr.bounds, clip: fr.clip };
   return { ui: fr.u, sel: o.scope === 'sel' ? sel : new Set(), cotas: o.scope === 'sel' ? 'sel' : 'all', show: o.show,
     eje: o.eje, human: o.human, ojos: o.human && o.ojos, grid: o.grid, guides: o.guias ? doc.guides : null, vw: fr.W, vh: fr.H,
-    escala: o.escala, rotulo: o.rotulo, bounds: fr.bounds, floorRange: [fr.bounds.x, fr.bounds.x + fr.bounds.w] };
+    escala: o.escala, rotulo: o.rotulo, bounds: fr.bounds, clip: fr.clip, floorRange: [fr.bounds.x - 1e4, fr.bounds.x + fr.bounds.w + 1e4] };
 }
 let prevRaf = 0;
 function renderPreview() {
@@ -2331,7 +2440,12 @@ function exInfo() {
   schedulePreview();
   const o = exOpts(), f = exFrame(o);
   $('ex-pxcm').disabled = o.fmt === 'svg';
-  const noSel = o.scope === 'sel' && !sel.size ? ' <span class="warn">No hay nada seleccionado: no saldrán cotas.</span>' : '';
+  let noSel = o.scope === 'sel' && !sel.size && !o.iso ? ' <span class="warn">No hay nada seleccionado: no saldrán cotas.</span>' : '';
+  const e = doc.opts.exp;
+  if (e.encuadre === 'sel' && !o.area) noSel += ' <span class="warn">No hay elementos seleccionados: se exporta todo el muro.</span>';
+  if (e.encuadre === 'area' && !o.area) noSel += isIso() && e.areaIso ? ' <span class="warn">El área se dibujó con otro ángulo o lado de la isométrica: vuelve a dibujarla. Mientras, se exporta todo.</span>'
+    : ' <span class="warn">Todavía no hay área: usa «Dibujar área…». Mientras, se exporta todo.</span>';
+  if (o.area) noSel = (isIso() ? ' Recorte de la vista isométrica.' : ' Recorte de ' + fmt(o.area.w) + ' × ' + fmt(o.area.h) + ' cm.') + noSel;
   if (o.fmt === 'svg') { $('ex-info').innerHTML = 'SVG vectorial de ' + fmt(f.bounds.w) + ' × ' + fmt(f.bounds.h) + ' cm; las imágenes se incrustan con la resolución cargada (máx. 1600 px por lado).' + noSel; return; }
   $('ex-info').innerHTML = f.W.toLocaleString('es') + ' × ' + f.H.toLocaleString('es') + ' px (' + fmt(f.W * f.H / 1e6) + ' Mpx).'
     + (f.capped ? ' <span class="warn">Se reduce a ' + fmt(f.s) + ' px/cm para no superar el límite de los navegadores.</span>' : '') + noSel;
@@ -2341,6 +2455,24 @@ function openExport() {
   if (doc.opts.exp.scope === 'sel' && !sel.size) doc.opts.exp.scope = 'all';
   syncExport(); $('dlg-export').showModal(); schedulePreview();
   preloadImages().then(schedulePreview);
+}
+$('ex-encuadre').addEventListener('change', (e) => {
+  doc.opts.exp.encuadre = e.target.value; dirty = true;
+  if (e.target.value === 'area' && !storedArea()) { startArea(); return; }
+  exInfo(); requestRender();
+});
+$('ex-drawarea').onclick = startArea;
+function startArea() {
+  $('dlg-export').close(); areaMode = true; areaRect = null; drag = null;
+  msg('Arrastra un rectángulo sobre el lienzo con la zona a exportar. Esc cancela.');
+  updateCursor(lastPx, lastPy); requestRender();
+}
+function endArea(r) {
+  areaMode = false; areaRect = null;
+  const e = doc.opts.exp;
+  if (isIso()) { e.areaIso = r; e.areaIsoSig = MD.isoSig(doc); } else e.area = r;
+  e.encuadre = 'area'; dirty = true; requestRender(); openExport();
+  msg('Área marcada. Queda indicada en el lienzo mientras el encuadre sea «Área dibujada».');
 }
 function togglePreviewSize() { const d = $('dlg-export'); d.classList.toggle('big'); $('ex-zoom').textContent = d.classList.contains('big') ? 'Reducir' : 'Ampliar'; schedulePreview(); }
 $('ex-zoom').onclick = togglePreviewSize;
@@ -2361,7 +2493,7 @@ $('ex-go').onclick = async () => {
   msg('Exportando…');
   await preloadImages();
   const fr = exFrame(o), so = exScene(o, fr);
-  const name = slug(doc.titulo) + (o.iso ? '-isometrica' : '');
+  const name = slug(doc.titulo) + (o.iso ? '-isometrica' : '') + (o.area ? (o.encuadre === 'sel' ? '-seleccion' : '-area') : '');
   if (o.fmt === 'svg') {
     const P = MD.svgPainter(doc.images); (o.iso ? MD.drawIso : MD.drawScene)(P, doc, fr.view, so);
     download(new Blob([P.toString(fr.W, fr.H, '#ffffff')], { type: 'image/svg+xml' }), name + '.svg'); msg('SVG exportado.'); return;
