@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Museografía - Editor de Planos</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/konva@9.3.6/konva.min.js"></script>
+    <!-- Usamos la fuente Inter para un aspecto moderno -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Ocultar scrollbars innecesarios en el layout principal */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen w-full flex overflow-hidden text-gray-800">
+
+    <!-- PANEL LATERAL (Sidebar) -->
+    <aside class="w-72 bg-white border-r border-gray-200 flex flex-col z-10 shadow-lg shrink-0 overflow-y-auto">
+        <div class="p-5 border-b border-gray-100">
+            <h1 class="text-xl font-bold text-gray-900">Museografía</h1>
+            <p class="text-sm text-gray-500">Editor Espacial</p>
+        </div>
+
+        <div class="p-5 flex-1 flex flex-col gap-6">
+            
+            <!-- SECCIÓN: Acciones Principales -->
+            <section class="flex flex-col gap-2">
+                <input type="file" id="fileUpload" accept="image/*" class="hidden">
+                <button onclick="document.getElementById('fileUpload').click()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Subir Imagen
+                </button>
+            </section>
+
+            <!-- SECCIÓN: Propiedades (Visible al seleccionar) -->
+            <section id="propertiesPanel" class="flex flex-col gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl hidden">
+                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Propiedades</h2>
+                
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Ancho real (cm)</label>
+                    <input type="number" id="inputWidth" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" min="1">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Alto real (cm)</label>
+                    <input type="number" id="inputHeight" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" min="1">
+                </div>
+                
+                <div class="flex gap-2 mt-2">
+                    <button id="btnUpdateProps" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-3 rounded-md shadow-sm transition-colors text-sm">
+                        Actualizar
+                    </button>
+                    <button id="btnDelete" class="bg-red-100 hover:bg-red-200 text-red-700 p-2 rounded-md transition-colors" title="Eliminar Imagen">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- SECCIÓN: Exportar -->
+            <section class="flex flex-col gap-2">
+                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-1">Exportar Gráficos</h2>
+                <button id="btnExportCanvas" class="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg shadow-sm transition-colors text-sm">
+                    Exportar Muro (PNG)
+                </button>
+                <button id="btnExportSelected" class="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg shadow-sm transition-colors text-sm opacity-50 cursor-not-allowed" disabled>
+                    Exportar Seleccionada (PNG)
+                </button>
+            </section>
+
+            <hr class="border-gray-200">
+
+            <!-- SECCIÓN: Proyecto (JSON) -->
+            <section class="flex flex-col gap-2">
+                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-1">Proyecto</h2>
+                <button id="btnSaveJson" class="w-full bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 font-medium py-2 px-4 rounded-lg shadow-sm transition-colors text-sm">
+                    Guardar Proyecto (JSON)
+                </button>
+                
+                <input type="file" id="fileLoadJson" accept=".json" class="hidden">
+                <button onclick="document.getElementById('fileLoadJson').click()" class="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg shadow-sm transition-colors text-sm">
+                    Cargar Proyecto (JSON)
+                </button>
+            </section>
+        </div>
+    </aside>
+
+    <!-- CONTENEDOR PRINCIPAL DEL LIENZO -->
+    <main id="canvas-container" class="flex-1 bg-gray-200 relative overflow-hidden cursor-grab active:cursor-grabbing">
+        <!-- Instrucciones superpuestas -->
+        <div class="absolute bottom-4 left-4 z-10 bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-sm text-xs text-gray-600 pointer-events-none">
+            <p><strong>Click y arrastrar fondo:</strong> Mover lienzo</p>
+            <p><strong>Click en imagen:</strong> Seleccionar / Mover</p>
+        </div>
+    </main>
+
+    <!-- LÓGICA DE LA APLICACIÓN -->
+    <script>
+        // --- CONSTANTES Y ESTADO ---
+        const PIXELS_PER_CM = 10; // Factor de escala global. 1cm real = 10px en pantalla.
+        
+        let state = {
+            items: [],      // Arreglo de objetos: { id, src, x, y, realWidth, realHeight }
+            selectedId: null // ID del elemento actualmente seleccionado
+        };
+        
+        // Caché para no recargar las imágenes Base64 repetidamente durante el redibujado
+        const imageCache = {};
+
+        // Referencias a UI
+        const propertiesPanel = document.getElementById('propertiesPanel');
+        const inputWidth = document.getElementById('inputWidth');
+        const inputHeight = document.getElementById('inputHeight');
+        const btnExportSelected = document.getElementById('btnExportSelected');
+
+        // --- CONFIGURACIÓN DE KONVA ---
+        const container = document.getElementById('canvas-container');
+        
+        const stage = new Konva.Stage({
+            container: 'canvas-container',
+            width: container.clientWidth,
+            height: container.clientHeight,
+            draggable: true // Permite arrastrar (pan) el muro completo
+        });
+
+        const layer = new Konva.Layer();
+        stage.add(layer);
+
+        // Ajustar el canvas si se redimensiona la ventana
+        window.addEventListener('resize', () => {
+            stage.width(container.clientWidth);
+            stage.height(container.clientHeight);
+        });
+
+        // --- MANEJO DE SELECCIÓN Y CLICKS ---
+        // Click en el fondo del lienzo deselecciona
+        stage.on('click tap', (e) => {
+            if (e.target === stage) {
+                selectItem(null);
+            }
+        });
+
+        function selectItem(id) {
+            state.selectedId = id;
+            updateUI();
+            renderAll(); // Redibujar para mostrar/ocultar los marcos de selección
+        }
+
+        function updateUI() {
+            if (state.selectedId) {
+                const item = state.items.find(i => i.id === state.selectedId);
+                if (item) {
+                    propertiesPanel.classList.remove('hidden');
+                    inputWidth.value = item.realWidth;
+                    inputHeight.value = item.realHeight;
+                    
+                    btnExportSelected.disabled = false;
+                    btnExportSelected.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            } else {
+                propertiesPanel.classList.add('hidden');
+                inputWidth.value = '';
+                inputHeight.value = '';
+                
+                btnExportSelected.disabled = true;
+                btnExportSelected.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // --- AGREGAR Y DIBUJAR IMÁGENES ---
+        // Manejador del input de subir imagen
+        document.getElementById('fileUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const base64Src = event.target.result;
+                const id = 'item_' + Date.now();
+                
+                // Valores por defecto: 50x50 cm, centrado en el viewport visible
+                const scale = stage.scaleX();
+                const defaultW = 50;
+                const defaultH = 50;
+                
+                // Calcular posición centrada basada en la vista actual (paning offset)
+                const x = (-stage.x() + stage.width() / 2) / scale - ((defaultW * PIXELS_PER_CM) / 2);
+                const y = (-stage.y() + stage.height() / 2) / scale - ((defaultH * PIXELS_PER_CM) / 2);
+
+                const newItem = {
+                    id: id,
+                    src: base64Src,
+                    x: x,
+                    y: y,
+                    realWidth: defaultW,
+                    realHeight: defaultH
+                };
+
+                state.items.push(newItem);
+                preloadAndRender(newItem);
+            };
+            reader.readAsDataURL(file);
+            this.value = ''; // Reset input
+        });
+
+        // Pre-carga la imagen al DOM antes de enviarla a Konva para evitar parpadeos
+        function preloadAndRender(item) {
+            if (!imageCache[item.id]) {
+                const img = new Image();
+                img.onload = () => {
+                    imageCache[item.id] = img;
+                    selectItem(item.id); // Autoseleccionar recién creado
+                };
+                img.src = item.src;
+            } else {
+                renderAll();
+            }
+        }
+
+        // Función principal de renderizado
+        function renderAll() {
+            layer.destroyChildren(); // Limpiar lienzo
+
+            state.items.forEach(item => {
+                const htmlImage = imageCache[item.id];
+                if (!htmlImage) return; // Si la imagen aún no carga, la saltamos por este frame
+
+                const isSelected = state.selectedId === item.id;
+                
+                // Dimensiones en Píxeles
+                const pxWidth = item.realWidth * PIXELS_PER_CM;
+                const pxHeight = item.realHeight * PIXELS_PER_CM;
+
+                // Grupo Contenedor de la obra de arte y sus cotas
+                const group = new Konva.Group({
+                    x: item.x,
+                    y: item.y,
+                    draggable: true,
+                    id: item.id
+                });
+
+                // Cambiar el cursor al hacer hover
+                group.on('mouseenter', () => container.style.cursor = 'move');
+                group.on('mouseleave', () => container.style.cursor = 'grab');
+
+                // Actualizar estado cuando el usuario termina de arrastrar la imagen
+                group.on('dragend', (e) => {
+                    item.x = e.target.x();
+                    item.y = e.target.y();
+                });
+
+                // Seleccionar al hacer click
+                group.on('mousedown touchstart', (e) => {
+                    selectItem(item.id);
+                    e.cancelBubble = true; // Prevenir que el click llegue al fondo
+                });
+
+                // 1. La Imagen de la Obra
+                const konvaImg = new Konva.Image({
+                    image: htmlImage,
+                    width: pxWidth,
+                    height: pxHeight,
+                    shadowColor: 'black',
+                    shadowBlur: 15,
+                    shadowOpacity: 0.15,
+                    shadowOffsetX: 5,
+                    shadowOffsetY: 5
+                });
+                group.add(konvaImg);
+
+                // 2. Líneas de Cota (Indicadores Técnicos)
+                // MATEMÁTICAS:
+                // Las líneas se separan `offset` píxeles del borde.
+                // Usamos `pxWidth` y `pxHeight` como límites locales (0,0 es la esquina superior izq de la imagen).
+                
+                const offset = 25; // Separación de la cota respecto a la imagen
+                const tick = 6;    // Tamaño de la pequeña línea perpendicular en los extremos
+
+                // --- Cota Inferior (Ancho) ---
+                // Línea principal
+                group.add(new Konva.Line({
+                    points: [0, pxHeight + offset, pxWidth, pxHeight + offset],
+                    stroke: '#6b7280', // Gray-500
+                    strokeWidth: 1
+                }));
+                // Topes (ticks) izquierdo y derecho
+                group.add(new Konva.Line({
+                    points: [0, pxHeight + offset - tick, 0, pxHeight + offset + tick],
+                    stroke: '#6b7280', strokeWidth: 1
+                }));
+                group.add(new Konva.Line({
+                    points: [pxWidth, pxHeight + offset - tick, pxWidth, pxHeight + offset + tick],
+                    stroke: '#6b7280', strokeWidth: 1
+                }));
+                // Texto de la cota inferior
+                const textBottom = new Konva.Text({
+                    x: 0,
+                    y: pxHeight + offset + 8,
+                    text: `${item.realWidth} cm`,
+                    fontSize: 12,
+                    fontFamily: 'Inter',
+                    fill: '#4b5563', // Gray-600
+                    width: pxWidth,
+                    align: 'center'
+                });
+                group.add(textBottom);
+
+                // --- Cota Derecha (Alto) ---
+                // Línea principal
+                group.add(new Konva.Line({
+                    points: [pxWidth + offset, 0, pxWidth + offset, pxHeight],
+                    stroke: '#6b7280', strokeWidth: 1
+                }));
+                // Topes (ticks) superior e inferior
+                group.add(new Konva.Line({
+                    points: [pxWidth + offset - tick, 0, pxWidth + offset + tick, 0],
+                    stroke: '#6b7280', strokeWidth: 1
+                }));
+                group.add(new Konva.Line({
+                    points: [pxWidth + offset - tick, pxHeight, pxWidth + offset + tick, pxHeight],
+                    stroke: '#6b7280', strokeWidth: 1
+                }));
+                // Texto de la cota derecha
+                // Para rotar el texto verticalmente y centrarlo
+                const textRight = new Konva.Text({
+                    x: pxWidth + offset + 8,
+                    y: pxHeight / 2 + 20, // Ajuste empírico por la rotación
+                    text: `${item.realHeight} cm`,
+                    fontSize: 12,
+                    fontFamily: 'Inter',
+                    fill: '#4b5563',
+                    rotation: -90
+                });
+                group.add(textRight);
+
+                // 3. Resaltado de Selección
+                if (isSelected) {
+                    const selectionRect = new Konva.Rect({
+                        x: -4,
+                        y: -4,
+                        width: pxWidth + 8,
+                        height: pxHeight + 8,
+                        stroke: '#3b82f6', // Blue-500
+                        strokeWidth: 2,
+                        dash: [5, 5],
+                        listening: false // No interactuable
+                    });
+                    group.add(selectionRect);
+                }
+
+                layer.add(group);
+            });
+
+            layer.draw();
+        }
+
+        // --- ACTUALIZACIÓN DESDE EL PANEL LATERAL ---
+        document.getElementById('btnUpdateProps').addEventListener('click', () => {
+            if (!state.selectedId) return;
+            
+            const item = state.items.find(i => i.id === state.selectedId);
+            if (item) {
+                const w = parseFloat(inputWidth.value);
+                const h = parseFloat(inputHeight.value);
+                
+                if (w > 0 && h > 0) {
+                    item.realWidth = w;
+                    item.realHeight = h;
+                    renderAll(); // Reconstruye el grupo con las nuevas proporciones
+                } else {
+                    alert("Por favor ingresa valores mayores a cero.");
+                }
+            }
+        });
+
+        document.getElementById('btnDelete').addEventListener('click', () => {
+            if (!state.selectedId) return;
+            
+            state.items = state.items.filter(i => i.id !== state.selectedId);
+            delete imageCache[state.selectedId];
+            selectItem(null);
+        });
+
+        // --- UTILIDADES DE EXPORTACIÓN ---
+        function downloadURI(uri, name) {
+            const link = document.createElement('a');
+            link.download = name;
+            link.href = uri;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        document.getElementById('btnExportCanvas').addEventListener('click', () => {
+            // Deseleccionamos temporalmente para no exportar los bordes punteados azules
+            const tempSelected = state.selectedId;
+            state.selectedId = null;
+            renderAll();
+
+            // Exportamos. pixelRatio: 2 asegura buena calidad.
+            const dataURL = stage.toDataURL({ pixelRatio: 2 });
+            downloadURI(dataURL, 'Muro_Museografico.png');
+
+            // Restauramos selección
+            state.selectedId = tempSelected;
+            renderAll();
+        });
+
+        document.getElementById('btnExportSelected').addEventListener('click', () => {
+            if (!state.selectedId) return;
+            
+            // Ocultamos selección temporalmente
+            const tempSelected = state.selectedId;
+            state.selectedId = null;
+            renderAll();
+
+            const group = layer.findOne('#' + tempSelected);
+            if (group) {
+                // toDataURL exportará sólo los límites de este grupo
+                const dataURL = group.toDataURL({ pixelRatio: 2 });
+                downloadURI(dataURL, 'Imagen_Acotada.png');
+            }
+
+            state.selectedId = tempSelected;
+            renderAll();
+        });
+
+        // --- GUARDAR Y CARGAR PROYECTO (JSON) ---
+        document.getElementById('btnSaveJson').addEventListener('click', () => {
+            const dataStr = JSON.stringify(state);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            downloadURI(dataUri, 'Proyecto_Museografia.json');
+        });
+
+        document.getElementById('fileLoadJson').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const loadedState = JSON.parse(event.target.result);
+                    if (loadedState && loadedState.items) {
+                        state = loadedState;
+                        state.selectedId = null; // Reiniciar selección por seguridad
+                        
+                        // Limpiar caché y pre-cargar imágenes antes de renderizar
+                        for (let key in imageCache) delete imageCache[key];
+                        
+                        let imagesToLoad = state.items.length;
+                        if (imagesToLoad === 0) {
+                            renderAll();
+                            updateUI();
+                        } else {
+                            state.items.forEach(item => {
+                                const img = new Image();
+                                img.onload = () => {
+                                    imageCache[item.id] = img;
+                                    imagesToLoad--;
+                                    if (imagesToLoad === 0) {
+                                        renderAll();
+                                        updateUI();
+                                    }
+                                };
+                                img.src = item.src;
+                            });
+                        }
+                    }
+                } catch (error) {
+                    alert("Error al cargar el archivo JSON. Verifica que el archivo sea válido.");
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file);
+            this.value = ''; // Reset input
+        });
+
+    </script>
+</body>
+</html>
