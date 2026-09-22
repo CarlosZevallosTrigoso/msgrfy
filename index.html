@@ -39,6 +39,19 @@
                 </button>
             </section>
 
+            <!-- SECCIÓN: Pared -->
+            <section class="flex flex-col gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Tamaño de Pared</h2>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Ancho (cm)</label>
+                    <input type="number" id="inputWallWidth" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" min="1" value="500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Alto (cm)</label>
+                    <input type="number" id="inputWallHeight" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" min="1" value="300">
+                </div>
+            </section>
+
             <!-- SECCIÓN: Propiedades (Visible al seleccionar) -->
             <section id="propertiesPanel" class="flex flex-col gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl hidden">
                 <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Propiedades</h2>
@@ -106,7 +119,8 @@
         
         let state = {
             items: [],      // Arreglo de objetos: { id, src, x, y, realWidth, realHeight }
-            selectedId: null // ID del elemento actualmente seleccionado
+            selectedId: null, // ID del elemento actualmente seleccionado
+            wall: { width: 500, height: 300 } // Dimensiones por defecto de la pared (cm)
         };
         
         // Caché para no recargar las imágenes Base64 repetidamente durante el redibujado
@@ -117,6 +131,8 @@
         const inputWidth = document.getElementById('inputWidth');
         const inputHeight = document.getElementById('inputHeight');
         const btnExportSelected = document.getElementById('btnExportSelected');
+        const inputWallWidth = document.getElementById('inputWallWidth');
+        const inputWallHeight = document.getElementById('inputWallHeight');
 
         // --- CONFIGURACIÓN DE KONVA ---
         const container = document.getElementById('canvas-container');
@@ -172,6 +188,23 @@
             }
         }
 
+        // --- ACTUALIZACIÓN DE LA PARED ---
+        inputWallWidth.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (val > 0) { 
+                state.wall.width = val; 
+                renderAll(); 
+            }
+        });
+        
+        inputWallHeight.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (val > 0) { 
+                state.wall.height = val; 
+                renderAll(); 
+            }
+        });
+
         // --- AGREGAR Y DIBUJAR IMÁGENES ---
         // Manejador del input de subir imagen
         document.getElementById('fileUpload').addEventListener('change', function(e) {
@@ -225,6 +258,26 @@
         // Función principal de renderizado
         function renderAll() {
             layer.destroyChildren(); // Limpiar lienzo
+
+            // 0. Dibujar la pared de fondo
+            const wallW = state.wall.width * PIXELS_PER_CM;
+            const wallH = state.wall.height * PIXELS_PER_CM;
+            const wallRect = new Konva.Rect({
+                x: 0,
+                y: 0,
+                width: wallW,
+                height: wallH,
+                fill: '#ffffff', // Fondo blanco para la pared
+                stroke: '#cbd5e1', // Borde gris claro
+                strokeWidth: 2,
+                shadowColor: '#000000',
+                shadowBlur: 15,
+                shadowOpacity: 0.05,
+                shadowOffsetX: 5,
+                shadowOffsetY: 5,
+                listening: false // Crítico: Evita que bloquee los clicks de 'pan' en el stage
+            });
+            layer.add(wallRect);
 
             state.items.forEach(item => {
                 const htmlImage = imageCache[item.id];
@@ -448,6 +501,11 @@
                     if (loadedState && loadedState.items) {
                         state = loadedState;
                         state.selectedId = null; // Reiniciar selección por seguridad
+                        
+                        // Asegurar compatibilidad si se carga un JSON antiguo sin configuración de pared
+                        if (!state.wall) state.wall = { width: 500, height: 300 };
+                        inputWallWidth.value = state.wall.width;
+                        inputWallHeight.value = state.wall.height;
                         
                         // Limpiar caché y pre-cargar imágenes antes de renderizar
                         for (let key in imageCache) delete imageCache[key];
