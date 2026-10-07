@@ -56,6 +56,10 @@ input[type=range]{accent-color:var(--mossD);width:100%}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .g6{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
 label.f{display:flex;flex-direction:column;gap:2px;color:var(--dim);font-size:11px;min-width:0}
+label.f textarea{width:100%;border:1px solid var(--line);border-radius:2px;padding:4px 6px;background:#fff;color:var(--ink);font-family:var(--mono);font-size:12px;resize:vertical;min-height:52px}
+#cota-ed{position:absolute;z-index:5;background:#fff;border:1px solid var(--ink);border-radius:2px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,.14);width:220px}
+#cota-ed[hidden]{display:none}
+#cota-ed .t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 label.f input,label.f select{width:100%;border:1px solid var(--line);border-radius:2px;padding:4px 6px;background:#fff;color:var(--ink);min-height:26px}
 label.f input[type=color]{padding:1px 2px;height:26px}
 label.c{display:flex;align-items:center;gap:6px;cursor:pointer;margin:4px 0}
@@ -163,6 +167,7 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
 <div id="main">
   <div id="work">
     <canvas id="cv" tabindex="0" aria-label="Muro de montaje"></canvas>
+    <div id="cota-ed" hidden></div>
     <div id="empty"><b>Arrastra imágenes de obras al muro</b> o usa «Añadir obra». Todas las medidas están en centímetros; las obras nuevas se colocan con el centro en el eje visual.</div>
   </div>
 
@@ -207,6 +212,7 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
         <button class="pbtn" id="a-blank" title="Obra sin imagen, solo con medidas">Obra sin imagen</button>
         <button class="pbtn" id="a-vano" title="Puerta, ventana, enchufe, extintor u otro obstáculo">Vano</button>
         <button class="pbtn" id="a-persona" title="Figura humana de referencia; puedes añadir varias">Persona</button>
+        <button class="pbtn" id="a-nota" title="Texto libre que se exporta con el plano. Con una obra seleccionada, la señala.">Nota</button>
       </div>
     </details>
 
@@ -317,6 +323,7 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
       <label class="f">Formato<select id="ex-fmt"><option value="png">PNG</option><option value="svg">SVG (vectorial)</option></select></label>
       <label class="f">Resolución (px por cm)<input id="ex-pxcm" type="number" min="1" max="100" step="1"></label>
       <label class="f">Margen (cm)<input id="ex-margin" type="number" min="0" step="5"></label>
+      <label class="f" title="Altura del texto de las cotas medida sobre el muro. No cambia con la resolución.">Texto de cotas (cm)<input id="ex-cota" type="number" min="0.5" max="50" step="0.5"></label>
       <label class="f">Cotas de<select id="ex-scope"><option value="all">todas las obras</option><option value="sel">la selección</option></select></label>
     </div>
     <div class="row">
@@ -343,6 +350,7 @@ table.keys td:first-child{white-space:nowrap;color:var(--steel)}
         <label class="c"><input type="checkbox" data-ex="imagenes"> Imágenes de las obras</label>
         <label class="c"><input type="checkbox" data-ex="fichas"> Fichas <span class="muted small">(título, autor, año, técnica; se completan en Selección)</span></label>
         <label class="c"><input type="checkbox" data-ex="vanos"> Vanos</label>
+        <label class="c"><input type="checkbox" data-ex="notas"> Notas</label>
         <label class="c"><input type="checkbox" data-ex="eje"> Eje visual</label>
         <label class="c"><input type="checkbox" data-ex="guias"> Guías</label>
         <label class="c"><input type="checkbox" data-ex="grid"> Cuadrícula</label>
@@ -456,25 +464,38 @@ function newDoc() {
 // qué incluye la exportación (se guarda con el proyecto)
 function defaultExp() {
   return {
-    fmt: 'png', pxcm: 10, margen: 40, scope: 'all',
+    fmt: 'png', pxcm: 10, margen: 40, scope: 'all', cotaCm: 4,
     imagenes: true, vanos: true, human: true, ojos: false, eje: true, grid: false, guias: false,
     dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, muro: true,
-    fichas: false, escala: true, rotulo: true,
+    fichas: false, escala: true, rotulo: true, notas: true,
     encuadre: 'todo', area: null, areaIso: null, areaIsoSig: '',
   };
 }
 const EXP_PRESETS = {
-  montaje: { muro: true, imagenes: true, vanos: true, human: false, ojos: false, eje: true, grid: false, guias: false, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, fichas: true, escala: true, rotulo: true },
-  presentacion: { muro: false, imagenes: true, vanos: true, human: true, ojos: false, eje: false, grid: false, guias: false, dims: false, gaps: false, bordes: false, centro: false, lineas: true, medidas: false, fichas: true, escala: true, rotulo: true },
-  tecnico: { muro: true, imagenes: false, vanos: true, human: true, ojos: true, eje: true, grid: false, guias: true, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, fichas: false, escala: true, rotulo: true },
+  montaje: { notas: true, muro: true, imagenes: true, vanos: true, human: false, ojos: false, eje: true, grid: false, guias: false, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, fichas: true, escala: true, rotulo: true },
+  presentacion: { notas: false, muro: false, imagenes: true, vanos: true, human: true, ojos: false, eje: false, grid: false, guias: false, dims: false, gaps: false, bordes: false, centro: false, lineas: true, medidas: false, fichas: true, escala: true, rotulo: true },
+  tecnico: { notas: true, muro: true, imagenes: false, vanos: true, human: true, ojos: true, eje: true, grid: false, guias: true, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, fichas: false, escala: true, rotulo: true },
 };
 function makeObra(o) {
   return Object.assign({
     id: uid('o'), tipo: 'obra', nombre: 'Obra', x: 0, y: 0, w: 50, h: 70,
     marco: 0, pp: 0, prof: 3, caida: 0, rot: 0, lock: true, bloqueado: false, oculto: false,
-    imgId: null, imgRatio: null,
+    imgId: null, imgRatio: null, est: { w: false, h: false },
     ficha: { titulo: '', autor: '', anio: '', tecnica: '', inv: '' },
   }, o);
+}
+// nota libre: texto en cm de muro (tam = altura de letra), opcionalmente señala una obra (apunta = id)
+function makeNota(o) {
+  const it = Object.assign({ id: uid('n'), tipo: 'nota', nombre: 'Nota', texto: 'Nota', x: 0, y: 0, tam: 4, apunta: null, bloqueado: false, oculto: false }, o);
+  it.texto = it.texto == null ? '' : String(it.texto);
+  it.tam = Math.max(0.5, Math.min(50, num(it.tam, 4)));
+  if (typeof it.apunta !== 'string' || !it.apunta) it.apunta = null;
+  return it;
+}
+function notaGeom(it) {
+  const tam = Math.max(0.5, num(it.tam, 4)), ls = String(it.texto || ' ').split('\n');
+  const n = Math.max(1, ...ls.map((l) => l.length)), pad = tam * 0.35;
+  return { tam, ls, pad, lh: tam * 1.25, w: n * TXW * tam + 2 * pad, h: ls.length * tam * 1.25 - tam * 0.25 + 2 * pad };
 }
 function makeVano(o) {
   return Object.assign({ id: uid('v'), tipo: 'vano', nombre: 'Vano', x: 0, y: 0, w: 90, h: 210, prof: 0, bloqueado: false, oculto: false }, o);
@@ -509,6 +530,7 @@ function makeMedida(o) {
 // ---------- geometría ----------
 function frameW(it) { return it.tipo === 'obra' ? Math.max(0, num(it.marco, 0)) + Math.max(0, num(it.pp, 0)) : 0; }
 function outer(it) {
+  if (it.tipo === 'nota') { const g = notaGeom(it); return { x: it.x, y: it.y, w: g.w, h: g.h }; }
   if (it.tipo === 'medida') {
     return { x: Math.min(it.x1, it.x2), y: Math.min(it.y1, it.y2), w: Math.abs(it.x2 - it.x1), h: Math.abs(it.y2 - it.y1) };
   }
@@ -567,12 +589,20 @@ function setPos(doc, it, campo, val) {
   moveItem(it, nx - o.x, ny - o.y);
 }
 // cambia ancho/alto de la obra (sin marco). Con lock, conserva la proporción actual.
+// Escribir una medida la marca como medida. Con lock, la otra se recalcula solo si estaba estimada:
+// una medida confirmada nunca se pisa por proporción.
 function setObraDim(it, campo, val) {
   val = Math.max(0.1, num(val, 0.1));
   if (it.tipo !== 'obra') { it[campo] = val; return; }
-  const r = it.w / it.h;
-  if (campo === 'w') { it.w = val; if (it.lock) it.h = val / r; }
-  else { it.h = val; if (it.lock) it.w = val * r; }
+  const est = it.est = Object.assign({ w: false, h: false }, it.est), r = it.w / it.h, otro = campo === 'w' ? 'h' : 'w';
+  it[campo] = val; est[campo] = false;
+  if (it.lock && est[otro]) it[otro] = campo === 'w' ? val / r : val * r;
+}
+function markEst(it, w, h) {
+  if (it.tipo !== 'obra') return;
+  it.est = Object.assign({ w: false, h: false }, it.est);
+  if (w) it.est.w = true;
+  if (h) it.est.h = true;
 }
 // cambia marco/paspartú creciendo hacia afuera (el centro de la obra no se mueve)
 function setFrame(it, campo, val) {
@@ -582,7 +612,8 @@ function setFrame(it, campo, val) {
   it.x -= d; it.y -= d;
 }
 function rotate90(it) {
-  if (it.tipo === 'medida') return;
+  if (it.tipo === 'medida' || it.tipo === 'nota') return;
+  if (it.tipo === 'obra') { const e = Object.assign({ w: false, h: false }, it.est); it.est = { w: e.h, h: e.w }; }
   const o = outer(it), cx = o.x + o.w / 2, cy = o.y + o.h / 2;
   const t = it.w; it.w = it.h; it.h = t;
   if (it.tipo === 'obra') {
@@ -715,13 +746,104 @@ function cotasRow(r, obst, wall, pad, id, below) {
   return out;
 }
 
+// ---------- planificador de cotas de tamaño ----------
+// Trabaja en px de salida. Cada obra recibe su ancho (debajo o encima) y su alto (a la derecha o a la
+// izquierda) en el primer carril libre. Se reserva también la franja entre la obra y su cota, para que
+// ninguna línea quede entre una obra y la cota de otra. Si el alto no cabe en ningún costado se une al
+// ancho ("100 × 66.8"); si nada cabe, rótulo con línea guía.
+const TXW = 0.62; // ancho de un carácter monoespaciado, en em
+function textBox(t) {
+  const size = t.o.size || 11, w = t.s.length * TXW * size, h = size;
+  const al = t.o.align || 'left', base = t.o.base || 'alphabetic';
+  const x0 = al === 'center' ? -w / 2 : al === 'right' ? -w : 0;
+  const y0 = base === 'top' ? 0 : base === 'middle' ? -h / 2 : -h;
+  if (t.o.rot === -90) return { x: t.x + y0, y: t.y - (x0 + w), w: h, h: w };
+  return { x: t.x + x0, y: t.y + y0, w, h };
+}
+function boxHit(b, obst, own, m) {
+  for (const q of obst) {
+    if (own && q.own && own.has(q.own)) continue;
+    if (b.x < q.x + q.w + m && q.x < b.x + b.w + m && b.y < q.y + q.h + m && q.y < b.y + b.h + m) return true;
+  }
+  return false;
+}
+// geometría de una cota de ancho (side 'below' | 'above') o alto ('right' | 'left') a distancia d
+function cotaGeom(r, side, d, txt, u) {
+  const size = 10 * u, tw = txt.length * TXW * size, tick = 4 * u;
+  if (side === 'below' || side === 'above') {
+    const cx = r.x + r.w / 2, x0 = Math.min(r.x, cx - tw / 2), x1 = Math.max(r.x + r.w, cx + tw / 2);
+    if (side === 'below') { const ly = r.y + r.h + d; return { line: ly, box: { x: x0, y: r.y + r.h, w: x1 - x0, h: d + 4 * u + size } }; }
+    const ly = r.y - d, top = Math.min(ly - tick, ly - 3 * u - size);
+    return { line: ly, box: { x: x0, y: top, w: x1 - x0, h: r.y - top } };
+  }
+  const cy = r.y + r.h / 2, y0 = Math.min(r.y, cy - tw / 2), y1 = Math.max(r.y + r.h, cy + tw / 2);
+  if (side === 'right') { const lx = r.x + r.w + d; return { line: lx, box: { x: r.x + r.w, y: y0, w: d + 4 * u + size, h: y1 - y0 } }; }
+  const lx = r.x - d; return { line: lx, box: { x: lx - 4 * u - size, y: y0, w: r.x - (lx - 4 * u - size), h: y1 - y0 } };
+}
+// reqs: [{ id, own:Set, r:{x,y,w,h} px, vw, vh }] · obst: [{x,y,w,h,own?}] px (se amplía con lo colocado)
+// o: { u, below:boolean, floorY }
+function planCotas(reqs, obst, o) {
+  const u = o.u, m = 2 * u, d0 = 8 * u, step = 3 * u, dMax = d0 + 42 * u, pen = 6 * u;
+  const out = [], belowExt = new Map();
+  obst = obst.slice();
+  if (o.floorY != null) obst.push({ x: -1e9, y: o.floorY, w: 2e9, h: 1e9 });
+  const tryPlace = (q, sides, txt, mate) => {
+    const own = mate ? new Set([...q.own, 'c:' + q.id]) : q.own;
+    const cands = [];
+    sides.forEach((sd, i) => { for (let d = d0; d <= dMax + EPS; d += step) cands.push({ sd, d, c: d + i * pen }); });
+    cands.sort((a, b) => a.c - b.c);
+    for (const c of cands) {
+      const g = cotaGeom(q.r, c.sd, c.d, txt, u);
+      if (!boxHit(g.box, obst, own, m)) return { side: c.sd, d: c.d, line: g.line, box: g.box, txt };
+    }
+    return null;
+  };
+  const keep = (q, kind, p) => { p.est = kind === 'w' ? !!q.estW : !!q.estH; p.box.own = 'c:' + q.id; obst.push(p.box); out.push(Object.assign({ id: q.id, kind, r: q.r }, p)); if (p.side === 'below') belowExt.set(q.id, p.box.h + 2 * u); };
+  const wSides = o.below ? ['below', 'above'] : ['above', 'below'], hSides = ['right', 'left'];
+  const order = reqs.slice().sort((a, b) => Math.min(a.r.w, a.r.h) - Math.min(b.r.w, b.r.h) || a.r.x - b.r.x);
+  for (const q of order) {
+    const tw = (q.estW ? '≈' : '') + fmt(q.vw), th = (q.estH ? '≈' : '') + fmt(q.vh);
+    const pw = tryPlace(q, wSides, tw);
+    if (pw) { obst.push(Object.assign({ own: 'c:' + q.id }, pw.box)); const ph = tryPlace(q, hSides, th, true); obst.pop();
+      if (ph) { keep(q, 'w', pw); keep(q, 'h', ph); continue; }
+      const pc = tryPlace(q, wSides, tw + ' × ' + th); // el alto no cabe: se une al ancho
+      if (pc) { keep(q, 'w', pc); continue; }
+      keep(q, 'w', pw); leader(q, 'alto ' + th); continue;
+    }
+    const ph = tryPlace(q, hSides, th);
+    if (ph) { keep(q, 'h', ph); leader(q, 'ancho ' + tw); continue; }
+    leader(q, tw + ' × ' + th);
+  }
+  // rótulo suelto con línea guía hacia el borde más cercano de la obra
+  function leader(q, txt) {
+    const size = 10 * u, tw = txt.length * TXW * size, r = q.r, cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+    let best = null;
+    for (let d = d0; d <= d0 + 80 * u && !best; d += 4 * u) {
+      for (const [dx, dy] of dirs) {
+        const bx = dx > 0 ? r.x + r.w + d : dx < 0 ? r.x - d - tw : cx - tw / 2;
+        const by = dy > 0 ? r.y + r.h + d : dy < 0 ? r.y - d - size : cy - size / 2;
+        const box = { x: bx, y: by, w: tw, h: size };
+        if (!boxHit(box, obst, q.own, m)) { best = box; break; }
+      }
+    }
+    const forced = !best;
+    if (!best) best = { x: cx - tw / 2, y: r.y + r.h + d0, w: tw, h: size };
+    const tx = Math.max(r.x, Math.min(r.x + r.w, best.x + best.w / 2)), ty = Math.max(r.y, Math.min(r.y + r.h, best.y + best.h / 2));
+    const lx = Math.max(best.x, Math.min(best.x + best.w, tx)), ly = Math.max(best.y, Math.min(best.y + best.h, ty));
+    obst.push(best);
+    out.push({ id: q.id, kind: 'leader', r, box: best, txt, from: [tx, ty], to: [lx, ly], forced });
+  }
+  return { out, belowExt };
+}
+
 // ---------- ajuste (snap) ----------
 // contexto: rectángulos destino + líneas verticales (v) y horizontales (h) + paso de cuadrícula
 function snapContext(doc, exclude, o) {
   const W = doc.wall.w, H = doc.wall.h, rects = [], v = [0, W / 2, W], h = [0, H];
   if (doc.opts.showEje) h.push(H - doc.wall.eje);
   if (o.obj) for (const it of doc.items) {
-    if (it.oculto || it.tipo === 'medida' || it.tipo === 'persona' || exclude.has(it.id)) continue;
+    if (it.oculto || it.tipo === 'medida' || it.tipo === 'persona' || it.tipo === 'nota' || exclude.has(it.id)) continue;
     rects.push(outer(it));
   }
   if (o.guides && doc.opts.showGuides) { v.push(...doc.guides.v); h.push(...doc.guides.h); }
@@ -812,9 +934,12 @@ function normalize(src) {
   d.items = (src.items || []).map((it) => {
     if (it.tipo === 'vano') return makeVano(it);
     if (it.tipo === 'medida') return makeMedida(it);
+    if (it.tipo === 'nota') return makeNota(it);
     if (it.tipo === 'persona') return makePersona(it, d.wall.h);
-    const o = makeObra(it); o.ficha = Object.assign(makeObra({}).ficha, it.ficha || {}); return o;
-  }).filter((it) => ['x', 'y', 'w', 'h'].every((k) => it.tipo === 'medida' || isFinite(it[k]))
+    const o = makeObra(it); o.ficha = Object.assign(makeObra({}).ficha, it.ficha || {});
+    o.est = { w: !!(it.est && it.est.w), h: !!(it.est && it.est.h) }; // proyectos anteriores: todo cuenta como medido
+    return o;
+  }).filter((it) => (it.tipo === 'nota' ? ['x', 'y'] : ['x', 'y', 'w', 'h']).every((k) => it.tipo === 'medida' || isFinite(it[k]))
     && (it.tipo !== 'medida' || ['x1', 'y1', 'x2', 'y2'].every((k) => isFinite(it[k]))));
   const so = src.opts || {};
   if (!d.items.some((i) => i.tipo === 'persona') && so.humanH != null) { // proyecto de la fase 1: una sola figura en opciones
@@ -859,14 +984,14 @@ function parseProject(text) {
 function csvCell(v) { const s = v == null ? '' : String(v); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 function toCSV(doc) {
   const head = ['orden', 'tipo', 'nombre', 'titulo', 'autor', 'anio', 'tecnica', 'inventario',
-    'ancho_obra_cm', 'alto_obra_cm', 'marco_cm', 'paspartu_cm', 'profundidad_cm', 'ancho_ext_cm', 'alto_ext_cm',
+    'ancho_obra_cm', 'alto_obra_cm', 'estado_ancho', 'estado_alto', 'marco_cm', 'paspartu_cm', 'profundidad_cm', 'ancho_ext_cm', 'alto_ext_cm',
     'desde_izquierda_cm', 'piso_a_borde_inf_cm', 'piso_a_centro_cm', 'piso_a_borde_sup_cm', 'caida_cm', 'altura_clavo_cm'];
   const rows = [head];
   const els = doc.items.filter((it) => it.tipo === 'obra' || it.tipo === 'vano').slice().sort((a, b) => outer(a).x - outer(b).x);
   els.forEach((it, i) => {
     const n = info(doc, it), f = it.ficha || {}, o = it.tipo === 'obra';
     rows.push([i + 1, it.tipo, it.nombre, f.titulo, f.autor, f.anio, f.tecnica, f.inv,
-      fmt(it.w), fmt(it.h), o ? fmt(num(it.marco, 0)) : '', o ? fmt(num(it.pp, 0)) : '', fmt(num(it.prof, 0)), fmt(n.extW), fmt(n.extH),
+      fmt(it.w), fmt(it.h), o ? (it.est && it.est.w ? 'estimado' : 'medido') : '', o ? (it.est && it.est.h ? 'estimado' : 'medido') : '', o ? fmt(num(it.marco, 0)) : '', o ? fmt(num(it.pp, 0)) : '', fmt(num(it.prof, 0)), fmt(n.extW), fmt(n.extH),
       fmt(n.izq), fmt(n.inf), fmt(n.centro), fmt(n.sup), o ? fmt(num(it.caida, 0)) : '', o ? fmt(n.clavo) : '']);
   });
   return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
@@ -881,12 +1006,19 @@ function exportBounds(doc, o) {
     if (it.tipo === 'persona' && !o.human) continue;
     if (it.tipo === 'vano' && sh.vanos === false) continue;
     if (it.tipo === 'medida' && sh.medidas === false) continue;
+    if (it.tipo === 'nota' && sh.notas === false) continue;
     rects.push(outer(it));
   }
   const b = bbox(rects), m = Math.max(0, num(o.margen, 40));
   if (sh.muro) { const e = Math.max(12, b.w * 0.045); const L = Math.min(b.x, -e), T = Math.min(b.y, -e); b.w += b.x - L; b.h += b.y - T; b.x = L; b.y = T; }
   const pie = (o.pie || o.escala || o.rotulo) ? Math.max(30, b.w * 0.08) : 0;
   return { x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m + pie };
+}
+// escala de anotación: en alzado, el texto de cota mide cotaCm sobre el muro, sea cual sea la resolución
+// (antes crecía con el ancho de la imagen y en muros largos superaba los huecos entre obras)
+function annotU(o, s, Wpx) {
+  if (o.iso) return Math.max(1, Wpx / 1200);
+  return Math.max(0.2, Math.min(50, num(o.cotaCm, 4)) * s / 10);
 }
 function maxPxCm(bounds) {
   return Math.min(Math.sqrt(MAX_AREA / (bounds.w * bounds.h)), MAX_SIDE / bounds.w, MAX_SIDE / bounds.h);
@@ -896,7 +1028,7 @@ function areaFrame(doc, area, o) {
   const pxcm = num(o.pxcm, 10), withPie = !!(o.escala || o.rotulo);
   let extra = 0;
   if (o.iso && o.escala) { const ax = isoAxes(isoCfg(doc)); extra = Math.abs(ax.dx) * niceLen(Math.min(doc.wall.w, area.w) * 0.3); }
-  const frame = (s) => { const u = Math.max(1, area.w * s / 1200), pie = withPie ? (70 * u) / s + extra : 0; return { u, b: { x: area.x, y: area.y, w: area.w, h: area.h + pie } }; };
+  const frame = (s) => { const u = annotU(o, s, area.w * s), pie = withPie ? (70 * u) / s + extra : 0; return { u, b: { x: area.x, y: area.y, w: area.w, h: area.h + pie } }; };
   let s = Math.max(0.1, Math.min(pxcm, maxPxCm(frame(pxcm).b)));
   s = Math.max(0.1, Math.min(s, maxPxCm(frame(s).b)));
   const { u, b } = frame(s);
@@ -908,7 +1040,7 @@ function exportFrame(doc, o) {
   const bounds = o.iso ? isoBounds(doc, o) : exportBounds(doc, o);
   const s = Math.max(0.1, Math.min(num(o.pxcm, 10), maxPxCm(bounds)));
   const W = Math.max(1, Math.round(bounds.w * s)), H = Math.max(1, Math.round(bounds.h * s));
-  return { bounds, s, W, H, view: { s, ox: -bounds.x * s, oy: -bounds.y * s }, u: Math.max(1, W / 1200), capped: s < num(o.pxcm, 10) - 1e-9 };
+  return { bounds, s, W, H, view: { s, ox: -bounds.x * s, oy: -bounds.y * s }, u: annotU(o, s, W), capped: s < num(o.pxcm, 10) - 1e-9 };
 }
 
 // ---------- pintores (misma escena para pantalla, PNG y SVG) ----------
@@ -1025,13 +1157,13 @@ function drawScene(P, doc, v, o) {
   const X = (x) => v.ox + x * s, Y = (y) => v.oy + y * s, L = (l) => l * s;
   const W = doc.wall.w, H = doc.wall.h;
   const sel = o.sel || new Set();
-  const show = Object.assign({ imagenes: true, vanos: true, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, muro: false, fichas: false }, o.show || {});
+  const show = Object.assign({ imagenes: true, vanos: true, dims: true, gaps: true, bordes: true, centro: true, lineas: true, medidas: true, muro: false, fichas: false, notas: true }, o.show || {});
   const KIND = { size: 'dims', gap: 'gaps', wall: 'bordes', floor: 'bordes', center: 'centro', label: 'centro', medida: 'medidas', muro: 'muro' };
   const vis = doc.items.filter((it) => !it.oculto && (it.tipo !== 'vano' || show.vanos) && (it.tipo !== 'persona' || o.human));
-  const labeled = new Set(), sized = new Set();
+  const labeled = new Set();
+  let belowExt = new Map(); // px que ocupa, bajo cada obra, la cota de ancho colocada debajo
   const below = doc.opts.anchoAbajo !== false;
-  const drop = () => (below && show.dims ? 30 * u : 0); // espacio que ocupa el ancho bajo la obra
-  const hasWidthBelow = (id) => below && show.dims && (sized.has(id) || (sized.has('__sel') && sel.has(id)));
+  const extBelow = (id) => belowExt.get(id) || (sel.has(id) ? belowExt.get('__sel') || 0 : 0);
 
   if (o.clip) P.clipStart(o.clip.x, o.clip.y, o.clip.w, o.clip.h);
   // piso
@@ -1056,7 +1188,7 @@ function drawScene(P, doc, v, o) {
   }
   // elementos
   for (const it of vis) {
-    if (it.tipo === 'medida') continue;
+    if (it.tipo === 'medida' || it.tipo === 'nota') continue;
     if (it.tipo === 'persona') { drawPersona(it); continue; }
     const r = outer(it), x = X(r.x), y = Y(r.y), w = L(r.w), h = L(r.h);
     if (it.tipo === 'vano') {
@@ -1092,18 +1224,56 @@ function drawScene(P, doc, v, o) {
   // cotas
   const pad = (16 * u) / s;
   const solid = vis.filter((it) => it.tipo === 'obra' || it.tipo === 'vano');
+  // 1) reunir cotas: las de tamaño se planifican; el resto conserva su sitio
+  const sizeReq = [], rest = [];
+  const pxR = (r) => ({ x: X(r.x), y: Y(r.y), w: L(r.w), h: L(r.h) });
+  const estOf = (its, k) => its.some((it) => it.tipo === 'obra' && it.est && it.est[k]);
+  const take = (gs, id, own, r, its) => {
+    let hasSize = false;
+    for (const g of gs) { if (g.k === 'size') hasSize = true; else rest.push(g); }
+    if (hasSize) sizeReq.push({ id, own, r: pxR(r), cm: r, vw: r.w, vh: r.h, estW: estOf(its, 'w'), estH: estOf(its, 'h') });
+  };
   if (o.cotas === 'all') {
     for (const it of solid) {
       if (sel.has(it.id)) continue;
       const r = outer(it), obst = solid.filter((q) => q !== it).map(outer);
-      for (const g of cotasRow(r, obst, doc.wall, pad, it.id, below)) drawDim(g, COL.steel);
+      take(cotasRow(r, obst, doc.wall, pad, it.id, below), it.id, new Set([it.id]), r, [it]);
     }
   }
   if (o.cotas !== 'none' && sel.size) {
     const ss = solid.filter((it) => sel.has(it.id));
     if (ss.length) {
       const r = bbox(ss.map(outer)), obst = solid.filter((q) => !sel.has(q.id)).map(outer);
-      for (const g of cotasFull(r, obst, doc.wall, pad, below)) drawDim(g, COL.steel);
+      take(cotasFull(r, obst, doc.wall, pad, below), '__sel', new Set(ss.map((it) => it.id).concat('__sel')), r, ss);
+    }
+  }
+  // 2) obstáculos: obras, vanos, personas y los rótulos de las demás cotas
+  let plan = null;
+  if (show.dims && sizeReq.length) {
+    const obst = solid.map((it) => Object.assign({ own: it.id }, pxR(outer(it))));
+    for (const it of vis) if (it.tipo === 'persona' || (it.tipo === 'nota' && show.notas)) obst.push(pxR(outer(it)));
+    for (const g of rest) { const t = dimText(g); if (t) obst.push(textBox(t)); }
+    plan = planCotas(sizeReq, obst, { u, below, floorY: Y(H) });
+    belowExt = plan.belowExt;
+  }
+  // 3) dibujar
+  for (const g of rest) drawDim(g, COL.steel);
+  // o.hits (solo pantalla): zonas de cada cota de tamaño, para editarla con doble clic
+  const hit = (p, dim, b) => { if (o.hits) o.hits.push({ id: p.id, dim, box: b }); };
+  const union = (a, b) => { const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y); return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y }; };
+  if (plan) for (const p of plan.out) {
+    const r = sizeReq.find((q) => q.id === p.id).cm, cmX = (px) => (px - v.ox) / s, cmY = (py) => (py - v.oy) / s;
+    if (p.kind === 'w' || p.kind === 'h') {
+      const g = p.kind === 'w'
+        ? { x1: r.x, y1: cmY(p.line), x2: r.x + r.w, y2: cmY(p.line), v: r.w, k: 'size', under: p.side === 'below', t: p.txt, est: p.est }
+        : { x1: cmX(p.line), y1: r.y, x2: cmX(p.line), y2: r.y + r.h, v: r.h, k: 'size', out: p.side === 'right' ? 1 : -1, t: p.txt, est: p.est };
+      drawDim(g, COL.steel);
+      const t = dimText(g), x1 = X(g.x1), y1 = Y(g.y1), x2 = X(g.x2), y2 = Y(g.y2), k = 4 * u;
+      if (t) hit(p, p.kind === 'h' ? 'h' : (p.txt.indexOf('×') >= 0 ? 'wh' : 'w'), union(textBox(t), { x: Math.min(x1, x2) - k, y: Math.min(y1, y2) - k, w: Math.abs(x2 - x1) + 2 * k, h: Math.abs(y2 - y1) + 2 * k }));
+    } else {
+      if (show.lineas) P.line(p.from[0], p.from[1], p.to[0], p.to[1], { stroke: COL.steel, lw: 0.75 * u });
+      P.text(p.txt, p.box.x + p.box.w / 2, p.box.y + p.box.h / 2, { size: 10 * u, fill: COL.steel, align: 'center', base: 'middle', halo: true });
+      hit(p, /^alto/.test(p.txt) ? 'h' : /^ancho/.test(p.txt) ? 'w' : 'wh', p.box);
     }
   }
   // tamaño total del muro: ancho arriba, alto a la izquierda
@@ -1118,13 +1288,29 @@ function drawScene(P, doc, v, o) {
       if (it.tipo !== 'obra') continue;
       const f = it.ficha || {}, r = outer(it);
       const lines = [f.titulo || '', [f.autor, f.anio].filter(Boolean).join(', '), f.tecnica || ''].filter(Boolean);
-      let y0 = Y(r.y + r.h) + 5 * u + (hasWidthBelow(it.id) ? drop() : 0) + (labeled.has(it.id) || (labeled.has('__sel') && sel.has(it.id)) ? 15 * u : 0);
+      let y0 = Y(r.y + r.h) + 5 * u + extBelow(it.id) + (labeled.has(it.id) || (labeled.has('__sel') && sel.has(it.id)) ? 15 * u : 0);
       if (!lines.length) continue;
       // fondo tipo cédula (tipografía monoespaciada: ancho ≈ 0,6 em por carácter)
       const bw = Math.max(...lines.map((t, i) => t.length * (i ? 9.5 : 10.5) * 0.61)) * u + 6 * u, bh = lines.length * 13 * u + 4 * u;
       P.rect(X(r.x) - 3 * u, y0 - 2 * u, bw, bh, { fill: doc.wall.color || '#fff' });
       lines.forEach((t, i) => P.text(t, X(r.x), y0 + i * 13 * u, { size: (i ? 9.5 : 10.5) * u, fill: i ? '#44443f' : COL.ink, weight: i ? 400 : 600, base: 'top' }));
     }
+  }
+  // notas: recuadro con texto y, si señala una obra visible, línea guía hasta su borde más cercano
+  if (show.notas) for (const it of vis) {
+    if (it.tipo !== 'nota') continue;
+    const g = notaGeom(it), b = outer(it), tgt = it.apunta ? vis.find((q) => q.id === it.apunta && q.tipo === 'obra') : null;
+    if (tgt) {
+      const t = outer(tgt), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+      const ex = Math.max(t.x, Math.min(t.x + t.w, cx)), ey = Math.max(t.y, Math.min(t.y + t.h, cy));
+      const sx = Math.max(b.x, Math.min(b.x + b.w, ex)), sy = Math.max(b.y, Math.min(b.y + b.h, ey));
+      if (Math.hypot(ex - sx, ey - sy) > EPS) {
+        P.line(X(sx), Y(sy), X(ex), Y(ey), { stroke: COL.orange, lw: u });
+        P.circle(X(ex), Y(ey), 2.2 * u, { fill: COL.orange });
+      }
+    }
+    P.rect(X(b.x), Y(b.y), L(b.w), L(b.h), { fill: '#fffdf6', stroke: COL.orange, lw: u });
+    g.ls.forEach((ln, i) => P.text(ln, X(b.x + g.pad), Y(b.y + g.pad + i * g.lh), { size: L(g.tam), fill: COL.ink, base: 'top' }));
   }
   // guías del usuario
   if (o.guides) {
@@ -1147,7 +1333,7 @@ function drawScene(P, doc, v, o) {
   }
   if (o.handles && sel.size === 1) {
     const it = vis.find((q) => sel.has(q.id));
-    if (it && it.tipo !== 'medida' && !it.bloqueado) {
+    if (it && it.tipo !== 'medida' && it.tipo !== 'nota' && !it.bloqueado) {
       const r = outer(it);
       for (const c of corners(r)) if (it.tipo !== 'persona' || c[2][0] === 'n') P.rect(X(c[0]) - 4, Y(c[1]) - 4, 8, 8, { fill: '#fff', stroke: COL.mossD, lw: 1.5 });
     }
@@ -1183,30 +1369,39 @@ function drawScene(P, doc, v, o) {
     const len = Math.hypot(m.x2 - m.x1, m.y2 - m.y1);
     drawDim({ x1: m.x1, y1: m.y1, x2: m.x2, y2: m.y2, v: len, k: 'medida' }, col, lw);
   }
-  function drawDim(g, col, lwMul) {
-    if (KIND[g.k] && !show[KIND[g.k]]) return;
-    if (g.k === 'label' && g.id) labeled.add(g.id);
-    if (g.k === 'size' && g.id) sized.add(g.id);
-    const lw = (lwMul || 1) * u;
+  // ubicación del texto de una cota (sin dibujar): sirve para dibujarla y para medirla como obstáculo
+  function dimText(g) {
+    if (KIND[g.k] && !show[KIND[g.k]]) return null;
     const x1 = X(g.x1), y1 = Y(g.y1), x2 = X(g.x2), y2 = Y(g.y2);
-    if (g.k === 'label') { P.text('c ' + fmt(g.v), x1, y1 + 4 * u + (g.id && hasWidthBelow(g.id) ? drop() : 0), { size: 10 * u, fill: col, align: 'center', base: 'top', halo: true }); return; }
-    const len = Math.hypot(x2 - x1, y2 - y1);
-    if (len < 2) return;
-    if (show.lineas || g.k === 'medida') {
-      P.line(x1, y1, x2, y2, { stroke: col, lw, dash: g.k === 'center' ? [2 * u, 3 * u] : null });
-      const nx = -(y2 - y1) / len, ny = (x2 - x1) / len, t = 4 * u;
-      P.line(x1 - nx * t, y1 - ny * t, x1 + nx * t, y1 + ny * t, { stroke: col, lw });
-      P.line(x2 - nx * t, y2 - ny * t, x2 + nx * t, y2 + ny * t, { stroke: col, lw });
-    }
+    if (g.k === 'label') return { s: 'c ' + fmt(g.v), x: x1, y: y1 + 4 * u + (g.id ? extBelow(g.id) : 0), o: { size: 10 * u, align: 'center', base: 'top' } };
+    if (Math.hypot(x2 - x1, y2 - y1) < 2) return null;
     const strong = g.k === 'medida' || g.k === 'muro';
     const label = g.t || ((g.k === 'center' ? 'c ' : '') + fmt(g.v) + (strong ? ' cm' : ''));
     const size = (strong ? 11 : 10) * u, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-    const txt = { size, fill: col, halo: true, weight: strong ? 600 : 400 };
-    if (g.k === 'center') P.text(label, g.side === 'right' ? x1 + 4 * u : x1 - 4 * u, y1 + 2 * u, Object.assign(txt, { align: g.side === 'right' ? 'left' : 'right', base: 'top' }));
-    else if (g.under) P.text(label, mx, my + 4 * u, Object.assign(txt, { align: 'center', base: 'top' }));
-    else if (Math.abs(x2 - x1) >= Math.abs(y2 - y1)) P.text(label, mx, my - 3 * u, Object.assign(txt, { align: 'center', base: 'bottom' }));
-    else if (g.k === 'medida') P.text(label, mx + 5 * u, my, Object.assign(txt, { align: 'left', base: 'middle' }));
-    else { const out = g.out || 1; P.text(label, mx + out * 4 * u, my, Object.assign(txt, { align: 'center', base: out > 0 ? 'top' : 'bottom', rot: -90 })); }
+    if (g.k === 'center') return { s: label, x: g.side === 'right' ? x1 + 4 * u : x1 - 4 * u, y: y1 + 2 * u, o: { size, align: g.side === 'right' ? 'left' : 'right', base: 'top' } };
+    if (g.under) return { s: label, x: mx, y: my + 4 * u, o: { size, align: 'center', base: 'top' } };
+    if (Math.abs(x2 - x1) >= Math.abs(y2 - y1)) return { s: label, x: mx, y: my - 3 * u, o: { size, align: 'center', base: 'bottom' } };
+    if (g.k === 'medida') return { s: label, x: mx + 5 * u, y: my, o: { size, align: 'left', base: 'middle' } };
+    const out = g.out || 1;
+    return { s: label, x: mx + out * 4 * u, y: my, o: { size, align: 'center', base: out > 0 ? 'top' : 'bottom', rot: -90 } };
+  }
+  function drawDim(g, col, lwMul) {
+    if (KIND[g.k] && !show[KIND[g.k]]) return;
+    if (g.k === 'label' && g.id) labeled.add(g.id);
+    const lw = (lwMul || 1) * u;
+    const x1 = X(g.x1), y1 = Y(g.y1), x2 = X(g.x2), y2 = Y(g.y2);
+    const t = dimText(g);
+    if (g.k === 'label') { if (t) P.text(t.s, t.x, t.y, Object.assign({ fill: col, halo: true }, t.o)); return; }
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < 2) return;
+    if (show.lineas || g.k === 'medida') {
+      P.line(x1, y1, x2, y2, { stroke: col, lw, dash: g.k === 'center' ? [2 * u, 3 * u] : g.est ? [5 * u, 3 * u] : null });
+      const nx = -(y2 - y1) / len, ny = (x2 - x1) / len, tk = 4 * u;
+      P.line(x1 - nx * tk, y1 - ny * tk, x1 + nx * tk, y1 + ny * tk, { stroke: col, lw });
+      P.line(x2 - nx * tk, y2 - ny * tk, x2 + nx * tk, y2 + ny * tk, { stroke: col, lw });
+    }
+    const strong = g.k === 'medida' || g.k === 'muro';
+    P.text(t.s, t.x, t.y, Object.assign({ fill: col, halo: true, weight: strong ? 600 : 400 }, t.o));
   }
 }
 
@@ -1438,11 +1633,11 @@ function corners(r) { return [[r.x, r.y, 'nw'], [r.x + r.w, r.y, 'ne'], [r.x, r.
 
 return {
   VERSION: 2, COL, FONT, EPS, fmt, uid, clone, num, defaultExp, EXP_PRESETS,
-  newDoc, makeObra, makeVano, makeMedida, makePersona, groundPersonas, setPersona, personaW, ojos,
+  newDoc, makeObra, makeVano, makeMedida, makeNota, notaGeom, markEst, makePersona, groundPersonas, setPersona, personaW, ojos,
   frameW, outer, bbox, wallRect, normRect, intersects, distSeg, corners,
   moveItem, applyDeltas, info, setPos, setObraDim, setFrame, rotate90, imgAspect,
   align, distribute, centerOnEye, centerGroupH,
-  neighbors, cotasFull, cotasRow,
+  neighbors, cotasFull, cotasRow, planCotas, cotaGeom, textBox, annotU,
   snapContext, snapRect, snapPoint,
   hitTest, idsInRect, resizeRect, reorder,
   snapshot, restore, serialize, normalize, migrateV1, parseProject, toCSV,
@@ -1595,6 +1790,7 @@ function afterView() { $('zoomv').value = fmt(view.s / calib * 100, view.s / cal
 
 // ---------- dibujo ----------
 let raf = 0;
+let lastHits = []; // cotas de tamaño dibujadas en pantalla: { id, dim: 'w'|'h'|'wh', box (px) }
 function requestRender() { if (!raf) raf = requestAnimationFrame(draw); }
 function draw() {
   raf = 0;
@@ -1608,7 +1804,7 @@ function draw() {
     MD.drawIso(P, doc, view, { ui: 1, sel, human: doc.opts.showHuman, ojos: doc.opts.showOjos, eje: doc.opts.showEje,
       show: { fichas: !!doc.opts.showFichas, muro: !!doc.opts.showMuro } });
   } else MD.drawScene(P, doc, view, {
-    ui: 1, sel, handles: tool === 'select', cotas: doc.opts.cotas, eje: doc.opts.showEje, human: doc.opts.showHuman,
+    hits: (lastHits = []), ui: 1, sel, handles: tool === 'select', cotas: doc.opts.cotas, eje: doc.opts.showEje, human: doc.opts.showHuman,
     ojos: doc.opts.showOjos, show: { fichas: !!doc.opts.showFichas, muro: !!doc.opts.showMuro },
     grid: doc.opts.showGrid, guides: doc.opts.showGuides ? doc.guides : null, snap: snapVis, marquee, tempMed,
     floorRange: [(0 - view.ox) / view.s, (w - view.ox) / view.s], vw: w, vh: h,
@@ -1681,7 +1877,7 @@ function drawRulers(w, h) {
 function handleAt(px, py) {
   if (tool !== 'select' || sel.size !== 1) return null;
   const it = getItem([...sel][0]);
-  if (!it || it.tipo === 'medida' || it.bloqueado || it.oculto) return null;
+  if (!it || it.tipo === 'medida' || it.tipo === 'nota' || it.bloqueado || it.oculto) return null;
   for (const c of MD.corners(MD.outer(it))) if ((it.tipo !== 'persona' || c[2][0] === 'n') && Math.abs(X(c[0]) - px) <= 7 && Math.abs(Y(c[1]) - py) <= 7) return { id: it.id, corner: c[2] };
   return null;
 }
@@ -1705,13 +1901,75 @@ function updateCursor(px, py) {
     const hd = handleAt(px, py);
     if (hd) c = (hd.corner === 'nw' || hd.corner === 'se') ? 'nwse-resize' : 'nesw-resize';
     else { const g = guideAt(px, py); if (g) c = g.axis === 'v' ? 'col-resize' : 'row-resize';
-      else { const p = toCm(px, py); if (MD.hitTest(doc, p.x, p.y, 6 / view.s)) c = 'move'; } }
+      else { const p = toCm(px, py); if (MD.hitTest(doc, p.x, p.y, 6 / view.s)) c = 'move'; else if (cotaAt(px, py)) c = 'text'; } }
   }
   cv.style.cursor = c;
 }
 let lastPx = null, lastPy = null;
 
 // ---------- interacción con puntero ----------
+// ---------- editar una medida desde su cota (doble clic) ----------
+function cotaAt(px, py) {
+  if (tool !== 'select' || isIso()) return null;
+  for (let i = lastHits.length - 1; i >= 0; i--) {
+    const b = lastHits[i].box;
+    if (px >= b.x - 3 && px <= b.x + b.w + 3 && py >= b.y - 3 && py <= b.y + b.h + 3) return lastHits[i];
+  }
+  return null;
+}
+function closeCotaEditor() { const ed = $('cota-ed'); if (!ed.hidden) { ed.hidden = true; ed.innerHTML = ''; cv.focus({ preventScroll: true }); } }
+function openCotaEditor(it, dim, px, py) {
+  const ed = $('cota-ed'), f = MD.frameW(it), obra = it.tipo === 'obra';
+  const campos = dim === 'wh' ? ['w', 'h'] : [dim];
+  const nom = { w: obra ? 'Ancho obra' : 'Ancho', h: obra ? 'Alto obra' : 'Alto' };
+  ed.innerHTML = '<div class="t">' + esc(it.nombre || 'Obra') + '</div>'
+    + campos.map((k) => '<label class="f">' + nom[k] + ' (cm)' + (obra && it.est && it.est[k] ? ' <span class="warn">≈ estimado</span>' : '')
+      + '<input type="text" inputmode="decimal" data-k="' + k + '" value="' + fmt(it[k], 2) + '"></label>').join('')
+    + (f > 0 ? '<p class="note">Sin marco ni paspartú. La cota muestra el exterior (+' + fmt(2 * f) + ' cm).</p>' : '')
+    + '<p class="note">Enter guarda como medida confirmada · Esc cancela</p>'
+    + '<div class="g2"><button class="pbtn" data-c="no">Cancelar</button><button class="pbtn main" data-c="ok">Guardar</button></div>';
+  ed.hidden = false;
+  const W = work.clientWidth, H = work.clientHeight;
+  ed.style.left = Math.max(4, Math.min(W - ed.offsetWidth - 4, px + 10)) + 'px';
+  ed.style.top = Math.max(4, Math.min(H - ed.offsetHeight - 4, py + 10)) + 'px';
+  const save = () => {
+    const vals = {};
+    for (const el of ed.querySelectorAll('input[data-k]')) {
+      const v = parseFloat(String(el.value).replace(',', '.'));
+      if (!(v > 0)) { el.focus(); el.select(); msg('Escribe una medida mayor que 0.'); return; }
+      vals[el.dataset.k] = v;
+    }
+    const c = MD.outer(it), cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+    for (const k of campos) MD.setObraDim(it, k, vals[k]); // en ese orden: el último escrito manda
+    const n = MD.outer(it); it.x = cx - n.w / 2; it.y = cy - n.h / 2;
+    closeCotaEditor(); layersDirty = true; commit(); selChanged();
+    msg('Medida confirmada: ' + (it.nombre || 'obra') + ', ' + fmt(it.w) + ' × ' + fmt(it.h) + ' cm.');
+  };
+  ed.onkeydown = (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeCotaEditor(); }
+  };
+  ed.onclick = (e) => { const b = e.target.closest('[data-c]'); if (b) b.dataset.c === 'ok' ? save() : closeCotaEditor(); };
+  const first = ed.querySelector('input'); first.focus(); first.select();
+}
+cv.addEventListener('dblclick', (e) => {
+  if (tool !== 'select' || isIso()) return;
+  const { px, py } = evPos(e), h = cotaAt(px, py);
+  if (h) {
+    const it = h.id === '__sel' ? (sel.size === 1 ? getItem([...sel][0]) : null) : getItem(h.id);
+    if (!it) { msg('Esa cota es del conjunto: selecciona una sola obra para editar su medida.'); return; }
+    if (it.tipo !== 'obra' && it.tipo !== 'vano') return;
+    if (it.bloqueado) { msg('Está bloqueada: desbloquéala en Capas para cambiar su medida.'); return; }
+    openCotaEditor(it, h.dim, px, py); return;
+  }
+  const p = toCm(px, py), it = MD.hitTest(doc, p.x, p.y, 6 / view.s);
+  if (it && it.tipo === 'nota') {
+    sel = new Set([it.id]); selChanged();
+    const ta = $('sel-body').querySelector('textarea'); if (ta) { ta.focus(); ta.select(); }
+  }
+});
+cv.addEventListener('pointerdown', () => closeCotaEditor(), true);
 cv.addEventListener('pointerdown', (e) => {
   cv.focus({ preventScroll: true });
   const { px, py } = evPos(e);
@@ -1758,6 +2016,7 @@ cv.addEventListener('pointerdown', (e) => {
     drag = { kind: 'move', p0: p, orig: new Map(movable.map((i) => [i.id, MD.clone(i)])), moved: false, dup: e.altKey };
     selChanged(); return;
   }
+  if (!e.shiftKey && cotaAt(px, py)) return; // clic sobre una cota: se conserva la selección
   if (!e.shiftKey) sel.clear();
   drag = { kind: 'marquee', p0: p, base: new Set(sel) }; marquee = { x: p.x, y: p.y, w: 0, h: 0 };
   selChanged();
@@ -1812,6 +2071,7 @@ cv.addEventListener('pointermove', (e) => {
       const f = MD.frameW(it), keep = (it.tipo === 'obra' ? !!it.lock : false) !== e.shiftKey;
       const r = MD.resizeRect(drag.orig, drag.corner, q.x, q.y, keep, f, 1);
       it.x = r.x; it.y = r.y; it.w = r.w - 2 * f; it.h = r.h - 2 * f;
+      MD.markEst(it, Math.abs(r.w - drag.orig.w) > 1e-6, Math.abs(r.h - drag.orig.h) > 1e-6);
       showPos(p, fmt(it.w) + ' × ' + fmt(it.h) + ' cm'); panelDirty = true; requestRender(); break;
     }
     case 'move': {
@@ -2066,7 +2326,7 @@ async function addImageFiles(files, at) {
       const r = await readImage(f, 1600);
       const imgId = MD.uid('i'); doc.images[imgId] = r.dataURL;
       const ratio = r.w / r.h, big = 60;
-      const it = MD.makeObra({ nombre: f.name.replace(/\.[^.]+$/, ''), w: ratio >= 1 ? big : big * ratio, h: ratio >= 1 ? big / ratio : big, imgId, imgRatio: ratio });
+      const it = MD.makeObra({ nombre: f.name.replace(/\.[^.]+$/, ''), w: ratio >= 1 ? big : big * ratio, h: ratio >= 1 ? big / ratio : big, imgId, imgRatio: ratio, est: { w: true, h: true } });
       placeNew(it, null);
       if (at) { const o = MD.outer(it); it.x = added.length ? nextX : at.x - o.w / 2; nextX = it.x + o.w + 10; }
       doc.items.push(it); added.push(it.id);
@@ -2082,8 +2342,18 @@ $('a-img').onclick = () => $('file-img').click();
 $('file-img').addEventListener('change', (e) => { addImageFiles(e.target.files); e.target.value = ''; });
 $('a-blank').onclick = () => {
   const n = doc.items.filter((i) => i.tipo === 'obra').length + 1;
-  const it = MD.makeObra({ nombre: 'Obra ' + n, w: 50, h: 70 }); placeNew(it);
+  const it = MD.makeObra({ nombre: 'Obra ' + n, w: 50, h: 70, est: { w: true, h: true } }); placeNew(it);
   doc.items.push(it); sel = new Set([it.id]); commit(); selChanged(); msg('Obra sin imagen añadida.');
+};
+$('a-nota').onclick = () => {
+  const ss = selItems(), one = ss.length === 1 && ss[0].tipo === 'obra' ? ss[0] : null;
+  const it = MD.makeNota({ texto: 'Nota', tam: +(doc.opts.exp && doc.opts.exp.cotaCm) || 4 });
+  // encima de la obra, dejando libre la franja donde suelen ir las cotas (y espacio para una segunda línea)
+  if (one) { const r = MD.outer(one), c = it.tam, h2 = MD.notaGeom({ texto: 'a\nb', tam: c }).h; it.x = r.x; it.y = r.y - h2 - (3 * c + 8); it.apunta = one.id; }
+  else { const c = toCm((work.clientWidth + RULER) / 2, (work.clientHeight + RULER) / 2); it.x = c.x; it.y = c.y; }
+  doc.items.push(it); sel = new Set([it.id]); commit(); selChanged();
+  const ta = $('sel-body').querySelector('textarea'); if (ta) { ta.focus(); ta.select(); }
+  msg(one ? 'Nota añadida señalando «' + (one.nombre || 'obra') + '». Escribe el texto en Selección.' : 'Nota añadida. Escribe el texto en Selección.');
 };
 $('a-vano').onclick = () => {
   const it = MD.makeVano({ nombre: 'Puerta', x: 20, y: doc.wall.h - 210 });
@@ -2104,7 +2374,7 @@ $('file-replace').addEventListener('change', async (e) => {
   try {
     const r = await readImage(f, 1600), id = MD.uid('i');
     doc.images[id] = r.dataURL; it.imgId = id; it.imgRatio = r.w / r.h; it.rot = 0;
-    const c = MD.outer(it), cy = c.y + c.h / 2; it.h = it.w / it.imgRatio; const n = MD.outer(it); it.y = cy - n.h / 2;
+    const c = MD.outer(it), cy = c.y + c.h / 2; it.h = it.w / it.imgRatio; MD.markEst(it, false, true); const n = MD.outer(it); it.y = cy - n.h / 2;
     commit(); selChanged(); msg('Imagen reemplazada; se conservó el ancho.');
   } catch (err) { msg('No se pudo leer esa imagen.'); }
 });
@@ -2145,7 +2415,8 @@ function renderPanel() {
         TXT('nombre', 'Nombre en capas')
         + '<h4>Ficha</h4><div class="stack">' + TXT('f.titulo', 'Título') + '<div class="g2">' + TXT('f.autor', 'Autor') + TXT('f.anio', 'Año') + TXT('f.tecnica', 'Técnica') + TXT('f.inv', 'N.º de inventario') + '</div></div>'
         + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho obra', ' min="0.1"') + NUM('h', 'Alto obra', ' min="0.1"') + NUM('marco', 'Marco', ' min="0"') + NUM('pp', 'Paspartú', ' min="0"') + NUM('prof', 'Profundidad', ' min="0" title="Cuánto sobresale del muro: marco, bastidor o caja. Se ve en la vista isométrica."') + '</div>'
-        + '<label class="c"><input type="checkbox" data-b="lock"> Mantener proporción</label>'
+        + '<div class="g2"><label class="c" title="Calculada, arrastrada o tomada de la imagen: sale con ≈ y línea punteada"><input type="checkbox" data-b="est.w"> Ancho estimado</label><label class="c" title="Calculada, arrastrada o tomada de la imagen: sale con ≈ y línea punteada"><input type="checkbox" data-b="est.h"> Alto estimado</label></div>'
+        + '<label class="c" title="Al escribir una medida, la otra se recalcula solo si está estimada"><input type="checkbox" data-b="lock"> Mantener proporción</label>'
         + '<div class="kv"><span>Exterior</span><b class="out" data-o="ext"></b></div>'
         + '<h4>Posición (cm)</h4><div class="g2">' + NUM('izq', 'Desde la izquierda') + NUM('centro', 'Piso a centro') + NUM('inf', 'Piso a borde inf.') + NUM('sup', 'Piso a borde sup.') + '</div>'
         + '<h4>Colgado (cm)</h4><div class="g2">' + NUM('caida', 'Caída del gancho', ' min="0" title="Del borde superior del marco al punto de apoyo del alambre tenso o la argolla"') + NUM('clavo', 'Altura del clavo', ' title="Desde el piso. Editarla mueve la obra."') + '</div>'
@@ -2163,6 +2434,13 @@ function renderPanel() {
           .map((pp) => '<button class="pbtn" data-act="pp" data-h="' + pp[1] + '" data-f="' + pp[2] + '">' + pp[0] + '</button>').join('') + '</div>'
         + '<p class="note">Las personas se apoyan siempre en el piso. La altura de ojos es una estimación proporcional.</p>'
         + '<div class="g2" style="margin-top:10px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
+      else if (it.tipo === 'nota') box.innerHTML =
+        '<label class="f">Texto<textarea data-b="texto" rows="3"></textarea></label>'
+        + '<div class="g2" style="margin-top:6px">' + NUM('tam', 'Letra (cm)', ' min="0.5" max="50" step="0.5"')
+        + '<label class="f">Señala a<select data-b="apunta"><option value="">(ninguna obra)</option>'
+        + doc.items.filter((q) => q.tipo === 'obra').map((q) => '<option value="' + q.id + '">' + esc(q.nombre || 'Obra') + '</option>').join('') + '</select></label></div>'
+        + '<p class="note">Sale en la exportación (opción «Notas»). La línea guía sigue a la obra si la mueves.</p>'
+        + '<div class="g2" style="margin-top:10px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
       else if (it.tipo === 'vano') box.innerHTML =
         TXT('nombre', 'Nombre') + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho', ' min="0.1"') + NUM('h', 'Alto', ' min="0.1"') + NUM('prof', 'Profundidad', ' min="0" title="0 = superficie plana; más para extintores, tableros o cajas"') + '</div>'
         + '<h4>Posición (cm)</h4><div class="g2">' + NUM('izq', 'Desde la izquierda') + NUM('inf', 'Piso a borde inf.') + '</div>'
@@ -2178,6 +2456,8 @@ function renderPanel() {
 }
 function getB(it, k) {
   if (k === 'nombre') return it.nombre;
+  if (it.tipo === 'nota') return k === 'texto' ? it.texto : k === 'tam' ? it.tam : k === 'apunta' ? (it.apunta || '') : undefined;
+  if (k.startsWith('est.')) return !!(it.est && it.est[k.slice(4)]);
   if (it.tipo === 'persona') return k === 'figura' ? it.figura : k === 'ph' ? it.h : k === 'pcx' ? it.x + it.w / 2 : k === 'pdist' ? MD.num(it.dist, 120) : undefined;
   if (k.startsWith('f.')) return (it.ficha || {})[k.slice(2)];
   if (k === 'prof') return MD.num(it.prof, 0);
@@ -2207,7 +2487,15 @@ function fillPanel() {
   }
 }
 function setB(it, k, el) {
+  if (el.type === 'checkbox' && k.startsWith('est.')) { it.est = Object.assign({ w: false, h: false }, it.est); it.est[k.slice(4)] = el.checked; layersDirty = true; return true; }
   if (el.type === 'checkbox') { it[k] = el.checked; return true; }
+  if (it.tipo === 'nota') {
+    if (k === 'texto') { it.texto = el.value; layersDirty = true; return true; }
+    if (k === 'apunta') { it.apunta = el.value || null; return true; }
+    const nv = parseFloat(String(el.value).replace(',', '.')); if (!(nv > 0)) return false;
+    if (k === 'tam') it.tam = Math.max(0.5, Math.min(50, nv));
+    return true;
+  }
   if (k === 'nombre') { it.nombre = el.value; layersDirty = true; return true; }
   if (k.startsWith('f.')) { it.ficha = it.ficha || {}; it.ficha[k.slice(2)] = el.value; return true; }
   if (it.tipo === 'persona') {
@@ -2223,7 +2511,7 @@ function setB(it, k, el) {
   if (k === 'w' || k === 'h') {
     if (v <= 0) return false;
     const c = MD.outer(it), cx = c.x + c.w / 2, cy = c.y + c.h / 2; // cambia el tamaño alrededor del centro
-    MD.setObraDim(it, k, v);
+    MD.setObraDim(it, k, v); layersDirty = true;
     const n = MD.outer(it); it.x = cx - n.w / 2; it.y = cy - n.h / 2;
   } else if (k === 'marco' || k === 'pp') MD.setFrame(it, k, Math.max(0, v));
   else if (k === 'caida') it.caida = Math.max(0, v);
@@ -2253,7 +2541,7 @@ $('sel-body').addEventListener('click', (e) => {
   else if (act === 'img') $('file-replace').click();
   else if (act === 'ratio') {
     const a = MD.imgAspect(it); if (!a) return;
-    const c = MD.outer(it), cy = c.y + c.h / 2; it.h = it.w / a; const n = MD.outer(it); it.y = cy - n.h / 2;
+    const c = MD.outer(it), cy = c.y + c.h / 2; it.h = it.w / a; MD.markEst(it, false, true); const n = MD.outer(it); it.y = cy - n.h / 2;
     commit(); selChanged(); msg('Alto ajustado a la proporción de la imagen.');
   }
 });
@@ -2267,7 +2555,9 @@ const ICON = {
   up: '<svg viewBox="0 0 16 16"><path d="M4 10l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
   down: '<svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
 };
-const TYPE = { obra: '▭', vano: '▨', medida: '↔', persona: '▯' };
+const TYPE = { obra: '▭', vano: '▨', medida: '↔', persona: '▯', nota: '✎' };
+const layerName = (it) => it.tipo === 'nota' ? (String(it.texto || '').split('\n')[0] || 'Nota')
+  : (it.nombre || it.tipo) + (it.tipo === 'obra' && it.est && (it.est.w || it.est.h) ? ' ≈' : '');
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function renderLayers() {
   layersDirty = false;
@@ -2277,7 +2567,7 @@ function renderLayers() {
     '<li data-id="' + it.id + '" class="' + (sel.has(it.id) ? 'on ' : '') + (it.oculto ? 'hid' : '') + '">'
     + '<button data-l="vis" title="' + (it.oculto ? 'Mostrar' : 'Ocultar') + '" class="' + (it.oculto ? '' : 'act') + '">' + (it.oculto ? ICON.eyeOff : ICON.eye) + '</button>'
     + '<button data-l="lock" title="' + (it.bloqueado ? 'Desbloquear' : 'Bloquear') + '" class="' + (it.bloqueado ? 'act' : '') + '">' + (it.bloqueado ? ICON.lock : ICON.unlock) + '</button>'
-    + '<span class="ty">' + TYPE[it.tipo] + '</span><span class="nm">' + esc(it.nombre || it.tipo) + '</span>'
+    + '<span class="ty">' + TYPE[it.tipo] + '</span><span class="nm">' + esc(layerName(it)) + '</span>'
     + '<button data-l="up" title="Subir">' + ICON.up + '</button><button data-l="down" title="Bajar">' + ICON.down + '</button></li>').join('');
 }
 $('layers').addEventListener('click', (e) => {
@@ -2395,18 +2685,18 @@ function exArea() {
 }
 function exOpts() {
   const e = doc.opts.exp || MD.defaultExp();
-  return { iso: isIso(), area: exArea(), encuadre: e.encuadre, fmt: e.fmt, pxcm: +e.pxcm || 10, margen: +e.margen || 0, scope: e.scope, human: e.human, ojos: e.ojos, eje: e.eje, grid: e.grid, guias: e.guias,
-    escala: e.escala, rotulo: e.rotulo, show: { imagenes: e.imagenes, vanos: e.vanos, dims: e.dims, gaps: e.gaps, bordes: e.bordes, centro: e.centro, lineas: e.lineas, medidas: e.medidas, muro: e.muro, fichas: e.fichas } };
+  return { iso: isIso(), area: exArea(), encuadre: e.encuadre, fmt: e.fmt, pxcm: +e.pxcm || 10, margen: +e.margen || 0, cotaCm: +e.cotaCm || 4, scope: e.scope, human: e.human, ojos: e.ojos, eje: e.eje, grid: e.grid, guias: e.guias,
+    escala: e.escala, rotulo: e.rotulo, show: { notas: e.notas !== false, imagenes: e.imagenes, vanos: e.vanos, dims: e.dims, gaps: e.gaps, bordes: e.bordes, centro: e.centro, lineas: e.lineas, medidas: e.medidas, muro: e.muro, fichas: e.fichas } };
 }
 function syncExport() {
   const e = doc.opts.exp;
   $('ex-encuadre').value = e.encuadre || 'todo';
   $('ex-ancho').value = doc.opts.anchoAbajo === false ? 'arriba' : 'abajo'; $('ex-ancho').disabled = isIso();
-  $('ex-fmt').value = e.fmt; $('ex-pxcm').value = e.pxcm; $('ex-margin').value = e.margen; $('ex-scope').value = e.scope;
+  $('ex-fmt').value = e.fmt; $('ex-pxcm').value = e.pxcm; $('ex-margin').value = e.margen; $('ex-cota').value = e.cotaCm; $('ex-cota').disabled = isIso(); $('ex-scope').value = e.scope;
   document.querySelectorAll('[data-ex]').forEach((el) => { el.checked = !!e[el.dataset.ex]; });
   document.querySelector('[data-ex="ojos"]').disabled = !e.human;
   // en isométrica no aplican las cotas finas, guías ni cuadrícula
-  const NOISO = ['dims', 'gaps', 'bordes', 'centro', 'lineas', 'medidas', 'guias', 'grid'];
+  const NOISO = ['notas', 'dims', 'gaps', 'bordes', 'centro', 'lineas', 'medidas', 'guias', 'grid'];
   NOISO.forEach((k) => { document.querySelector('[data-ex="' + k + '"]').disabled = isIso(); });
   $('ex-scope').disabled = isIso();
   $('dlg-export').querySelector('.dh').textContent = isIso() ? 'Exportar vista isométrica' : 'Exportar imagen';
@@ -2446,9 +2736,12 @@ function exInfo() {
   if (e.encuadre === 'area' && !o.area) noSel += isIso() && e.areaIso ? ' <span class="warn">El área se dibujó con otro ángulo o lado de la isométrica: vuelve a dibujarla. Mientras, se exporta todo.</span>'
     : ' <span class="warn">Todavía no hay área: usa «Dibujar área…». Mientras, se exporta todo.</span>';
   if (o.area) noSel = (isIso() ? ' Recorte de la vista isométrica.' : ' Recorte de ' + fmt(o.area.w) + ' × ' + fmt(o.area.h) + ' cm.') + noSel;
+  const nEst = o.iso || !o.show.dims ? 0 : doc.items.filter((i) => i.tipo === 'obra' && !i.oculto && i.est && (i.est.w || i.est.h)).length;
+  if (nEst) noSel += ' <span class="warn">' + nEst + (nEst === 1 ? ' obra tiene medidas estimadas' : ' obras tienen medidas estimadas') + ': salen con ≈ y línea punteada.</span>';
   if (o.fmt === 'svg') { $('ex-info').innerHTML = 'SVG vectorial de ' + fmt(f.bounds.w) + ' × ' + fmt(f.bounds.h) + ' cm; las imágenes se incrustan con la resolución cargada (máx. 1600 px por lado).' + noSel; return; }
   $('ex-info').innerHTML = f.W.toLocaleString('es') + ' × ' + f.H.toLocaleString('es') + ' px (' + fmt(f.W * f.H / 1e6) + ' Mpx).'
-    + (f.capped ? ' <span class="warn">Se reduce a ' + fmt(f.s) + ' px/cm para no superar el límite de los navegadores.</span>' : '') + noSel;
+    + (f.capped ? ' <span class="warn">Se reduce a ' + fmt(f.s) + ' px/cm para no superar el límite de los navegadores.</span>' : '')
+    + (o.iso ? '' : ' Cotas de ' + fmt(10 * f.u, 0) + ' px.' + (10 * f.u < 9 ? ' <span class="warn">Pueden ser difíciles de leer: sube la resolución o el texto.</span>' : '')) + noSel;
 }
 function openExport() {
   doc.opts.exp = Object.assign(MD.defaultExp(), doc.opts.exp || {});
@@ -2480,6 +2773,7 @@ $('ex-prev').onclick = togglePreviewSize;
 window.addEventListener('resize', () => { if ($('dlg-export').open) schedulePreview(); });
 $('ex-fmt').addEventListener('change', (e) => { doc.opts.exp.fmt = e.target.value; exInfo(); });
 $('ex-scope').addEventListener('change', (e) => { doc.opts.exp.scope = e.target.value; exInfo(); });
+$('ex-cota').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v > 0) { doc.opts.exp.cotaCm = v; exInfo(); } });
 $('ex-pxcm').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v > 0) { doc.opts.exp.pxcm = v; exInfo(); } });
 $('ex-margin').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v >= 0) { doc.opts.exp.margen = v; exInfo(); } });
 document.querySelectorAll('[data-ex]').forEach((el) => el.addEventListener('change', () => { doc.opts.exp[el.dataset.ex] = el.checked; dirty = true; syncExport(); }));
