@@ -42,7 +42,7 @@ export const nuevaObra = (o = {}) => ({
 });
 
 export const nuevaSala = (s = {}) => ({
-  id: nuevoId('s'), nombre: 'Sala', rotulo: 0.2, rejilla: 0.05, imanes: true, entidades: [], calco: null, ...s,
+  id: nuevoId('s'), nombre: 'Sala', rotulo: 0.2, rejilla: 0.05, imanes: true, entidades: [], calco: null, iso: null, ...s,
 });
 
 export const nuevoMuro = (m = {}) => ({
@@ -135,6 +135,7 @@ const validarSala = (s, obras) => {
   return nuevaSala({
     id: str(s.id) || nuevoId('s'), nombre: str(s.nombre, 'Sala'), rotulo: pos(s.rotulo, 0.2),
     rejilla: num(s.rejilla, 0.05), imanes: bool(s.imanes, true), entidades: ents, calco: c,
+    iso: s.iso && typeof s.iso === 'object' ? { ...s.iso } : null, // cámara del modo 3D
   });
 };
 const TIPOS_OTRO = new Set(['vano', 'persona', 'medida', 'nota']);
@@ -167,7 +168,8 @@ const validarAnotacion = (a, imagenes, salas, muros) => {
   const b = a.base || {};
   const base = b.tipo === 'imagen' && imagenes.has(b.imagenId) && b.w > 0 && b.h > 0 ? { tipo: 'imagen', imagenId: b.imagenId, w: b.w, h: b.h }
     : b.tipo === 'sala' && salas.has(b.salaId) ? { tipo: 'sala', salaId: b.salaId, w: pos(b.w, 0), h: pos(b.h, 0) }
-      : b.tipo === 'muro' && muros.has(b.muroId) ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0) } : null;
+      : b.tipo === 'muro' && muros.has(b.muroId) ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0) }
+        : b.tipo === 'iso' && salas.has(b.salaId) ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0) } : null;
   if (!base) throw new ErrorProyecto(`El plano anotado «${str(a.nombre, '?')}» no tiene base válida`);
   const capas = (Array.isArray(a.capas) ? a.capas : []).filter((c) => c && c.id).map((c) => ({ id: str(c.id), nombre: str(c.nombre, 'capa'), visible: bool(c.visible, true) }));
   if (!capas.length) capas.push({ id: nuevoId('k'), nombre: 'base', visible: true });
@@ -334,7 +336,7 @@ export const incorporar = (p, d) => {
     otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]) })),
   });
   for (const a of q.anotaciones) p.anotaciones.push({
-    ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : a.base.tipo === 'sala' ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
+    ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : (a.base.tipo === 'sala' || a.base.tipo === 'iso') ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
     capas: a.capas.map((c) => ({ ...c, id: re(c.id, 'k') })), capaActiva: re(a.capaActiva, 'k'),
     items: a.items.map((it) => ({ ...it, id: re(it.id, 'i'), capa: re(it.capa, 'k'), ...(it.imagenId ? { imagenId: re(it.imagenId, 'img') } : {}) })),
   });

@@ -381,3 +381,18 @@ body.lectura #bEditar{display:inline-block}
 #bEditar{display:none}
 #tituloLectura{display:none;font-weight:400;color:var(--ink2)}
 body.lectura #tituloLectura{display:inline}
+
+/* ── modo 3D de la planta ── */
+#psIso{position:absolute;inset:0;background:#fff;z-index:3;display:flex;flex-direction:column}
+#psIso[hidden]{display:none}
+#psIso .iso-barra{flex:none;display:flex;align-items:center;gap:8px;padding:0 10px;height:36px;border-bottom:1px solid var(--linea);background:var(--panel);overflow-x:auto;white-space:nowrap}
+#psIso .iso-tit{font-weight:700}
+#psIso .iso-l{display:inline-flex;align-items:center;gap:4px;margin:0;color:var(--ink2);font-size:11px;text-transform:none;letter-spacing:0}
+#psIso .iso-l input[type=range]{width:90px}
+#psIso .iso-l b{color:var(--ink);min-width:30px}
+#psIso .iso-l select,#psIso .iso-l input[type=text]{width:auto;padding:2px 4px}
+#psIso .iso-sep{flex:1}
+#psIso .iso-giros button{padding:2px 8px}
+#psIso #isoCv{flex:1;display:block;cursor:grab;touch-action:none}
+#psIso #isoCv:active{cursor:grabbing}
+#psIso .iso-pie{flex:none;height:22px;line-height:22px;padding:0 10px;font-size:11px;color:var(--ink2);border-top:1px solid var(--linea);background:var(--panel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -29,7 +29,7 @@ export const MARKUP = `
   </header>
 
   <aside id="ap-izquierda">
-    <h2>Planos <span><button id="ap-btnPlano" title="Añadir plano desde una imagen">+ imagen</button> <button id="ap-btnPlanoSala" title="Añadir la planta de una sala del proyecto">+ planta</button> <button id="ap-btnPlanoMuro" title="Añadir el alzado de un muro del proyecto">+ muro</button></span></h2>
+    <h2>Planos <span><button id="ap-btnPlano" title="Añadir plano desde una imagen">+ imagen</button> <button id="ap-btnPlanoSala" title="Añadir la planta de una sala del proyecto">+ planta</button> <button id="ap-btnPlanoMuro" title="Añadir el alzado de un muro del proyecto">+ muro</button> <button id="ap-btnPlanoIso" title="Añadir la vista 3D de una sala, con el giro guardado en la planta">+ 3D</button></span></h2>
     <ul id="ap-listaPlanos" class="lista"></ul>
     <h2>Capas <button id="ap-btnCapa" title="Nueva capa">+</button></h2>
     <ul id="ap-listaCapas" class="lista"></ul>

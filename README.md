@@ -11,7 +11,9 @@ Unifica tres herramientas que antes eran archivos sueltos (plano-sala, MuseoDraf
 - **Fase 3 (hecha):** vista Muro (la mesa de montaje de MuseoDraft) sobre el proyecto, conectada a la planta: desde un tramo de muro se abre su alzado con el ancho, el alto y los cuadros ya colocados; las obras se pueden colgar también desde la lista.
 - **Fase 4 (hecha):** vista Lectura (el anotador) sobre imágenes o sobre las plantas y muros del propio proyecto, redibujados a escala; `app.html` de un solo archivo; exportación de HTML de lectura autocontenido.
 
-Las cuatro fases del plan están hechas. La mesa de montaje anterior sigue intacta en `legacy/museodraft.html`.
+- **Modo 3D (hecho):** la sala en axonometría con giro libre e inclinación, al estilo de Los Sims: los muros que dan la espalda a la cámara se cortan a un zócalo, se vuelven transparentes o se dejan enteros. Cuadros con su colgado, obras en planta y columnas con su alto, proyectores con su haz. Exporta PNG y SVG y entra en Lectura como base («+ 3D»).
+
+Las cuatro fases del plan están hechas, más el modo 3D. La mesa de montaje anterior sigue intacta en `legacy/museodraft.html`.
 
 Dos formas de abrir la app:
 - `index.html` en GitHub Pages (o cualquier servidor; en local, `python3 -m http.server`). Usa módulos ES, así que con doble clic desde el disco se queda en blanco.
@@ -29,9 +31,9 @@ src/core/              sin DOM, probado en Node
   modelo.js            esquema v3, validación, importar/incorporar los .json antiguos
   planta.js            geometría y render SVG de la planta (de plano-sala)
   muro.js              geometría, cotas y pintores del alzado (de MuseoDraft)
-  puente.js            planta → muro: alzado de un tramo con sus cuadros colocados
-  anotacion.js         geometría del anotador (de anotador-planos)
   puente.js            planta → muro; SVG a escala de una sala o un muro; documento de la vista Muro
+  anotacion.js         geometría del anotador (de anotador-planos)
+  isometrica.js        modo 3D: proyección con giro libre, escena por piezas, corte de muros, pintado
 src/vistas/
   planta.js            vista Planta (de plano-sala, sobre una sala del proyecto)
   planta-markup.js     su marcado
@@ -39,6 +41,7 @@ src/vistas/
   muro-markup.js       su marcado
   lectura.js           vista Lectura (de anotador-planos, sobre las anotaciones del proyecto)
   lectura-markup.js    su marcado
+  isometrica.js        modo 3D de la planta: canvas, arrastrar para girar e inclinar, exportación
 build/concatenar.js    produce app.html (resuelve los import/export y los incrusta con el CSS)
 app.html               generado
 src/ui/
@@ -60,6 +63,10 @@ En el panel de un muro de la planta, cada tramo tiene un botón ▭ que abre su 
 
 La vista Muro guarda posición, marco, caída y demás en `muro.colgado[]` y las medidas y la ficha en la obra compartida: cambiar un ancho en el muro cambia la ficha que ve la planta. Lo que se añade en el muro (vanos, personas, notas, medidas) vive solo en el muro. Mover un cuadro en la planta después de crear el alzado no lo mueve en el muro: son dos decisiones distintas (dónde va en la sala, cómo cuelga).
 
+### Modo 3D
+
+Botón «3D» (o tecla 3) en la planta. Proyección: la planta se gira θ grados y se mira con elevación φ: `X = x'`, `Y = y'·sen φ − z·cos φ`; las paralelas siguen paralelas. Cada tramo de muro se trocea en rebanadas de 0,5 m con profundidad propia y todo se pinta de lejos a cerca (orden de pintor); un muro de contorno cuya cara interior da la espalda a la cámara es «de frente» y se corta al zócalo, se vuelve transparente o se deja entero según la opción. Las obras en planta y las columnas toman su alto del campo «alto en 3D» de su ficha (1 m y la altura del muro por defecto); los cuadros, el colgado del alzado del tramo si existe, y si no quedan centrados en el eje visual a 1,50 m. No hay ocultación real entre objetos que se atraviesan ni perspectiva. La cámara se guarda en la sala (`sala.iso`).
+
 ### Cómo se conecta la lectura con el resto
 
 Un plano anotado tiene una base: una imagen suelta, o una sala o un muro del proyecto. Las bases «sala» y «muro» se redibujan a partir del proyecto cada vez que se abren (la planta a 2400 px de ancho, el alzado a 8 px/cm, o menos si no cabe en 16 Mpx), ya con la escala puesta, así que no hay que calibrar. Las anotaciones se guardan en píxeles de esa imagen: si después la planta crece mucho (otra sala al lado, por ejemplo), el dibujo se reencuadra y los marcadores pueden quedar desplazados; para planos cerrados es más seguro anotar al final.
@@ -79,7 +86,7 @@ proyecto { app:'museodraft', version:3, nombre, creado, modificado,
                    otros[] (vanos, personas, medidas, notas en el formato de MuseoDraft, en m),
                    guias:{v,h}, opts }
   anotaciones[]  { id, nombre, base, escala, capas[], capaActiva, items[] }
-                   base: {tipo:'imagen', imagenId, w, h} | {tipo:'sala', salaId} | {tipo:'muro', muroId}
+                   base: {tipo:'imagen', imagenId, w, h} | {tipo:'sala', salaId} | {tipo:'muro', muroId} | {tipo:'iso', salaId, cam}
                    items en el formato de anotador-planos (px de la imagen base); las imágenes incrustadas por imagenId
   imagenes{}     id → dataURL }
 ```

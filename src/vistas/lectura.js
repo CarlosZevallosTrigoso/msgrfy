@@ -3,6 +3,7 @@
 import { A as G } from '../core/anotacion.js';
 import * as M from '../core/modelo.js';
 import { svgDeSala, svgDeMuro } from '../core/puente.js';
+import * as I from '../core/isometrica.js';
 import { MARKUP } from './lectura-markup.js';
 
 // env: { root, proyecto, modo: 'editor'|'lectura', onCambio(), onGuardar(), onExportarHtml(), onEditar(), onArchivoJson(f), mensaje }
@@ -22,16 +23,16 @@ const cacheFuente = new Map();
 const fuente = (pl) => {
   const b = pl.base;
   if (b.tipo === 'imagen') return { href: env.proyecto.imagenes[b.imagenId] || '', w: b.w, h: b.h };
-  const obj = b.tipo === 'sala' ? M.salaDe(env.proyecto, b.salaId) : M.muroDe(env.proyecto, b.muroId);
+  const obj = b.tipo === 'muro' ? M.muroDe(env.proyecto, b.muroId) : M.salaDe(env.proyecto, b.salaId);
   if (!obj) return { href: '', w: b.w || 100, h: b.h || 100 };
-  const firma = JSON.stringify(b.tipo === 'sala' ? [obj, env.proyecto.obras] : [obj, env.proyecto.obras.filter((o) => obj.colgado.some((c) => c.obraId === o.id))]);
+  const firma = JSON.stringify(b.tipo === 'muro' ? [obj, env.proyecto.obras.filter((o) => obj.colgado.some((c) => c.obraId === o.id))] : [obj, env.proyecto.obras, env.proyecto.muros, b.cam]);
   const c = cacheFuente.get(pl.id);
   if (c && c.firma === firma) return c;
-  const r = b.tipo === 'sala' ? svgDeSala(env.proyecto, obj) : svgDeMuro(env.proyecto, obj);
+  const r = b.tipo === 'sala' ? svgDeSala(env.proyecto, obj) : b.tipo === 'muro' ? svgDeMuro(env.proyecto, obj) : I.svgDeIso(env.proyecto, obj, { ...I.camDefecto(), ...(b.cam || obj.iso || {}) }, 120);
   if (!r) return { href: '', w: b.w || 100, h: b.h || 100 };
   const f = { firma, href: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(r.svg), w: r.w, h: r.h };
   cacheFuente.set(pl.id, f);
-  b.w = r.w; b.h = r.h; pl.escala = { pxPorMetro: r.pxPorMetro, ref: null, automatica: true };
+  b.w = r.w; b.h = r.h; pl.escala = b.tipo === 'iso' ? null : { pxPorMetro: r.pxPorMetro, ref: null, automatica: true };
   return f;
 };
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -380,9 +381,10 @@ const agregarPlano = async (file) => {
 };
 const agregarPlanoDe = (tipo, obj) => {
   if (!obj) return;
-  const pl = M.nuevaAnotacion({ nombre: obj.nombre || (tipo === 'sala' ? 'Planta' : 'Muro'), base: tipo === 'sala' ? { tipo: 'sala', salaId: obj.id, w: 0, h: 0 } : { tipo: 'muro', muroId: obj.id, w: 0, h: 0 } });
+  const base = tipo === 'sala' ? { tipo: 'sala', salaId: obj.id, w: 0, h: 0 } : tipo === 'muro' ? { tipo: 'muro', muroId: obj.id, w: 0, h: 0 } : { tipo: 'iso', salaId: obj.id, cam: { ...I.camDefecto(), ...(obj.iso || {}) }, w: 0, h: 0 };
+  const pl = M.nuevaAnotacion({ nombre: (obj.nombre || (tipo === 'muro' ? 'Muro' : 'Planta')) + (tipo === 'iso' ? ' · 3D' : ''), base });
   S.proyecto.planos.push(pl); activarPlano(pl.id);
-  mensaje(tipo === 'sala' ? `Planta «${pl.nombre}» añadida, a escala` : `Alzado «${pl.nombre}» añadido, a escala`);
+  mensaje(tipo === 'sala' ? `Planta «${pl.nombre}» añadida, a escala` : tipo === 'muro' ? `Alzado «${pl.nombre}» añadido, a escala` : `Vista 3D «${pl.nombre}» añadida con el giro guardado en la planta`);
 };
 const elegir = (titulo, lista) => {
   if (!lista.length) { mensaje('El proyecto no tiene ' + (titulo === 'sala' ? 'salas' : 'muros') + ' todavía', true); return null; }
@@ -545,6 +547,7 @@ $('#ap-btnCerrarAyuda').addEventListener('click', () => el.ayuda.classList.remov
 $('#ap-btnPlano').addEventListener('click', () => { el.filePlano.value = ''; el.filePlano.click(); });
 $('#ap-btnPlanoSala').addEventListener('click', () => agregarPlanoDe('sala', elegir('sala', env.proyecto.salas)));
 $('#ap-btnPlanoMuro').addEventListener('click', () => agregarPlanoDe('muro', elegir('muro', env.proyecto.muros)));
+$('#ap-btnPlanoIso').addEventListener('click', () => agregarPlanoDe('iso', elegir('sala', env.proyecto.salas)));
 $('#ap-btnCapa').addEventListener('click', () => { const pl = plano(); if (!pl) return mensaje('Primero añade un plano', true); const n = prompt('Nombre de la capa'); if (!n) return; snap(); const c = { id: G.nuevoId('c'), nombre: n.trim(), visible: true }; pl.capas.push(c); pl.capaActiva = c.id; cambio(); });
 $('#ap-btnExportHtml').addEventListener('click', () => { if (!S.proyecto.planos.length) return mensaje('No hay planos que exportar', true); if (env.onExportarHtml) env.onExportarHtml(); });
 $('#ap-btnExportPng').addEventListener('click', () => exportarPng());

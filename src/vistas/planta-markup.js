@@ -12,6 +12,7 @@ export const MARKUP = `
       <button id="bRehacer" title="Rehacer (Ctrl+Y)">↷</button>
       <span class="sep"></span>
       <button id="bAjustar" title="Ver todo el plano (0)">⤢ ver todo</button>
+      <button id="b3d" title="Ver la sala en 3D: giro libre, muros cortados (3)">3D</button>
       <span class="sep"></span>
       <button id="bExportar" class="primario" title="Descargar el plano como SVG a escala o PNG">Exportar</button>
       <button id="bAyuda" title="Ayuda (?)">?</button>
@@ -47,6 +48,7 @@ export const MARKUP = `
       <g id="capaSel"></g>
       <g id="capaDraft"></g>
     </svg>
+    <div id="psIso" hidden></div>
     <div id="guia"><span class="paso"></span><span class="txt"></span><button id="bGuiaCerrar">entendido</button></div>
     <div id="barraEscala"><span class="t"></span><div class="l"></div></div>
     <div id="flotante"></div>
@@ -127,6 +129,7 @@ export const MARKUP = `
       <tr><td><kbd>G</kbd> Región</td><td>Lazo poligonal para un núcleo o zona curatorial. Muestra su nombre y cuántas obras caen dentro.</td></tr>
       <tr><td>Lista</td><td>Sin nada elegido, el panel lista las obras; clic en una para ir a ella. «Lista de obras (CSV)» descarga la checklist de montaje.</td></tr>
       <tr><td><kbd>T</kbd> Texto</td><td>Clic y escribe en el panel derecho.</td></tr>
+      <tr><td><kbd>3</kbd> 3D</td><td>La sala en axonometría con giro libre. Arrastra para girar e inclinar; los muros que darían la espalda se cortan a un zócalo o se vuelven transparentes. Las obras en planta y columnas toman su alto de la ficha; los cuadros, su colgado del alzado si existe. Exporta PNG y SVG.</td></tr>
       <tr><td><kbd>D</kbd> Cota</td><td>Primer punto, segundo punto, y un tercer clic para separarla del muro. Después, cada clic encadena otra medida en la misma línea; <kbd>⏎</kbd> o <kbd>Esc</kbd> termina. En el panel puedes mostrar el total.</td></tr>
       <tr><td>Rótulos</td><td>Las medidas, alturas y números se colocan solos donde no chocan con otros rótulos, muros, cuadros ni obras. Con «Elegir» puedes arrastrar cualquiera; sigue a su muro si este se mueve. Doble clic sobre un rótulo movido lo devuelve a su sitio automático.</td></tr>
       <tr><td>Altura</td><td>Con un muro elegido, escribe su altura en el panel; aparece como «h 3,20 m» por el otro lado del muro. Si un tramo es distinto, escribe su alto en la tabla de tramos.</td></tr>

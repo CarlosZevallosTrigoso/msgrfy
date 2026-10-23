@@ -4,6 +4,7 @@
 import { G } from '../core/planta.js';
 import * as M from '../core/modelo.js';
 import { MARKUP } from './planta-markup.js';
+import { montarIso } from './isometrica.js';
 
 // ctx: { root, proyecto, sala, onCambio(), onGuardar(), onObraCambiada(obraId) }
 export function montarPlanta(ctx) {
@@ -32,6 +33,7 @@ const el = {
   exportar: $('#exportar'), ayuda: $('#ayuda'), selSala: $('#selSala'),
 };
 
+let iso = null; // modo 3D, se monta más abajo
 const S = {
   doc: ctx.sala, tool: 'select', sel: null, vsel: null, tramo: null, activa: false, obraPendiente: null,
   view: { vx: -1, vy: -1, zoom: 60 }, draft: null, cursor: null, iman: null, raw: null, buffer: '',
@@ -278,7 +280,7 @@ const renderPanel = () => {
       } else h += `<div class="nota">0 = línea simple. Para una hendidura, dibuja el quiebre del muro (por ejemplo, escribe 0,05 y ⏎) y dale espesor.</div>`;
       h += estiloHtml(e) + (e.cerrada ? rellenoHtml(e) : '');
     } else if (e.tipo === 'circulo') {
-      h += `<label>diámetro (m)</label><input type="text" inputmode="decimal" data-num="diametro" value="${G.fmtNum(e.r * 2)}">`;
+      h += `<div class="fila"><div><label>diámetro (m)</label><input type="text" inputmode="decimal" data-num="diametro" value="${G.fmtNum(e.r * 2)}"></div><div><label>alto en 3D (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto) : ''}" placeholder="muro"></div></div>`;
       h += check('medidas', 'mostrar el diámetro', e.medidas) + estiloHtml(e) + rellenoHtml(e);
     } else if (e.tipo === 'puerta') {
       h += `<label>ancho del vano (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}">`;
@@ -307,7 +309,7 @@ const renderPanel = () => {
       if (e.tipo === 'cuadro') {
         h += `<label>ancho en el muro (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}">`;
         h += check('medidas', 'mostrar el ancho', e.medidas) + `<div class="btns"><button data-acc="cara">⇄ cambiar de cara del muro</button></div>`;
-      } else h += `<div class="dato">ocupa en planta: <b>${G.fmtM2(G.area(e.pts))}</b></div>` + giroBotones('N', 'giro del número', 'sin giro') + tamBotones('N');
+      } else h += `<div class="fila"><div><label>alto en 3D (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto) : ''}" placeholder="1,00"></div><div class="dato" style="margin-top:22px">ocupa <b>${G.fmtM2(G.area(e.pts))}</b></div></div>` + giroBotones('N', 'giro del número', 'sin giro') + tamBotones('N');
       const r = G.regionDe(D(), e); h += `<div class="dato">región: <b>${r ? esc(r.nombre) : '—'}</b></div>`;
       h += `<label>color</label>${swatches(e.color)}`;
     } else if (e.tipo === 'proyeccion') {
@@ -459,6 +461,7 @@ const enlazarPanel = (e) => {
     const aplicar = () => {
       const v = G.parseNum(i.value); const k = i.dataset.num;
       if (k === 'altura' && String(i.value).trim() === '') { snap(); delete e.altura; cambio(); return; }
+      if (k === 'alto') { const txt = String(i.value).trim(); if (txt && !(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); if (txt) e.alto = v; else delete e.alto; cambio(); return; }
       if (!Number.isFinite(v) || (k === 'altura' && v < 0) || ((k === 'diametro' || k === 'ancho' || k === 'tam' || k === 'largo' || k === 'esp' || /^p[A-Z]/.test(k)) && !(v > 0)) || (k === 'espesor' && v < 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
       snap();
       if (k === 'diametro') e.r = v / 2;
@@ -608,6 +611,7 @@ const renderPista = () => {
 };
 const render = () => {
   renderSvg(); renderPanel(); renderPista();
+  if (iso && iso.visible) iso.refrescar();
   $$('#herramientas button[data-tool]').forEach((b) => b.classList.toggle('activo', b.dataset.tool === S.tool));
   el.lienzo.classList.toggle('dibujo', DIBUJO.includes(S.tool));
   el.lienzo.classList.toggle('pan', S.tool === 'calco');
@@ -934,6 +938,7 @@ el.lienzo.addEventListener('drop', (ev) => {
 document.addEventListener('keydown', (ev) => {
   if (!S.activa || (document.activeElement && !root.contains(document.activeElement) && document.activeElement !== document.body)) return;
   const ae = document.activeElement; const enCampo = ae && ['INPUT', 'TEXTAREA', 'SELECT'].includes(ae.tagName);
+  if (ev.key === 'Escape' && iso && iso.visible) { cerrar3d(); return; }
   if (ev.key === 'Escape') {
     if (el.ayuda.classList.contains('visible')) { el.ayuda.classList.remove('visible'); return; }
     if (el.exportar.classList.contains('visible')) { el.exportar.classList.remove('visible'); return; }
@@ -971,6 +976,7 @@ document.addEventListener('keydown', (ev) => {
   }
   const herr = { v: 'select', l: 'linea', r: 'rect', o: 'circulo', p: 'puerta', n: 'ventana', t: 'texto', d: 'cota', c: 'cuadro', b: 'obra', g: 'region', y: 'proyeccion' };
   if (herr[kl]) { setTool(herr[kl]); return; }
+  if (k === '3' && !S.draft) { iso.visible ? cerrar3d() : abrir3d(); return; }
   if (k === '0') verTodo(); else if (k === '+' || k === '=') { const { rect } = tam(); zoomEn(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.25); }
   else if (k === '-') { const { rect } = tam(); zoomEn(rect.left + rect.width / 2, rect.top + rect.height / 2, 0.8); }
   else if (k === '?') el.ayuda.classList.add('visible');
@@ -1010,7 +1016,7 @@ const renderSalas = () => {
 const setSala = (sala) => {
   if (!sala || sala === S.doc) return;
   S.doc = sala; S.sel = null; S.vsel = null; S.rsel = null; S.draft = null; S.buffer = ''; S.undo.length = 0; S.redo.length = 0; S.tool = 'select'; guia(null);
-  S.inicioOculto = !!(sala.entidades.length || sala.calco); renderSalas(); render(); verTodo();
+  S.inicioOculto = !!(sala.entidades.length || sala.calco); renderSalas(); render(); verTodo(); if (iso) iso.salaCambiada();
 };
 el.selSala.addEventListener('change', () => setSala(M.salaDe(ctx.proyecto, el.selSala.value)));
 $('#bSalaNueva').addEventListener('click', () => {
@@ -1070,6 +1076,14 @@ $('#exDescargar').addEventListener('click', () => {
   el.exportar.classList.remove('visible');
 });
 
+// ── modo 3D
+iso = montarIso({
+  root: $('#psIso'), proyecto: ctx.proyecto, sala: () => S.doc, mensaje, onCambio: autosave, descargar, nombreArchivo,
+  onCerrar: () => cerrar3d(),
+});
+const abrir3d = () => { if (!S.doc.entidades.length) return mensaje('Dibuja la sala antes de verla en 3D', true); S.draft = null; S.buffer = ''; iso.mostrar(); $('#b3d').classList.add('activo'); el.flot.style.display = 'none'; };
+const cerrar3d = () => { iso.ocultar(); $('#b3d').classList.remove('activo'); render(); };
+$('#b3d').addEventListener('click', () => (iso.visible ? cerrar3d() : abrir3d()));
 // ── arranque y API para el cascarón
 const activar = (on) => {
   S.activa = !!on;
