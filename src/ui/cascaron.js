@@ -2,12 +2,14 @@
 import * as M from '../core/modelo.js';
 import * as almacen from './almacen.js';
 import { montarPlanta } from '../vistas/planta.js';
+import { montarMuro } from '../vistas/muro.js';
+import * as puente from '../core/puente.js';
 import { montarObras } from './obras.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-let proyecto = null, planta = null, obras = null, vistaActiva = 'planta';
+let proyecto = null, planta = null, muro = null, obras = null, vistaActiva = 'planta';
 let msgT = 0;
 const mensaje = (t, error = false) => { const m = $('#msgTop'); m.textContent = t; m.classList.toggle('error', error); clearTimeout(msgT); msgT = setTimeout(() => { m.textContent = ''; }, error ? 8000 : 4500); };
 
@@ -39,22 +41,45 @@ const montar = () => {
     onGuardar: guardarJson,
     onObraCambiada: (id) => { obras.refrescar(); if (id) obras.seleccionar(id); },
     onArchivoJson: abrirArchivo,
+    onAbrirAlzado: abrirAlzado,
+  });
+  muro = montarMuro({
+    root: $('#vista-muro'), proyecto, muro: proyecto.muros[0] || null, mensaje,
+    onCambio: () => { cambio(); obras.refrescar(); },
+    onGuardar: guardarJson,
+    onObraCambiada: () => obras.refrescar(),
+    onArchivoJson: abrirArchivo,
   });
   obras = montarObras({
     root: $('#obras'), proyecto, mensaje,
     onCambio: () => { cambio(); planta.refrescar(); },
     onColocar: (id) => { setVista('planta'); planta.colocar(id); },
     onIrA: (id) => { setVista('planta'); return planta.irA(id); },
-    onPlantaCambiada: () => planta.refrescar(),
+    onPlantaCambiada: () => { planta.refrescar(); muro.refrescar(); },
+    hayMuro: () => !!muro.muro,
+    onColocarMuro: (id) => { setVista('muro'); muro.colocar(id); },
   });
   setVista(vistaActiva);
 };
-const desmontar = () => { $('#vista-planta').innerHTML = ''; $('#obras').innerHTML = ''; planta = null; obras = null; };
+const desmontar = () => { $('#vista-planta').innerHTML = ''; $('#vista-muro').innerHTML = ''; $('#obras').innerHTML = ''; planta = null; muro = null; obras = null; };
 const setVista = (v) => {
   vistaActiva = v;
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('activo', b.dataset.vista === v));
   document.querySelectorAll('.vista').forEach((d) => { d.hidden = d.id !== 'vista-' + v; });
   if (planta) planta.activar(v === 'planta');
+  if (muro) muro.activar(v === 'muro');
+  if (obras && v !== 'planta') obras.refrescar();
+};
+// desde un tramo de la planta: abre su alzado (lo crea si no existe) en la vista Muro
+const abrirAlzado = (sala, linea, i) => {
+  let m = puente.muroDelTramo(proyecto, sala, linea, i);
+  if (!m) {
+    m = puente.muroDesdeTramo(proyecto, sala, linea, i);
+    if (!m) return mensaje('Ese tramo no tiene longitud', true);
+    proyecto.muros.push(m); cambio();
+    mensaje(`Alzado creado: ${m.ancho} × ${m.alto} m, ${m.colgado.length} obra${m.colgado.length === 1 ? '' : 's'} colocada${m.colgado.length === 1 ? '' : 's'}`);
+  }
+  setVista('muro'); muro.abrir(m); obras.refrescar();
 };
 
 // ---------- archivos ----------
@@ -99,6 +124,6 @@ const arrancar = async () => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); $('#bAbrir').click(); }
   });
   window.addEventListener('beforeunload', () => { if (saveT) { clearTimeout(saveT); almacen.guardar(proyecto).catch(() => {}); } });
-  window.MD3 = { get proyecto() { return proyecto; }, get planta() { return planta; }, get obras() { return obras; }, M, setVista, abrirArchivo, cambio, listo: true };
+  window.MD3 = { get proyecto() { return proyecto; }, get planta() { return planta; }, get muro() { return muro; }, get obras() { return obras; }, M, puente, setVista, abrirArchivo, abrirAlzado, cambio, listo: true };
 };
 arrancar();

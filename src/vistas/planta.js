@@ -263,7 +263,9 @@ const renderPanel = () => {
       if (!e.cerrada) h += check('flecha', 'flecha al final (acceso, recorrido)', e.flecha);
       h += `<label>altura del muro (m)</label><input type="text" inputmode="decimal" data-num="altura" value="${e.altura > 0 ? G.fmtNum(e.altura) : ''}" placeholder="sin indicar">`;
       const ph = e.altura > 0 ? G.fmtNum(e.altura) : '—';
-      h += `<label>tramos: largo · alto (m)</label><table class="tramos">${segs.map(([a, b, i]) => `<tr><td>tramo ${i + 1}</td><td><input type="text" inputmode="decimal" data-tramo="${i}" value="${G.fmtNum(G.dist(a, b))}" aria-label="largo del tramo ${i + 1}"></td><td class="alto"><input type="text" inputmode="decimal" data-alto="${i}" value="${e.alturas && e.alturas[i] > 0 ? G.fmtNum(e.alturas[i]) : ''}" placeholder="${ph}" aria-label="alto del tramo ${i + 1}"></td></tr>`).join('')}</table>`;
+      const tieneMuro = (i) => ctx.proyecto.muros.some((m) => m.salaId === S.doc.id && m.tramo && m.tramo.entidadId === e.id && m.tramo.i === i);
+      h += `<label>tramos: largo · alto (m) · alzado</label><table class="tramos">${segs.map(([a, b, i]) => `<tr><td>tramo ${i + 1}</td><td><input type="text" inputmode="decimal" data-tramo="${i}" value="${G.fmtNum(G.dist(a, b))}" aria-label="largo del tramo ${i + 1}"></td><td class="alto"><input type="text" inputmode="decimal" data-alto="${i}" value="${e.alturas && e.alturas[i] > 0 ? G.fmtNum(e.alturas[i]) : ''}" placeholder="${ph}" aria-label="alto del tramo ${i + 1}"></td><td class="u"><button data-alzado="${i}" class="${tieneMuro(i) ? 'activo' : ''}" title="${tieneMuro(i) ? 'Abrir el alzado de este tramo' : 'Crear el alzado de este tramo con sus cuadros'}">▭</button></td></tr>`).join('')}</table>`;
+      h += `<div class="nota">▭ abre el alzado del tramo en la vista Muro, con sus cuadros ya colocados.</div>`;
       h += `<div class="nota">El alto de un tramo solo hace falta si difiere de la altura del muro.</div>`;
       h += `<div class="nota">Cambiar una medida estira la figura desde el final de ese tramo.</div>`;
       h += `<div class="dato">largo total: <b>${G.fmtM(G.longitudLinea(e))}</b>${e.cerrada && e.pts.length > 2 ? ` · área: <b>${G.fmtM2(G.area(e.pts))}</b>` : ''}</div>`;
@@ -426,6 +428,11 @@ const enlazarPanel = (e) => {
     };
     i.addEventListener('change', aplicar);
     i.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); i.blur(); } });
+  });
+  $$('[data-alzado]', P).forEach((b) => {
+    b.addEventListener('mouseenter', () => { S.tramo = +b.dataset.alzado; pedirRender(); });
+    b.addEventListener('mouseleave', () => { S.tramo = null; pedirRender(); });
+    b.addEventListener('click', () => { if (ctx.onAbrirAlzado) ctx.onAbrirAlzado(S.doc, e, +b.dataset.alzado); });
   });
   $$('[data-alto]', P).forEach((i) => {
     const t = +i.dataset.alto;

@@ -8,7 +8,8 @@ Unifica tres herramientas que antes eran archivos sueltos (plano-sala, MuseoDraf
 
 - **Fase 1 (hecha):** modelo de datos, validación e importadores de los tres formatos anteriores, con tests.
 - **Fase 2 (hecha):** `index.html` es la app nueva: cascarón con pestañas, lista de obras, Planta sobre el proyecto (varias salas), guardado automático en IndexedDB, abrir/guardar .json e importación de los archivos antiguos.
-- Fase 3: Muro conectado a la planta (abrir alzado desde un tramo). Fase 4: Lectura, `app.html` concatenado.
+- **Fase 3 (hecha):** vista Muro (la mesa de montaje de MuseoDraft) sobre el proyecto, conectada a la planta: desde un tramo de muro se abre su alzado con el ancho, el alto y los cuadros ya colocados; las obras se pueden colgar también desde la lista.
+- Fase 4: Lectura (planos anotados), `app.html` concatenado.
 
 La mesa de montaje anterior sigue intacta en `legacy/museodraft.html`.
 
@@ -23,9 +24,13 @@ src/core/              sin DOM, probado en Node
   unidades.js          metros ↔ centímetros, formato numérico en español
   modelo.js            esquema v3, validación, importar/incorporar los .json antiguos
   planta.js            geometría y render SVG de la planta (de plano-sala)
+  muro.js              geometría, cotas y pintores del alzado (de MuseoDraft)
+  puente.js            planta → muro: alzado de un tramo con sus cuadros colocados
 src/vistas/
   planta.js            vista Planta (de plano-sala, sobre una sala del proyecto)
   planta-markup.js     su marcado
+  muro.js              vista Muro (de MuseoDraft, sobre un muro del proyecto; trabaja en cm y vuelca en m)
+  muro-markup.js       su marcado
 src/ui/
   cascaron.js          arranque, pestañas, abrir/guardar, reparto del proyecto a las vistas
   obras.js             panel de obras
@@ -38,6 +43,12 @@ test/                  node --test (sin dependencias)
 ### Cómo se conectan obras y planta
 
 Las entidades `cuadro` y `obra` de la planta llevan `obraId` y no guardan ficha. Al dibujar un cuadro se crea una obra en la lista con el ancho del tramo; si antes se eligió una obra en el panel («colocar en planta»), se usa esa y el cuadro toma el ancho de su ficha. Borrar un cuadro de la planta no borra la obra: queda «sin colocar». El título, autor y medidas se editan en cualquiera de los dos sitios y son el mismo dato.
+
+### Cómo se conectan planta y muro
+
+En el panel de un muro de la planta, cada tramo tiene un botón ▭ que abre su alzado en la vista Muro. Si no existe, se crea con el largo del tramo, su altura y los cuadros que cuelgan de la cara interior, colocados desde la izquierda tal como se ven desde dentro de la sala, centrados en el eje visual. A las obras sin alto conocido se les asigna uno estimado (≈). El alzado queda ligado al tramo (`muro.tramo = {entidadId, i, cara}`), así que el botón vuelve a abrir el mismo muro.
+
+La vista Muro guarda posición, marco, caída y demás en `muro.colgado[]` y las medidas y la ficha en la obra compartida: cambiar un ancho en el muro cambia la ficha que ve la planta. Lo que se añade en el muro (vanos, personas, notas, medidas) vive solo en el muro. Mover un cuadro en la planta después de crear el alzado no lo mueve en el muro: son dos decisiones distintas (dónde va en la sala, cómo cuelga).
 
 ## Modelo (versión 3)
 

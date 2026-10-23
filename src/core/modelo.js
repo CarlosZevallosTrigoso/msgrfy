@@ -143,7 +143,7 @@ const otroValido = (o) => o && TIPOS_OTRO.has(o.tipo) && (
     : o.tipo === 'nota' ? Number.isFinite(o.x) && Number.isFinite(o.y)
       : Number.isFinite(o.x) && Number.isFinite(o.y) && o.w > 0 && o.h > 0);
 const validarMuro = (m, obras, salas) => {
-  const tramo = m.tramo && typeof m.tramo === 'object' && m.tramo.entidadId && Number.isInteger(m.tramo.i) ? { entidadId: str(m.tramo.entidadId), i: m.tramo.i } : null;
+  const tramo = m.tramo && typeof m.tramo === 'object' && m.tramo.entidadId && Number.isInteger(m.tramo.i) ? { entidadId: str(m.tramo.entidadId), i: m.tramo.i, cara: m.tramo.cara === -1 ? -1 : 1 } : null;
   return nuevoMuro({
     id: str(m.id) || nuevoId('m'), nombre: str(m.nombre, 'Muro'),
     salaId: m.salaId && salas.has(m.salaId) ? m.salaId : null, tramo: salas.has(m.salaId) ? tramo : null,
@@ -322,7 +322,7 @@ export const incorporar = (p, d) => {
     entidades: s.entidades.map((e) => ({ ...e, id: re(e.id, 'e'), ...(e.obraId ? { obraId: re(e.obraId, 'o') } : {}) })),
   });
   for (const m of q.muros) p.muros.push({
-    ...m, id: re(m.id, 'm'), salaId: re(m.salaId, 's'), tramo: m.tramo ? { entidadId: re(m.tramo.entidadId, 'e'), i: m.tramo.i } : null,
+    ...m, id: re(m.id, 'm'), salaId: re(m.salaId, 's'), tramo: m.tramo ? { ...m.tramo, entidadId: re(m.tramo.entidadId, 'e') } : null,
     colgado: m.colgado.map((c) => ({ ...c, id: re(c.id, 'c'), obraId: re(c.obraId, 'o') })),
     otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]) })),
   });

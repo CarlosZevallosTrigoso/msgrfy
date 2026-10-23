@@ -40,7 +40,7 @@ export function montarObras(ctx) {
       if (o.imgRatio && (!(o.alto > 0) || o.estimado.alto) && o.ancho > 0) h += `<div class="btns"><button data-acc="altoImagen">alto según la imagen (${fmtNum(o.ancho / o.imgRatio)} m)</button></div>`;
       h += txt('inv', 'n.º de inventario') + `<label>nota</label><textarea data-ok="nota" rows="2">${esc(o.nota || '')}</textarea>`;
       h += `<div class="dato">${u.salas.length ? `en ${u.salas.length} sala${u.salas.length > 1 ? 's' : ''}` : 'sin colocar en planta'}${u.muros.length ? ` · en ${u.muros.length} muro${u.muros.length > 1 ? 's' : ''}` : ''}</div>`;
-      h += `<div class="btns"><button data-acc="colocar" class="primario" title="Dibujarla como cuadro en la sala activa">colocar en planta</button>${u.salas.length ? '<button data-acc="ir">ver en la planta</button>' : ''}<button data-acc="borrar" class="peligro">borrar obra</button></div></div>`;
+      h += `<div class="btns"><button data-acc="colocar" class="primario" title="Dibujarla como cuadro en la sala activa">colocar en planta</button>${ctx.hayMuro && ctx.hayMuro() ? '<button data-acc="colocarMuro" title="Colgarla en el muro abierto en la vista Muro">colocar en muro</button>' : ''}${u.salas.length ? '<button data-acc="ir">ver en la planta</button>' : ''}<button data-acc="borrar" class="peligro">borrar obra</button></div></div>`;
     }
     root.querySelector('.ob-cuerpo').innerHTML = h;
     enlazar(o);
@@ -70,6 +70,7 @@ export function montarObras(ctx) {
     else if (acc === 'quitarImagen') { if (!o) return; o.imagenId = null; o.imgRatio = null; M.limpiarImagenes(p()); ctx.onCambio(); render(); }
     else if (acc === 'altoImagen') { if (!o || !o.imgRatio || !(o.ancho > 0)) return; o.alto = r6(o.ancho / o.imgRatio); o.estimado.alto = true; ctx.onCambio(); render(); }
     else if (acc === 'colocar') { if (o) ctx.onColocar(o.id); }
+    else if (acc === 'colocarMuro') { if (o && ctx.onColocarMuro) ctx.onColocarMuro(o.id); }
     else if (acc === 'ir') { if (o && !ctx.onIrA(o.id)) ctx.mensaje('Está en otra sala: cámbiala en el selector de la planta'); }
     else if (acc === 'borrar') {
       if (!o) return; const u = M.usosDeObra(p(), o.id);
