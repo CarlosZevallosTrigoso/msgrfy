@@ -1241,7 +1241,7 @@ $('b-fit').onclick = fitView; $('b-100').onclick = () => zoomTo(calib); $('b-cen
 $('zoomv').addEventListener('change', (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (isFinite(v) && v > 0) zoomTo(calib * v / 100); else afterView(); });
 $('zoomv').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
 
-new ResizeObserver(() => requestRender()).observe(work);
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestRender()).observe(work);
 
 // ---------- inicio y API para el cascarón ----------
 const cargar = (mu) => {
