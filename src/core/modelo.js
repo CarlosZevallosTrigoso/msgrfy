@@ -162,10 +162,13 @@ const validarMuro = (m, obras, salas) => {
     opts: m.opts && typeof m.opts === 'object' ? { ...m.opts } : {},
   });
 };
-const validarAnotacion = (a, imagenes) => {
-  const base = a.base && a.base.tipo === 'imagen' && imagenes.has(a.base.imagenId) && a.base.w > 0 && a.base.h > 0
-    ? { tipo: 'imagen', imagenId: a.base.imagenId, w: a.base.w, h: a.base.h } : null;
-  if (!base) throw new ErrorProyecto(`La anotación «${str(a.nombre, '?')}» no tiene imagen de base válida`);
+// base: una imagen del almacén, o una sala o un muro del proyecto (se redibujan a escala al abrir)
+const validarAnotacion = (a, imagenes, salas, muros) => {
+  const b = a.base || {};
+  const base = b.tipo === 'imagen' && imagenes.has(b.imagenId) && b.w > 0 && b.h > 0 ? { tipo: 'imagen', imagenId: b.imagenId, w: b.w, h: b.h }
+    : b.tipo === 'sala' && salas.has(b.salaId) ? { tipo: 'sala', salaId: b.salaId, w: pos(b.w, 0), h: pos(b.h, 0) }
+      : b.tipo === 'muro' && muros.has(b.muroId) ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0) } : null;
+  if (!base) throw new ErrorProyecto(`El plano anotado «${str(a.nombre, '?')}» no tiene base válida`);
   const capas = (Array.isArray(a.capas) ? a.capas : []).filter((c) => c && c.id).map((c) => ({ id: str(c.id), nombre: str(c.nombre, 'capa'), visible: bool(c.visible, true) }));
   if (!capas.length) capas.push({ id: nuevoId('k'), nombre: 'base', visible: true });
   const capaIds = new Set(capas.map((c) => c.id));
@@ -192,7 +195,11 @@ export const validar = (d) => {
   const salas = (Array.isArray(d.salas) ? d.salas : []).filter((s) => s && typeof s === 'object').map((s) => validarSala(s, obraIds));
   const salaIds = new Set(salas.map((s) => s.id));
   const muros = (Array.isArray(d.muros) ? d.muros : []).filter((m) => m && typeof m === 'object').map((m) => validarMuro(m, obraIds, salaIds));
-  const anotaciones = (Array.isArray(d.anotaciones) ? d.anotaciones : []).filter((a) => a && typeof a === 'object').map((a) => validarAnotacion(a, imagenes));
+  const muroIds = new Set(muros.map((m) => m.id));
+  const anotaciones = [];
+  for (const a of (Array.isArray(d.anotaciones) ? d.anotaciones : []).filter((a) => a && typeof a === 'object')) {
+    try { anotaciones.push(validarAnotacion(a, imagenes, salaIds, muroIds)); } catch (e) { if (!(e instanceof ErrorProyecto)) throw e; }
+  }
   return {
     app: APP, version: VERSION, nombre: str(d.nombre, 'proyecto'), creado: str(d.creado, ahora()), modificado: str(d.modificado, ahora()),
     obras, salas, muros, anotaciones, imagenes: Object.fromEntries(imagenes),
@@ -327,7 +334,7 @@ export const incorporar = (p, d) => {
     otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]) })),
   });
   for (const a of q.anotaciones) p.anotaciones.push({
-    ...a, id: re(a.id, 'a'), base: { ...a.base, imagenId: re(a.base.imagenId, 'img') },
+    ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : a.base.tipo === 'sala' ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
     capas: a.capas.map((c) => ({ ...c, id: re(c.id, 'k') })), capaActiva: re(a.capaActiva, 'k'),
     items: a.items.map((it) => ({ ...it, id: re(it.id, 'i'), capa: re(it.capa, 'k'), ...(it.imagenId ? { imagenId: re(it.imagenId, 'img') } : {}) })),
   });

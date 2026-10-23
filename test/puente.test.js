@@ -67,3 +67,20 @@ test('muroDelTramo encuentra el muro ya creado y el proyecto valida con cara', (
   assert.equal(P.muroDelTramo(p, s, linea, 0, -1), null);
   const q = M.validar(p); assert.deepEqual(q.muros[0].tramo, { entidadId: 'L', i: 0, cara: 1 });
 });
+
+test('svgDeSala y svgDeMuro producen SVG a escala con px por metro', async () => {
+  const P2 = await import('../src/core/puente.js');
+  const { p, s, linea } = salaBase();
+  cuadro(p, s, { x: 1, y: 0 }, { x: 2.2, y: 0 }, 1, { nombre: 'A', autor: 'X', ancho: 1.2, alto: 0.8, estimado: { ancho: false, alto: false } });
+  const r = P2.svgDeSala(p, s, 2000);
+  assert.ok(r.svg.startsWith('<svg')); assert.equal(r.w, 2000); assert.ok(r.h > 0);
+  assert.ok(r.svg.includes('1 · A') || r.svg.includes('>1<'), 'el cuadro lleva su número');
+  const m = P2.muroDesdeTramo(p, s, linea, 0); p.muros.push(m);
+  const rm = P2.svgDeMuro(p, m, 5);
+  assert.ok(rm.svg.includes('<svg') && rm.svg.includes('</svg>'));
+  assert.equal(rm.pxPorMetro, 500);
+  assert.ok(rm.svg.includes('A'), 'la ficha de la obra aparece');
+  assert.ok(rm.w > 8 * 500, 'el ancho incluye el muro de 8 m más márgenes');
+  const doc = P2.docDeMuro(p, m);
+  assert.equal(doc.wall.w, 800); assert.equal(doc.items.filter((i) => i.tipo === 'obra').length, 1);
+});

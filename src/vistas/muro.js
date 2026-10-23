@@ -5,6 +5,7 @@ import { MD } from '../core/muro.js';
 import * as M from '../core/modelo.js';
 import { cmAm, mAcm, r6 } from '../core/unidades.js';
 import { MARKUP } from './muro-markup.js';
+import { docDeMuro } from '../core/puente.js';
 
 // env: { root, proyecto, muro (puede ser null), onCambio(), onGuardar(), onObraCambiada(id), onArchivoJson(f), mensaje }
 export function montarMuro(env) {
@@ -18,31 +19,7 @@ let activa = false;
 
 // ---------- puente proyecto ↔ documento ----------
 const P = () => env.proyecto;
-const construir = (mu) => {
-  if (!mu) return MD.newDoc();
-  const src = {
-    version: 2, titulo: mu.nombre,
-    wall: { w: mAcm(mu.ancho), h: mAcm(mu.alto), color: mu.color, eje: mAcm(mu.eje), grosor: mAcm(mu.grosor) },
-    guides: { v: mu.guias.v.map(mAcm), h: mu.guias.h.map(mAcm) }, opts: mu.opts || {}, images: {}, items: [],
-  };
-  for (const c of mu.colgado) {
-    const o = M.obraDe(P(), c.obraId); if (!o) continue;
-    const w = o.ancho > 0 ? o.ancho : 0.5, h = o.alto > 0 ? o.alto : (o.imgRatio > 0 ? w / o.imgRatio : 0.7);
-    if (o.imagenId && P().imagenes[o.imagenId]) src.images[o.imagenId] = P().imagenes[o.imagenId];
-    src.items.push({
-      id: c.id, tipo: 'obra', nombre: o.nombre, x: mAcm(c.x), y: mAcm(c.y), w: mAcm(w), h: mAcm(h),
-      marco: mAcm(c.marco), pp: mAcm(c.pp), prof: mAcm(c.prof), caida: mAcm(c.caida), rot: c.rot, lock: c.lock, bloqueado: c.bloqueado, oculto: c.oculto,
-      imgId: o.imagenId && P().imagenes[o.imagenId] ? o.imagenId : null, imgRatio: o.imgRatio,
-      est: { w: !(o.ancho > 0) || o.estimado.ancho, h: !(o.alto > 0) || o.estimado.alto },
-      ficha: { titulo: o.nombre, autor: o.autor, anio: o.anio, tecnica: o.tecnica, inv: o.inv },
-    });
-  }
-  const CM = { vano: ['x', 'y', 'w', 'h', 'prof'], persona: ['x', 'y', 'h', 'w', 'dist'], medida: ['x1', 'y1', 'x2', 'y2'], nota: ['x', 'y', 'tam'] };
-  for (const ot of mu.otros) { const n = { ...ot }; for (const k of CM[ot.tipo] || []) if (Number.isFinite(n[k])) n[k] = mAcm(n[k]); src.items.push(n); }
-  const d = MD.normalize(src);
-  // normalize añade una persona si no hay ninguna y el proyecto es de fase 1; aquí respetamos lo guardado
-  return d;
-};
+const construir = (mu) => (mu ? docDeMuro(P(), mu) : MD.newDoc());
 // doc → muro + obras del proyecto
 const volcar = () => {
   if (!muro) return;

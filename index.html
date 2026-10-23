@@ -10,13 +10,15 @@
 <header id="top">
   <span id="brand" title="Recargar" onclick="location.reload()">MuseoDraft</span>
   <input id="nombreProyecto" type="text" placeholder="nombre del proyecto" aria-label="Nombre del proyecto">
+  <span id="tituloLectura"></span>
   <nav id="tabs" aria-label="Vistas">
     <button data-vista="planta">Planta</button>
     <button data-vista="muro" title="Alzados de muro y hoja de montaje">Muro</button>
-    <button data-vista="lectura" data-pronto title="Fase 4: planos anotados navegables">Lectura</button>
+    <button data-vista="lectura" title="Planos anotados con marcadores y enlaces">Lectura</button>
   </nav>
   <div id="accTop">
     <span id="msgTop" role="status" aria-live="polite"></span>
+    <button id="bEditar" title="Abrir este proyecto en el editor completo">Editar</button>
     <button id="bObras" title="Lista de obras del proyecto">Obras</button>
     <button id="bAbrir" title="Abrir un proyecto o importar un .json de plano-sala, MuseoDraft o anotador-planos (Ctrl+O)">Abrir</button>
     <button id="bGuardar" title="Descargar el proyecto como .json (Ctrl+S)">Guardar</button>
@@ -28,7 +30,7 @@
   <div id="vistas">
     <div id="vista-planta" class="vista"></div>
     <div id="vista-muro" class="vista" hidden></div>
-    <div id="vista-lectura" class="vista" hidden><div class="pronto"><div><b>Lectura</b> llega en la fase 4: planos anotados con marcadores y enlaces, exportables como HTML navegable.</div></div></div>
+    <div id="vista-lectura" class="vista" hidden></div>
   </div>
   <aside id="obras" aria-label="Obras"></aside>
 </div>

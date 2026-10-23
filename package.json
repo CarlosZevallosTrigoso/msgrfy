@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build": "node build/concatenar.js",
+    "pretest": "node build/concatenar.js"
   }
 }
