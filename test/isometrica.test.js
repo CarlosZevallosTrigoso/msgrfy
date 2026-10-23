@@ -69,7 +69,7 @@ test('svgDeIso devuelve un SVG con tamaño y las piezas ordenadas de lejos a cer
   assert.ok(r.w > 0 && r.h > 0);
   assert.ok(r.svg.includes('<polygon'));
   const ds = r.piezas.slice().sort((a, b) => a.d - b.d).map((z) => z.d);
-  assert.equal(ds[0], -Infinity, 'el piso va primero');
+  assert.ok(r.piezas.slice().sort((a, b) => a.d - b.d).slice(0, 3).map((z) => z.tipo).join() === 'sombra,losa,piso', 'sombra, losa y piso van primero');
 });
 
 test('el cuadro toma el colgado del alzado si existe', async () => {

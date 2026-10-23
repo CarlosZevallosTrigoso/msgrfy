@@ -3261,6 +3261,13 @@ const escena = (proyecto, sala, cam) => {
   // piso: el contorno mayor; si no hay, la caja de todo
   const pisoPts = contorno ? contorno.pts : (G.caja(ents, 0.2) ? (({ x, y, w, h }) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }])(G.caja(ents, 0.2)) : []);
   if (pisoPts.length) {
+    // losa bajo el piso, que asoma algo más que los muros, y una sombra en el suelo para que no flote
+    const t = contorno ? (() => { const [o0, o1] = banda(contorno); const f = G.ladoFuera(contorno); return f > 0 ? Math.max(0, o1) + 0.12 : Math.min(0, o0) - 0.12; })() : 0.12;
+    const losaPts = G.desplazarPolilinea(pisoPts, true, t);
+    const sombra = losaPts.map((q) => { const pr = P(q.x, q.y, -0.15); return [pr.X + 0.35, pr.Y + 0.25]; });
+    piezas.push({ tipo: 'sombra', d: -3e6, caras: [{ pts: sombra, fill: 'rgba(17,17,17,0.07)', stroke: null }] });
+    const losa = prisma(losaPts, 0.15, '#d9d7cf', '#8f8d85', P, cara, prof, false, -0.15); losa.d = -2e6; losa.tipo = 'losa';
+    piezas.push(losa);
     const caras = [cara(pisoPts.map((p) => [p.x, p.y, 0]), { fill: '#eeede8', stroke: '#b9b7ae', lw: 1 })];
     if (cam.rejilla) {
       const b = G.cajaPuntos(pisoPts); const seg = [];
@@ -3268,7 +3275,7 @@ const escena = (proyecto, sala, cam) => {
       for (let y = Math.ceil(b.y); y <= b.y + b.h; y++) seg.push([[b.x, y, 0], [b.x + b.w, y, 0]]);
       for (const [a, c] of seg) for (const [u, v] of recortar(a, c, pisoPts)) caras.push(cara([u, v], { stroke: 'rgba(17,17,17,0.08)', lw: 1, linea: true }));
     }
-    piezas.push({ tipo: 'piso', d: -Infinity, caras });
+    piezas.push({ tipo: 'piso', d: -1e6, caras });
   }
 
   // muros: cada tramo se trocea en rebanadas cortas (≈ 0,5 m) con profundidad propia, para que el orden
