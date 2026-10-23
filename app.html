@@ -4723,7 +4723,6 @@ document.addEventListener('keydown', (ev) => {
   const k = ev.key; const kl = k.toLowerCase(); const mod = ev.ctrlKey || ev.metaKey;
   if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); return; }
   if (mod && kl === 'y') { ev.preventDefault(); rehacer(); return; }
-  if (mod && kl === 's') { ev.preventDefault(); if (ctx.onGuardar) ctx.onGuardar(); return; }
   if (mod && kl === 'd') { ev.preventDefault(); duplicar(); return; }
   if (mod || ev.altKey) return;
   if (k === ' ') { ev.preventDefault(); if (!S.espacio) { S.espacio = true; el.lienzo.classList.add('pan'); } return; }
@@ -5734,7 +5733,6 @@ window.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey, k = e.key;
   if (mod && (k === 'z' || k === 'Z')) { if (typing) return; e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && (k === 'y' || k === 'Y')) { if (typing) return; e.preventDefault(); redo(); return; }
-  if (mod && (k === 's' || k === 'S')) { e.preventDefault(); if (env.onGuardar) env.onGuardar(); return; }
   if (mod && (k === 'e' || k === 'E')) { e.preventDefault(); openExport(); return; }
   if (mod && k === '0') { e.preventDefault(); fitView(); return; }
   if (mod && (k === '=' || k === '+')) { e.preventDefault(); zoomCenter(1.25); return; }
@@ -7191,7 +7189,6 @@ document.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? rehacer() : deshacer(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); rehacer(); return; }
-  if ((e.ctrlKey || e.metaKey) && k === 's') { e.preventDefault(); if (env.onGuardar) env.onGuardar(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tools = { v: 'select', m: 'marcador', t: 'texto', i: 'imagen', d: 'dimension', p: 'poligono', z: 'zona', x: 'medir', c: 'calibrar' };
   if (tools[k] && S.modo === 'editor') { setTool(tools[k]); return; }
@@ -7462,7 +7459,12 @@ const montar = () => {
   });
   setVista(vistaActiva);
 };
-const desmontar = () => { for (const id of ['#vista-planta', '#vista-muro', '#vista-lectura', '#obras']) $(id).innerHTML = ''; planta = null; muro = null; lectura = null; obras = null; };
+// las vistas registran teclado en document/window: hay que desactivarlas (y destruirlas si pueden) antes de vaciar su DOM
+const desmontar = () => {
+  for (const v of [planta, muro, lectura]) { if (!v) continue; try { v.activar(false); if (v.destruir) v.destruir(); } catch (e) { console.warn(e); } }
+  for (const id of ['#vista-planta', '#vista-muro', '#vista-lectura', '#obras']) $(id).innerHTML = '';
+  planta = null; muro = null; lectura = null; obras = null;
+};
 const setVista = (v) => {
   vistaActiva = v;
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('activo', b.dataset.vista === v));

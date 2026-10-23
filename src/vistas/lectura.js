@@ -528,7 +528,6 @@ document.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? rehacer() : deshacer(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); rehacer(); return; }
-  if ((e.ctrlKey || e.metaKey) && k === 's') { e.preventDefault(); if (env.onGuardar) env.onGuardar(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tools = { v: 'select', m: 'marcador', t: 'texto', i: 'imagen', d: 'dimension', p: 'poligono', z: 'zona', x: 'medir', c: 'calibrar' };
   if (tools[k] && S.modo === 'editor') { setTool(tools[k]); return; }

@@ -1010,7 +1010,6 @@ document.addEventListener('keydown', (ev) => {
   const k = ev.key; const kl = k.toLowerCase(); const mod = ev.ctrlKey || ev.metaKey;
   if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); return; }
   if (mod && kl === 'y') { ev.preventDefault(); rehacer(); return; }
-  if (mod && kl === 's') { ev.preventDefault(); if (ctx.onGuardar) ctx.onGuardar(); return; }
   if (mod && kl === 'd') { ev.preventDefault(); duplicar(); return; }
   if (mod || ev.altKey) return;
   if (k === ' ') { ev.preventDefault(); if (!S.espacio) { S.espacio = true; el.lienzo.classList.add('pan'); } return; }

@@ -68,7 +68,12 @@ const montar = () => {
   });
   setVista(vistaActiva);
 };
-const desmontar = () => { for (const id of ['#vista-planta', '#vista-muro', '#vista-lectura', '#obras']) $(id).innerHTML = ''; planta = null; muro = null; lectura = null; obras = null; };
+// las vistas registran teclado en document/window: hay que desactivarlas (y destruirlas si pueden) antes de vaciar su DOM
+const desmontar = () => {
+  for (const v of [planta, muro, lectura]) { if (!v) continue; try { v.activar(false); if (v.destruir) v.destruir(); } catch (e) { console.warn(e); } }
+  for (const id of ['#vista-planta', '#vista-muro', '#vista-lectura', '#obras']) $(id).innerHTML = '';
+  planta = null; muro = null; lectura = null; obras = null;
+};
 const setVista = (v) => {
   vistaActiva = v;
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('activo', b.dataset.vista === v));

@@ -568,7 +568,6 @@ window.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey, k = e.key;
   if (mod && (k === 'z' || k === 'Z')) { if (typing) return; e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && (k === 'y' || k === 'Y')) { if (typing) return; e.preventDefault(); redo(); return; }
-  if (mod && (k === 's' || k === 'S')) { e.preventDefault(); if (env.onGuardar) env.onGuardar(); return; }
   if (mod && (k === 'e' || k === 'E')) { e.preventDefault(); openExport(); return; }
   if (mod && k === '0') { e.preventDefault(); fitView(); return; }
   if (mod && (k === '=' || k === '+')) { e.preventDefault(); zoomCenter(1.25); return; }
