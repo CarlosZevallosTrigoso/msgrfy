@@ -5,6 +5,7 @@ import { G } from './planta.js';
 import { MD } from './muro.js';
 import * as M from './modelo.js';
 import { muroDelTramo, altoEstimado } from './puente.js';
+import { muebleCajas } from './biblioteca.js';
 
 const rad = (g) => g * Math.PI / 180;
 // color hex con transparencia, como rgba() (los pintores y cualquier rasterizador lo entienden)
@@ -161,6 +162,11 @@ export const escena = (proyecto, sala, cam) => {
     if (e.tipo === 'obra' && e.pts.length >= 3) {
       const h = e.alto > 0 ? e.alto : 1; const col = e.color || '#b06a36';
       piezas.push(prisma(e.pts, h, alfa(col, 0.45), col, P, cara, prof));
+    } else if (e.tipo === 'mueble') {
+      for (const cj of muebleCajas(e)) {
+        const col = cj.color || '#8a8a8a'; const esRgba = /^rgba/.test(col);
+        piezas.push(prisma(cj.pts, cj.h, esRgba ? col : alfa(col, col === '#ffffff' ? 0.95 : 0.8), esRgba ? '#6b8aa0' : (col === '#ffffff' ? '#8f8d85' : col), P, cara, prof, cj.forma === 'cilindro', cj.z0));
+      }
     } else if (e.tipo === 'circulo') {
       const n = 24, pts = []; for (let k = 0; k < n; k++) { const a = k / n * 2 * Math.PI; pts.push({ x: e.c.x + Math.cos(a) * e.r, y: e.c.y + Math.sin(a) * e.r }); }
       const h = e.alto > 0 ? e.alto : cam.altoDefecto; const col = e.color || '#111111';

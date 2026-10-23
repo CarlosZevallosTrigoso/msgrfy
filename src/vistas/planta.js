@@ -5,6 +5,7 @@ import { G } from '../core/planta.js';
 import * as M from '../core/modelo.js';
 import { MARKUP } from './planta-markup.js';
 import { montarIso } from './isometrica.js';
+import { CATALOGO, CATEGORIAS, muebleDesde, entradaDesde, csvMobiliario } from '../core/biblioteca.js';
 
 // ctx: { root, proyecto, sala, onCambio(), onGuardar(), onObraCambiada(obraId) }
 export function montarPlanta(ctx) {
@@ -15,7 +16,7 @@ const MAX_UNDO = 60, MAX_LADO_CALCO = 3000;
 const $ = (s, r = root) => r.querySelector(s);
 const $$ = (s, r = root) => Array.from(r.querySelectorAll(s));
 const esc = G.esc, C = G.C;
-const DIBUJO = ['linea', 'rect', 'circulo', 'puerta', 'ventana', 'texto', 'cota', 'calibrar', 'cuadro', 'obra', 'region', 'proyeccion'];
+const DIBUJO = ['linea', 'rect', 'circulo', 'puerta', 'ventana', 'texto', 'cota', 'calibrar', 'cuadro', 'obra', 'region', 'proyeccion', 'mueble'];
 const POLI = ['linea', 'obra', 'region'];
 const esPoli = (t) => POLI.includes(t);
 const COLORES_REGION = ['#4f6b82', '#586a45', '#b06a36', '#b03a2e', '#8a8a8a'];
@@ -35,7 +36,7 @@ const el = {
 
 let iso = null; // modo 3D, se monta más abajo
 const S = {
-  doc: ctx.sala, tool: 'select', sel: null, vsel: null, tramo: null, activa: false, obraPendiente: null,
+  doc: ctx.sala, tool: 'select', sel: null, vsel: null, tramo: null, activa: false, obraPendiente: null, muebleTpl: null, bibCat: 'soportes',
   view: { vx: -1, vy: -1, zoom: 60 }, draft: null, cursor: null, iman: null, raw: null, buffer: '',
   undo: [], redo: [], arr: null, alt: false, espacio: false, lsFallo: false, inicioOculto: false, guiaPaso: null, raf: 0,
 };
@@ -194,6 +195,12 @@ const renderDraft = (z) => {
       s += G.svgDibujo({ entidades: [tmp], rotulo: S.doc.rotulo }, { k: 1 / z }).cuerpo;
     }
   }
+  if (S.tool === 'mueble' && S.muebleTpl && cur) {
+    const tmp = muebleDesde(S.muebleTpl, cur.x, cur.y, '_m'); tmp.rot = S.muebleRot || 0;
+    const pts = G.mueblePts(tmp);
+    s += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" fill="#b06a36" fill-opacity="0.15" ${st('#b06a36')}/>`;
+    etiqueta = S.muebleTpl.nombre;
+  }
   // indicador de imán
   if (cur && (DIBUJO.includes(S.tool) || (S.arr && S.arr.tipo === 'asa')) && S.iman) {
     const a = 6 / z, p = cur, col = '#b06a36', w = C(1.5 / z);
@@ -251,7 +258,7 @@ const panelRotulo = (e, key, ra) => {
   if (ov) h += `<div class="btns"><button data-acc="etqUna" data-key="${key}">todo automático</button></div>`;
   return h;
 };
-const NOMBRES = { proyeccion: 'proyección', linea: 'muro / línea', circulo: 'círculo', puerta: 'puerta', ventana: 'ventana', texto: 'texto', cota: 'cota', cuadro: 'cuadro en muro', obra: 'obra en planta', region: 'región' };
+const NOMBRES = { mueble: 'mobiliario', proyeccion: 'proyección', linea: 'muro / línea', circulo: 'círculo', puerta: 'puerta', ventana: 'ventana', texto: 'texto', cota: 'cota', cuadro: 'cuadro en muro', obra: 'obra en planta', region: 'región' };
 
 const renderPanel = () => {
   const e = ent(); let h = '';
@@ -290,6 +297,16 @@ const renderPanel = () => {
       h += `<div class="fila"><div><label>ancho (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}"></div><div><label>espesor (m)</label><input type="text" inputmode="decimal" data-num="esp" value="${G.fmtNum(e.esp > 0 ? e.esp : 0.15)}"></div></div>`;
       h += `<div class="nota">El espesor es el del muro donde va la ventana.</div>`;
       h += check('medidas', 'mostrar el ancho', e.medidas) + `<label>color</label>${swatches(e.color)}`;
+    } else if (e.tipo === 'mueble') {
+      h += `<label>nombre</label><input type="text" data-k="nombre" value="${esc(e.nombre || '')}">`;
+      h += `<label>categoría</label><select data-mcat>${CATEGORIAS.map(([v, t]) => `<option value="${v}" ${v === e.cat ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+      const num = (k, label, v) => `<div><label>${label}</label><input type="text" inputmode="decimal" data-num="${k}" value="${G.fmtNum(v)}"></div>`;
+      h += e.forma === 'cilindro' ? `<div class="fila">${num('ml', 'diámetro (m)', e.l)}${num('mh', 'alto (m)', e.h)}</div>` : `<div class="fila">${num('ml', 'largo (m)', e.l)}${num('ma', 'ancho (m)', e.a)}${num('mh', 'alto (m)', e.h)}</div>`;
+      h += `<div class="fila"><div><label>giro (°)</label><input type="text" inputmode="decimal" data-num="mrot" value="${G.fmtNum(e.rot || 0, 0)}"></div><div><label>elevación (m)</label><input type="text" inputmode="decimal" data-num="mdz" value="${G.fmtNum(e.dz || 0)}" title="Altura de la base sobre el piso (0 = apoyado)"></div></div>`;
+      h += `<div class="btns"><button data-acc="rot90">⟲ 90°</button><button data-acc="rot0">sin giro</button></div>`;
+      if (e.partes) h += `<div class="nota">Objeto compuesto (${e.partes.length} piezas): las medidas escalan el conjunto.</div>`;
+      h += `<label>color</label>${swatches(e.color)}`;
+      h += `<div class="btns"><button data-acc="bibGuardar" title="Guardar este objeto con sus medidas en «Mi biblioteca»">guardar en mi biblioteca</button></div>`;
     } else if (e.tipo === 'texto') {
       h += `<label>texto</label><textarea data-k="texto" rows="3">${esc(e.texto)}</textarea>`;
       h += `<div class="fila"><div><label>tamaño (m)</label><input type="text" inputmode="decimal" data-num="tam" value="${G.fmtNum(e.tam)}"></div><div><label>giro (°)</label><input type="text" inputmode="decimal" data-num="rot" value="${G.fmtNum(e.rot || 0, 0)}"></div></div>`;
@@ -356,6 +373,13 @@ const renderPanel = () => {
     const cerradas = d.entidades.filter((x) => x.tipo === 'linea' && x.cerrada && x.pts.length > 2);
     if (cerradas.length) { const mayor = cerradas.reduce((a, b) => (G.area(b.pts) > G.area(a.pts) ? b : a)); h += `<div class="dato">figura mayor: <b>${G.fmtM2(G.area(mayor.pts))}</b> · perímetro <b>${G.fmtM(G.longitudLinea(mayor))}</b></div>`; }
     h += `<div class="dato">${d.entidades.length} elemento${d.entidades.length === 1 ? '' : 's'}</div>`;
+    // biblioteca de objetos
+    h += `<h3>biblioteca</h3><select data-bibcat>${CATEGORIAS.map(([v, t]) => `<option value="${v}" ${v === S.bibCat ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+    const items = S.bibCat === 'propios' ? ctx.proyecto.biblioteca : CATALOGO.filter((c) => c.cat === S.bibCat);
+    if (!items.length) h += `<div class="nota">${S.bibCat === 'propios' ? 'Vacía. Selecciona un mueble colocado y pulsa «guardar en mi biblioteca».' : 'Nada en esta categoría.'}</div>`;
+    else h += `<ul class="obras bib">${items.map((it) => `<li data-bib="${esc(it.id)}" title="Clic y luego clic en la planta donde va"><span>${esc(it.nombre)}</span>${S.bibCat === 'propios' ? `<button class="mini peligro" data-bibdel="${esc(it.id)}" title="Quitar de mi biblioteca">×</button>` : ''}</li>`).join('')}</ul>`;
+    h += `<div class="btns"><button data-acc="csvMob" title="Lista de mobiliario por sala con cantidades">Materiales (CSV)</button><button data-acc="bibExportar" title="Descargar mi biblioteca como .json">exportar biblioteca</button><button data-acc="bibImportar" title="Añadir objetos desde un .json de biblioteca">importar</button></div>`;
+    const nMuebles = d.entidades.filter(G.esMueble).length; if (nMuebles) h += `<div class="dato">${nMuebles} objeto${nMuebles === 1 ? '' : 's'} de mobiliario en esta sala</div>`;
     const obras = d.entidades.filter(G.esObra).sort(G.ordenNatural);
     const sueltas = M.obrasSinColocar(ctx.proyecto).length;
     h += `<h3>obras en esta sala · ${obras.length}</h3>`;
@@ -462,6 +486,14 @@ const enlazarPanel = (e) => {
       const v = G.parseNum(i.value); const k = i.dataset.num;
       if (k === 'altura' && String(i.value).trim() === '') { snap(); delete e.altura; cambio(); return; }
       if (k === 'alto') { const txt = String(i.value).trim(); if (txt && !(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); if (txt) e.alto = v; else delete e.alto; cambio(); return; }
+      if (k === 'mrot') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.rot = ((v % 360) + 360) % 360; cambio(); return; }
+      if (k === 'mdz') { if (!(v >= 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); e.dz = G.r6(v); cambio(); return; }
+      if (k === 'ml' || k === 'ma' || k === 'mh') {
+        if (!(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
+        snap(); const prop = k === 'ml' ? 'l' : k === 'ma' ? 'a' : 'h'; const f = v / e[prop];
+        if (e.partes) for (const pz of e.partes) { pz[prop] *= f; if (prop === 'l') pz.dx *= f; if (prop === 'a') pz.dy *= f; if (prop === 'h') pz.dz = (pz.dz || 0) * f; }
+        e[prop] = G.r6(v); if (e.forma === 'cilindro' && prop === 'l') e.a = e.l; cambio(); return;
+      }
       if (!Number.isFinite(v) || (k === 'altura' && v < 0) || ((k === 'diametro' || k === 'ancho' || k === 'tam' || k === 'largo' || k === 'esp' || /^p[A-Z]/.test(k)) && !(v > 0)) || (k === 'espesor' && v < 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
       snap();
       if (k === 'diametro') e.r = v / 2;
@@ -534,6 +566,19 @@ const enlazarPanel = (e) => {
   });
   $$('[data-giroexacto]', P).forEach((i) => i.addEventListener('change', () => { const v = G.parseNum(i.value); if (!Number.isFinite(v)) { renderPanel(); return; } fijarGiro(i.dataset.giroexacto, v); }));
   $$('[data-obra]', P).forEach((li) => li.addEventListener('click', () => { S.sel = li.dataset.obra; S.vsel = null; render(); }));
+  // biblioteca
+  $$('[data-bibcat]', P).forEach((sel) => sel.addEventListener('change', () => { S.bibCat = sel.value; renderPanel(); }));
+  $$('[data-bib]', P).forEach((li) => li.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-bibdel]')) return;
+    const id = li.dataset.bib; const tpl = (S.bibCat === 'propios' ? ctx.proyecto.biblioteca : CATALOGO).find((x) => x.id === id); if (!tpl) return;
+    S.muebleTpl = tpl; S.muebleRot = 0; setTool('mueble');
+  }));
+  $$('[data-bibdel]', P).forEach((b) => b.addEventListener('click', () => {
+    const i = ctx.proyecto.biblioteca.findIndex((x) => x.id === b.dataset.bibdel); if (i < 0) return;
+    if (!confirm(`¿Quitar «${ctx.proyecto.biblioteca[i].nombre}» de tu biblioteca?`)) return;
+    ctx.proyecto.biblioteca.splice(i, 1); autosave(); renderPanel();
+  }));
+  $$('[data-mcat]', P).forEach((sel) => sel.addEventListener('change', () => { if (!e) return; snap(); e.cat = sel.value; cambio(); }));
 };
 const aplicarTramo = (i, e, t) => {
   if (!e || !ent(e.id)) return;
@@ -560,6 +605,10 @@ const accion = (acc, e, btn = null) => {
   else if (acc === 'etqCentro') { snap(); delete e.etq; cambio(); }
   else if (acc === 'cara') { snap(); e.lado = e.lado === -1 ? 1 : -1; cambio(); }
   else if (acc === 'csvObras') exportarCsvObras();
+  else if (acc === 'csvMob') { if (!ctx.proyecto.salas.some((x) => x.entidades.some(G.esMueble))) return mensaje('Todavía no hay mobiliario', true); descargar(new Blob(['\ufeff' + csvMobiliario(ctx.proyecto)], { type: 'text/csv;charset=utf-8' }), nombreArchivo() + '-materiales.csv'); mensaje('Lista de materiales exportada'); }
+  else if (acc === 'bibGuardar') { if (!e || e.tipo !== 'mueble') return; const n = prompt('Nombre en tu biblioteca', e.nombre); if (!n) return; ctx.proyecto.biblioteca.push({ ...entradaDesde(e, M.nuevoId('b')), nombre: n.trim() || e.nombre }); autosave(); mensaje(`«${n}» guardado en tu biblioteca`); }
+  else if (acc === 'bibExportar') { if (!ctx.proyecto.biblioteca.length) return mensaje('Tu biblioteca está vacía', true); descargar(new Blob([JSON.stringify({ app: 'museodraft-biblioteca', version: 1, objetos: ctx.proyecto.biblioteca })], { type: 'application/json' }), 'biblioteca.json'); mensaje('Biblioteca exportada'); }
+  else if (acc === 'bibImportar') { const f = document.createElement('input'); f.type = 'file'; f.accept = 'application/json,.json'; f.addEventListener('change', () => { const file = f.files[0]; if (!file) return; const fr = new FileReader(); fr.onload = () => { try { const d = JSON.parse(fr.result); const lista = Array.isArray(d) ? d : Array.isArray(d.objetos) ? d.objetos : null; if (!lista) throw new Error('El archivo no es una biblioteca'); let n = 0; for (const it of lista) if (it && it.l > 0 && it.a > 0 && it.h > 0 && it.nombre) { ctx.proyecto.biblioteca.push({ ...it, id: M.nuevoId('b'), cat: 'propios' }); n++; } autosave(); S.bibCat = 'propios'; renderPanel(); mensaje(`${n} objeto${n === 1 ? '' : 's'} añadido${n === 1 ? '' : 's'} a tu biblioteca`); } catch (err) { mensaje(err.message, true); } }; fr.readAsText(file); }); f.click(); }
   else if (acc === 'calcoSubir') abrirCalco();
   else if (acc === 'calibrar') { setTool('calibrar'); guia('Calibrar', 'Haz clic en dos puntos de la imagen cuya distancia real conozcas (por ejemplo, los extremos de una pared acotada) y escribe cuántos metros mide.'); }
   else if (acc === 'calcoMover') setTool(S.tool === 'calco' ? 'select' : 'calco');
@@ -586,6 +635,7 @@ const pistaTexto = () => {
   if (t === 'puerta') return d ? 'Clic en el otro extremo del vano · o escribe el ancho y ⏎' : 'Clic en un extremo del vano, sobre el muro';
   if (t === 'ventana') return d ? 'Clic en el otro extremo de la ventana · o escribe el ancho y ⏎' : 'Clic en un extremo de la ventana, sobre el muro';
   if (t === 'texto') return 'Clic donde va el texto; escribe en el panel derecho';
+  if (t === 'mueble') return S.muebleTpl ? 'Clic donde va «' + S.muebleTpl.nombre + '» · R gira 90° · Esc cancela' : 'Elige un objeto en la biblioteca';
   if (t === 'cota' && d && d.cadena) return 'Clic en el siguiente punto para encadenar otra medida · escribe una medida y ⏎ · ⏎ o Esc termina';
   if (t === 'cota') return !d ? 'Clic en el primer punto a medir' : d.puntos.length === 1 ? 'Clic en el segundo punto · o escribe la medida y ⏎' : 'Aleja el cursor para separar la cota del muro y haz clic';
   if (t === 'calibrar') return d ? 'Clic en el segundo punto de la medida conocida' : 'Clic en el primer punto de una medida que conozcas, sobre la imagen';
@@ -688,6 +738,11 @@ const clicDibujo = (p, arr) => {
       d.puntos.push(p);
     }
     S.buffer = ''; return render();
+  }
+  if (t === 'mueble') {
+    if (!S.muebleTpl) { setTool('select'); return; }
+    const m = muebleDesde(S.muebleTpl, p.x, p.y, G.nuevoId()); m.rot = S.muebleRot || 0;
+    agregar(m); return;
   }
   if (t === 'texto') {
     const e = agregar({ tipo: 'texto', x: p.x, y: p.y, texto: 'Texto', tam: G.r6(S.doc.rotulo * 1.4), rot: 0 });
@@ -943,6 +998,7 @@ document.addEventListener('keydown', (ev) => {
     if (el.ayuda.classList.contains('visible')) { el.ayuda.classList.remove('visible'); return; }
     if (el.exportar.classList.contains('visible')) { el.exportar.classList.remove('visible'); return; }
     if (enCampo) { ae.blur(); return; }
+    if (S.tool === 'mueble') { S.muebleTpl = null; setTool('select'); return; }
     if (S.buffer) { S.buffer = ''; return render(); }
     if (S.draft) { if (esPoli(S.draft.tool) && S.draft.puntos.length >= 2) terminarLinea(false); else cancelarDraft(); return; }
     if (S.vsel != null) { S.vsel = null; return render(); }
@@ -974,6 +1030,7 @@ document.addEventListener('keydown', (ev) => {
     const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
     snap(); G.mover(e, d[0] * paso, d[1] * paso); cambio(); return;
   }
+  if (kl === 'r' && S.tool === 'mueble') { S.muebleRot = ((S.muebleRot || 0) + 90) % 360; pedirRender(); return; }
   const herr = { v: 'select', l: 'linea', r: 'rect', o: 'circulo', p: 'puerta', n: 'ventana', t: 'texto', d: 'cota', c: 'cuadro', b: 'obra', g: 'region', y: 'proyeccion' };
   if (herr[kl]) { setTool(herr[kl]); return; }
   if (k === '3' && !S.draft) { iso.visible ? cerrar3d() : abrir3d(); return; }
@@ -1081,7 +1138,7 @@ iso = montarIso({
   root: $('#psIso'), proyecto: ctx.proyecto, sala: () => S.doc, mensaje, onCambio: autosave, descargar, nombreArchivo,
   onCerrar: () => cerrar3d(),
 });
-const abrir3d = () => { if (!S.doc.entidades.length) return mensaje('Dibuja la sala antes de verla en 3D', true); S.draft = null; S.buffer = ''; iso.mostrar(); $('#b3d').classList.add('activo'); el.flot.style.display = 'none'; };
+const abrir3d = () => { if (!S.doc.entidades.length) return mensaje('Dibuja la sala antes de verla en 3D', true); S.draft = null; S.buffer = ''; S.muebleTpl = null; if (S.tool !== 'select') setTool('select'); iso.mostrar(); $('#b3d').classList.add('activo'); el.flot.style.display = 'none'; };
 const cerrar3d = () => { iso.ocultar(); $('#b3d').classList.remove('activo'); render(); };
 $('#b3d').addEventListener('click', () => (iso.visible ? cerrar3d() : abrir3d()));
 // ── arranque y API para el cascarón

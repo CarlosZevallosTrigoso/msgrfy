@@ -1,4 +1,5 @@
 // Geometría y render de la planta. Extraído de plano-sala; sin DOM. Modelo en metros, SVG en cm.
+import { mueblePts as _mueblePts } from './biblioteca.js';
 // ─── G: geometría y render, funciones puras sin DOM. Modelo en metros; SVG en centímetros (U).
 export const G = (() => {
   const U = 100;
@@ -56,8 +57,11 @@ export const G = (() => {
     return { q, t, d: dist(p, q) };
   };
   const esPoligono = (e) => e.tipo === 'obra' || e.tipo === 'region';
+  const esMueble = (e) => e.tipo === 'mueble';
+  const mueblePts = _mueblePts;
   const segmentos = (e) => {
     if (esPoligono(e)) { const s = []; const n = e.pts.length; for (let i = 0; i < n; i++) s.push([e.pts[i], e.pts[(i + 1) % n], i]); return n > 2 ? s : []; }
+    if (esMueble(e) && e.forma !== 'cilindro') { const pts = mueblePts(e); return pts.map((p, i) => [p, pts[(i + 1) % 4], i]); }
     if (e.tipo === 'linea') {
       const s = [];
       for (let i = 0; i < e.pts.length - 1; i++) s.push([e.pts[i], e.pts[i + 1], i]);
@@ -67,7 +71,7 @@ export const G = (() => {
     if (e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro') return [[e.a, e.b, 0]];
     return [];
   };
-  const verticesIman = (e) => (e.tipo === 'linea' ? e.pts : e.tipo === 'circulo' ? [e.c] : e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro' || e.tipo === 'proyeccion' ? [e.a, e.b] : esPoligono(e) ? e.pts : []);
+  const verticesIman = (e) => (e.tipo === 'linea' ? e.pts : e.tipo === 'circulo' ? [e.c] : e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro' || e.tipo === 'proyeccion' ? [e.a, e.b] : esPoligono(e) ? e.pts : esMueble(e) ? (e.forma === 'cilindro' ? [{ x: e.x, y: e.y }] : mueblePts(e)) : []);
   // Imán: vértice > punto medio > sobre un tramo > rejilla > libre
   const imanar = (p, o) => {
     const ents = o.entidades || [], tol = o.tol || 0.1, ex = o.excluir || null;
@@ -331,6 +335,7 @@ export const G = (() => {
       }
       case 'cuadro': { const g = cuadroGeom(e, o_ents); if (puntoEnPoligono(p, g.esquinas)) return 0; return Math.min(proyectar(p, e.a, e.b).d, dist(p, g.frente)); }
       case 'texto': { const c = textoCaja(e); const l = rotar(sub(p, e), -(e.rot || 0)); const dx = Math.max(0, Math.abs(l.x) - c.w / 2), dy = Math.max(0, Math.abs(l.y) - c.h / 2); return Math.hypot(dx, dy); }
+      case 'mueble': { const pts = mueblePts(e); if (puntoEnPoligono(p, pts)) return 0; let d = Infinity; for (let i = 0; i < pts.length; i++) d = Math.min(d, proyectar(p, pts[i], pts[(i + 1) % pts.length]).d); return d; }
       case 'cota': { const g = cotaGeom(e); return Math.min(proyectar(p, g.qmin, g.qmax).d, ...g.tramos.map((t) => dist(p, t.m))); }
     }
     return Infinity;
@@ -350,7 +355,7 @@ export const G = (() => {
     else if (esPoligono(e)) { e.pts = e.pts.map(m); if (e.etq) e.etq = m(e.etq); }
     else if (e.tipo === 'proyeccion') { e.a = m(e.a); e.b = m(e.b); e.p = m(e.p); }
     else if (e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro') { e.a = m(e.a); e.b = m(e.b); }
-    else if (e.tipo === 'texto') { const q = m(e); e.x = q.x; e.y = q.y; }
+    else if (e.tipo === 'texto' || esMueble(e)) { const q = m(e); e.x = q.x; e.y = q.y; }
     return e;
   };
   const asas = (e) => {
@@ -424,6 +429,7 @@ export const G = (() => {
     for (const e of ents) {
       if (e.tipo === 'linea') { const r = (e.medidas || tieneAlturas(e) ? h * 1.6 : 0) + (e.espesor > 0 ? e.espesor : 0); e.pts.forEach((p) => inc(p, r)); }
       else if (e.tipo === 'circulo') { inc(e.c, e.r); if (e.medidas) inc({ x: e.c.x + e.r + h * 6, y: e.c.y }); }
+      else if (esMueble(e)) mueblePts(e).forEach((p) => inc(p));
       else if (e.tipo === 'puerta') { inc(e.a); inc(e.b); const g = puertaGeom(e); if (g) inc(g.hoja); }
       else if (e.tipo === 'ventana') { const g = ventanaGeom(e); (g ? g.esquinas : [e.a, e.b]).forEach((p) => inc(p, e.medidas ? h * 1.6 : 0)); }
       else if (e.tipo === 'cota') { const g = cotaGeom(e); g.pts.forEach((p) => inc(p)); g.qs.forEach((p) => inc(p, h * 1.5)); if (e.total) { const o = (e.desp || 0) + g.lado * h * 2.2; inc(g.sobre(g.tmin, o), h * 1.5); inc(g.sobre(g.tmax, o), h * 1.5); } }
@@ -541,7 +547,7 @@ export const G = (() => {
       if (e.relleno === 'rayado') { usados.add(e.color); return `fill="url(#ry${e.color.slice(1)})"`; }
       return 'fill="none"';
     };
-    const capa = (e) => (e.tipo === 'region' ? -1 : e.tipo === 'puerta' || e.tipo === 'ventana' || esObra(e) || e.tipo === 'proyeccion' ? 1 : e.tipo === 'cota' || e.tipo === 'texto' ? 2 : 0);
+    const capa = (e) => (e.tipo === 'region' ? -1 : e.tipo === 'puerta' || e.tipo === 'ventana' || esObra(e) || e.tipo === 'proyeccion' || esMueble(e) ? 1 : e.tipo === 'cota' || e.tipo === 'texto' ? 2 : 0);
     const orden = [-1, 0, 1, 2].flatMap((n) => doc.entidades.filter((e) => capa(e) === n));
     for (const e of orden) {
       const col = e.color || COLORES[0];
@@ -701,6 +707,15 @@ export const G = (() => {
         const Lc = e.largo > 0 ? e.largo : 0.4, Wc = e.anchoCuerpo > 0 ? e.anchoCuerpo : 0.3;
         const tras = -(off + lineas.length * h * 0.5), lado = Wc / 2 + off + wl / 2;
         pedir(e, 'P', lineas, 0, f, [{ u: tras, v: 0 }, { u: Lc / 2, v: lado }, { u: Lc / 2, v: -lado }, { u: tras * 1.8, v: 0 }, { u: tras, v: wl * 0.7 }, { u: tras, v: -wl * 0.7 }, { u: Lc / 2, v: lado * 1.6 }, { u: Lc / 2, v: -lado * 1.6 }]);
+      } else if (esMueble(e)) {
+        // mobiliario: huella rellena con el color del objeto, muy tenue, y su nombre dentro si cabe
+        const pts = mueblePts(e); const col2 = e.color && e.color !== '#ffffff' ? e.color : '#8a8a8a';
+        cuerpo += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" fill="${col2}" fill-opacity="0.16" stroke="${col2}" stroke-width="${sw('medio')}" stroke-linejoin="miter"/>`;
+        if (e.forma !== 'cilindro') { const d0 = pts[0], d2 = pts[2]; cuerpo += `<line x1="${C(d0.x)}" y1="${C(d0.y)}" x2="${C(d2.x)}" y2="${C(d2.y)}" stroke="${col2}" stroke-width="${sw('fino')}" stroke-opacity="0.5"/>`; }
+        obsCajas.push(cajaDePuntos(pts));
+        const tam = Math.min(h * 0.75, Math.max(e.l, e.a) * 0.22);
+        if (tam >= h * 0.35) { const ang = e.forma === 'cilindro' ? 0 : (((e.rot || 0) % 180) + 180) % 180 > 90 ? ((e.rot || 0) % 180) - 180 : (e.rot || 0) % 180;
+          pedidos.push({ id: e.id, key: 'M', lineas: [{ texto: e.nombre || 'mueble', tam, color: '#333333' }], esc: 1, ang: e.l >= e.a ? ang : ang + 90, f: marcoFijo({ x: e.x, y: e.y }), cands: [{ u: 0, v: 0 }], fijo: true, movible: false }); }
       } else if (e.tipo === 'texto') {
         cuerpo += svgTexto(e.x, e.y, e.texto || ' ', e.tam, col, e.rot || 0, halo);
         const c = textoCaja(e); obsCajas.push(cajaRotada(e, c.w, c.h, e.rot || 0));
@@ -814,7 +829,7 @@ export const G = (() => {
 
   return { U, GROSOR, TRAZO, COLORES, ESCALAS, clamp, r6, dist, sub, add, mul, dot, unit, perp, medio, rotar, parseNum, fmtNum, fmtM, fmtM2, esc,
     snapGrid, snapAngulo, proyectar, segmentos, imanar, areaFirmada, area, longitudLinea, puntoEnPoligono, anguloLegible, etiquetasTramos,
-    esRectangulo, puertaGeom, ventanaGeom, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
+    esRectangulo, puertaGeom, ventanaGeom, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, esMueble, mueblePts, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
     calcoCentro, localAMundo, mundoALocal, calibrarCalco, esquinasCalco, caja, unirCajas, cajaPuntos, longitudBonita, papelPara,
     C, svgDibujo, svgCalco, marcoDe, enMarco, deMarco, cajasChocan, segCruzaCaja, construirSVG, nuevoId };
 })();

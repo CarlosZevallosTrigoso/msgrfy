@@ -32,7 +32,7 @@ const ahora = () => new Date().toISOString();
 // ---------- constructores ----------
 export const nuevoProyecto = (nombre = 'proyecto') => ({
   app: APP, version: VERSION, nombre, creado: ahora(), modificado: ahora(),
-  obras: [], salas: [], muros: [], anotaciones: [], imagenes: {},
+  obras: [], salas: [], muros: [], anotaciones: [], imagenes: {}, biblioteca: [],
 });
 
 export const nuevaObra = (o = {}) => ({
@@ -115,7 +115,7 @@ const validarObra = (o) => {
     imagenId: str(o.imagenId, null) || null, imgRatio: pos(o.imgRatio),
   });
 };
-const TIPOS_ENTIDAD = new Set(['linea', 'circulo', 'puerta', 'ventana', 'cota', 'texto', 'obra', 'region', 'cuadro', 'proyeccion']);
+const TIPOS_ENTIDAD = new Set(['linea', 'circulo', 'puerta', 'ventana', 'cota', 'texto', 'obra', 'region', 'cuadro', 'proyeccion', 'mueble']);
 const entidadValida = (e) => e && TIPOS_ENTIDAD.has(e.tipo) && (
   (e.tipo === 'linea' && Array.isArray(e.pts) && e.pts.length >= 2 && e.pts.every(esPunto)) ||
   (e.tipo === 'circulo' && esPunto(e.c) && e.r > 0) ||
@@ -123,7 +123,8 @@ const entidadValida = (e) => e && TIPOS_ENTIDAD.has(e.tipo) && (
   (e.tipo === 'cota' && ((Array.isArray(e.pts) && e.pts.length >= 2 && e.pts.every(esPunto)) || (esPunto(e.a) && esPunto(e.b)))) ||
   (e.tipo === 'texto' && Number.isFinite(e.x) && Number.isFinite(e.y) && e.tam > 0) ||
   ((e.tipo === 'obra' || e.tipo === 'region') && Array.isArray(e.pts) && e.pts.length >= 3 && e.pts.every(esPunto)) ||
-  (e.tipo === 'proyeccion' && esPunto(e.a) && esPunto(e.b) && esPunto(e.p)));
+  (e.tipo === 'proyeccion' && esPunto(e.a) && esPunto(e.b) && esPunto(e.p)) ||
+  (e.tipo === 'mueble' && Number.isFinite(e.x) && Number.isFinite(e.y) && e.l > 0 && e.a > 0 && e.h > 0));
 const validarSala = (s, obras) => {
   const ents = (Array.isArray(s.entidades) ? s.entidades : []).filter(entidadValida).map((e) => {
     const n = { ...e }; n.id = str(n.id) || nuevoId('e');
@@ -205,6 +206,7 @@ export const validar = (d) => {
   return {
     app: APP, version: VERSION, nombre: str(d.nombre, 'proyecto'), creado: str(d.creado, ahora()), modificado: str(d.modificado, ahora()),
     obras, salas, muros, anotaciones, imagenes: Object.fromEntries(imagenes),
+    biblioteca: (Array.isArray(d.biblioteca) ? d.biblioteca : []).filter((b) => b && b.l > 0 && b.a > 0 && b.h > 0 && typeof b.nombre === 'string').map((b) => ({ ...b, id: str(b.id) || nuevoId('b'), cat: 'propios' })),
   };
 };
 

@@ -13,7 +13,9 @@ Unifica tres herramientas que antes eran archivos sueltos (plano-sala, MuseoDraf
 
 - **Modo 3D (hecho):** la sala en axonometría con giro libre e inclinación, al estilo de Los Sims: los muros que dan la espalda a la cámara se cortan a un zócalo, se vuelven transparentes o se dejan enteros. Cuadros con su colgado, obras en planta y columnas con su alto, proyectores con su haz. Exporta PNG y SVG y entra en Lectura como base («+ 3D»).
 
-Las cuatro fases del plan están hechas, más el modo 3D. La mesa de montaje anterior sigue intacta en `legacy/museodraft.html`.
+- **Biblioteca de objetos (hecha):** mobiliario museográfico con medidas reales (pedestales, vitrinas, paneles, bancas, señalética, técnica, figuras de referencia) que se coloca en la planta con un clic, se ajusta y se guarda en una biblioteca propia exportable; aparece en el 3D y en la lista de materiales.
+
+Las cuatro fases del plan están hechas, más el modo 3D y la biblioteca. La mesa de montaje anterior sigue intacta en `legacy/museodraft.html`.
 
 Dos formas de abrir la app:
 - `index.html` en GitHub Pages (o cualquier servidor; en local, `python3 -m http.server`). Usa módulos ES, así que con doble clic desde el disco se queda en blanco.
@@ -34,6 +36,7 @@ src/core/              sin DOM, probado en Node
   puente.js            planta → muro; SVG a escala de una sala o un muro; documento de la vista Muro
   anotacion.js         geometría del anotador (de anotador-planos)
   isometrica.js        modo 3D: proyección con giro libre, escena por piezas, corte de muros, pintado
+  biblioteca.js        catálogo de mobiliario, huella y cajas 3D de un mueble, lista de materiales
 src/vistas/
   planta.js            vista Planta (de plano-sala, sobre una sala del proyecto)
   planta-markup.js     su marcado
@@ -67,6 +70,10 @@ La vista Muro guarda posición, marco, caída y demás en `muro.colgado[]` y las
 
 Botón «3D» (o tecla 3) en la planta. Proyección: la planta se gira θ grados y se mira con elevación φ: `X = x'`, `Y = y'·sen φ − z·cos φ`; las paralelas siguen paralelas. Cada tramo de muro se trocea en rebanadas de 0,5 m con profundidad propia y todo se pinta de lejos a cerca (orden de pintor); un muro de contorno cuya cara interior da la espalda a la cámara es «de frente» y se corta al zócalo, se vuelve transparente o se deja entero según la opción. Las obras en planta y las columnas toman su alto del campo «alto en 3D» de su ficha (1 m y la altura del muro por defecto); los cuadros, el colgado del alzado del tramo si existe, y si no quedan centrados en el eje visual a 1,50 m. No hay ocultación real entre objetos que se atraviesan ni perspectiva. La cámara se guarda en la sala (`sala.iso`).
 
+### Biblioteca de objetos
+
+Entidad `mueble` en la planta: `{ x, y (centro), l, a, h, rot, forma: 'caja'|'cilindro', nombre, cat, color, dz (elevación), partes? }`. `partes` son cajas relativas al centro de la base para objetos compuestos (una vitrina es base opaca + caja de cristal); al cambiar largo, ancho o alto se escalan. El catálogo base está en `src/core/biblioteca.js`; la biblioteca propia vive en `proyecto.biblioteca[]` y se intercambia como `.json` (`{ app:'museodraft-biblioteca', objetos:[…] }`). Todo son prismas y cilindros: no hay modelos 3D ni catálogos de fabricante.
+
 ### Cómo se conecta la lectura con el resto
 
 Un plano anotado tiene una base: una imagen suelta, o una sala o un muro del proyecto. Las bases «sala» y «muro» se redibujan a partir del proyecto cada vez que se abren (la planta a 2400 px de ancho, el alzado a 8 px/cm, o menos si no cabe en 16 Mpx), ya con la escala puesta, así que no hay que calibrar. Las anotaciones se guardan en píxeles de esa imagen: si después la planta crece mucho (otra sala al lado, por ejemplo), el dibujo se reencuadra y los marcadores pueden quedar desplazados; para planos cerrados es más seguro anotar al final.
@@ -79,7 +86,7 @@ Todas las longitudes en metros. La obra existe una sola vez; planta y alzados la
 proyecto { app:'museodraft', version:3, nombre, creado, modificado,
   obras[]        { id, nombre, autor, anio, tecnica, inv, nota,
                    ancho, alto (m o null), estimado:{ancho,alto}, imagenId, imgRatio }
-  salas[]        { id, nombre, rotulo, rejilla, imanes, calco, entidades[] }
+  salas[]        { id, nombre, rotulo, rejilla, imanes, calco, iso, entidades[] }
                    entidades en el formato de plano-sala; cuadro y obra en planta llevan obraId
   muros[]        { id, nombre, salaId, tramo:{entidadId,i}|null, ancho, alto, eje, grosor, color,
                    colgado[] { id, obraId, x, y, marco, pp, prof, caida, rot, lock, bloqueado, oculto },
@@ -88,7 +95,8 @@ proyecto { app:'museodraft', version:3, nombre, creado, modificado,
   anotaciones[]  { id, nombre, base, escala, capas[], capaActiva, items[] }
                    base: {tipo:'imagen', imagenId, w, h} | {tipo:'sala', salaId} | {tipo:'muro', muroId} | {tipo:'iso', salaId, cam}
                    items en el formato de anotador-planos (px de la imagen base); las imágenes incrustadas por imagenId
-  imagenes{}     id → dataURL }
+  imagenes{}     id → dataURL
+  biblioteca[]   objetos propios de mobiliario }
 ```
 
 `importar(json)` acepta un proyecto v3 o un .json de plano-sala, MuseoDraft 2 o anotador-planos y devuelve `{ proyecto, origen }`. `incorporar(proyecto, json)` añade lo que trae otro archivo regenerando ids. MuseoDraft 1 no se importa: ábrelo en `legacy/museodraft.html`, guárdalo y vuelve a importar.
