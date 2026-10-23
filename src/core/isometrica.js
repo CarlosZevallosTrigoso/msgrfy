@@ -9,7 +9,7 @@ import { muroDelTramo, altoEstimado } from './puente.js';
 const rad = (g) => g * Math.PI / 180;
 // color hex con transparencia, como rgba() (los pintores y cualquier rasterizador lo entienden)
 const alfa = (hex, a) => { const m = /^#([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return hex; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
-export const camDefecto = () => ({ giro: 35, inclinacion: 35, muros: 'cortados', zocalo: 0.9, altoDefecto: 3, rejilla: true });
+export const camDefecto = () => ({ giro: 35, inclinacion: 35, muros: 'cortados', zocalo: 0.9, altoDefecto: 3, rejilla: true, fondo: true });
 
 // ---------- proyección ----------
 // Gira la planta `giro` grados y la mira con elevación `inclinacion`: X = x', Y = y'·sen φ − z·cos φ.
@@ -44,6 +44,15 @@ export const escena = (proyecto, sala, cam) => {
     // losa bajo el piso, que asoma algo más que los muros, y una sombra en el suelo para que no flote
     const t = contorno ? (() => { const [o0, o1] = banda(contorno); const f = G.ladoFuera(contorno); return f > 0 ? Math.max(0, o1) + 0.12 : Math.min(0, o0) - 0.12; })() : 0.12;
     const losaPts = G.desplazarPolilinea(pisoPts, true, t);
+    // terreno: un plano de suelo que se extiende más allá de la sala, con rejilla de 1 m, sobre el que se apoya la losa
+    if (cam.fondo !== false) {
+      const b = G.cajaPuntos(losaPts); const M0 = 30; // muy amplio: lo recorta el encuadre
+      const x0 = Math.floor(b.x - M0), y0 = Math.floor(b.y - M0), x1 = Math.ceil(b.x + b.w + M0), y1 = Math.ceil(b.y + b.h + M0);
+      const suelo = [cara([[x0, y0, -0.15], [x1, y0, -0.15], [x1, y1, -0.15], [x0, y1, -0.15]], { fill: '#e6e4dc', stroke: '#cfcdc4', lw: 1 })];
+      for (let x = x0; x <= x1; x++) suelo.push(cara([[x, y0, -0.15], [x, y1, -0.15]], { stroke: 'rgba(17,17,17,0.06)', lw: 1, linea: true }));
+      for (let y = y0; y <= y1; y++) suelo.push(cara([[x0, y, -0.15], [x1, y, -0.15]], { stroke: 'rgba(17,17,17,0.06)', lw: 1, linea: true }));
+      piezas.push({ tipo: 'suelo', d: -4e6, caras: suelo });
+    }
     const sombra = losaPts.map((q) => { const pr = P(q.x, q.y, -0.15); return [pr.X + 0.35, pr.Y + 0.25]; });
     piezas.push({ tipo: 'sombra', d: -3e6, caras: [{ pts: sombra, fill: 'rgba(17,17,17,0.07)', stroke: null }] });
     const losa = prisma(losaPts, 0.15, '#d9d7cf', '#8f8d85', P, cara, prof, false, -0.15); losa.d = -2e6; losa.tipo = 'losa';
@@ -202,9 +211,10 @@ function prisma(pts, h, fill, stroke, P, cara, prof, suave = false, z0 = 0) {
 }
 
 // ---------- encuadre y pintado ----------
+// caja de la escena en unidades proyectadas; el terreno no cuenta (se extiende hasta donde llegue el encuadre)
 export const limites = (piezas) => {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const pz of piezas) for (const c of pz.caras) for (const [X, Y] of c.pts) { x0 = Math.min(x0, X); y0 = Math.min(y0, Y); x1 = Math.max(x1, X); y1 = Math.max(y1, Y); }
+  for (const pz of piezas) if (pz.tipo !== 'suelo') for (const c of pz.caras) for (const [X, Y] of c.pts) { x0 = Math.min(x0, X); y0 = Math.min(y0, Y); x1 = Math.max(x1, X); y1 = Math.max(y1, Y); }
   return x0 === Infinity ? { x: 0, y: 0, w: 1, h: 1 } : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 };
 // Pinta con un pintor del núcleo de Muro. view: { s (px por m), ox, oy }
@@ -232,7 +242,7 @@ const oscurecer = (c) => {
 };
 
 // SVG completo de la escena a una resolución dada (px por metro)
-export const svgDeIso = (proyecto, sala, cam, pxPorMetro = 120, margen = 0.5) => {
+export const svgDeIso = (proyecto, sala, cam, pxPorMetro = 120, margen = 1) => {
   const piezas = escena(proyecto, sala, cam); const b = limites(piezas);
   const W = Math.max(1, Math.round((b.w + 2 * margen) * pxPorMetro)), H = Math.max(1, Math.round((b.h + 2 * margen) * pxPorMetro));
   const imgs = {}; for (const pz of piezas) for (const im of pz.imagenes || []) imgs[im.id] = proyecto.imagenes[im.id];

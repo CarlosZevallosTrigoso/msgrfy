@@ -14,6 +14,7 @@ const MARKUP = `
   <label class="iso-l">zócalo <input type="text" inputmode="decimal" id="isoZocalo" style="width:52px"> m</label>
   <label class="iso-l">alto por defecto <input type="text" inputmode="decimal" id="isoAlto" style="width:52px"> m</label>
   <label class="check iso-l"><input type="checkbox" id="isoRejilla"> rejilla</label>
+  <label class="check iso-l"><input type="checkbox" id="isoFondo"> terreno</label>
   <span class="iso-sep"></span>
   <button id="isoAjustar" title="Encajar en la ventana">⤢</button>
   <button id="isoPng" title="Descargar PNG">PNG</button>
@@ -42,7 +43,7 @@ export function montarIso(ctx) {
   const sync = () => {
     $('#isoGiro').value = ((cam.giro % 360) + 360) % 360; $('#isoInc').value = cam.inclinacion;
     $('[data-v="giro"]').textContent = fmtNum(((cam.giro % 360) + 360) % 360, 0) + '°'; $('[data-v="inc"]').textContent = fmtNum(cam.inclinacion, 0) + '°';
-    $('#isoMuros').value = cam.muros; $('#isoZocalo').value = fmtNum(cam.zocalo); $('#isoAlto').value = fmtNum(cam.altoDefecto); $('#isoRejilla').checked = !!cam.rejilla;
+    $('#isoMuros').value = cam.muros; $('#isoZocalo').value = fmtNum(cam.zocalo); $('#isoAlto').value = fmtNum(cam.altoDefecto); $('#isoRejilla').checked = !!cam.rejilla; $('#isoFondo').checked = cam.fondo !== false;
   };
   const tam = () => ({ w: Math.max(1, root.clientWidth), h: Math.max(1, root.clientHeight - 36 - 22) });
   const reconstruir = () => { const s = sala(); piezas = s ? I.escena(ctx.proyecto, s, cam) : []; };
@@ -71,6 +72,7 @@ export function montarIso(ctx) {
   $('#isoZocalo').addEventListener('change', (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (v >= 0) cam.zocalo = v; actualizar(); });
   $('#isoAlto').addEventListener('change', (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (v > 0) cam.altoDefecto = v; actualizar(); });
   $('#isoRejilla').addEventListener('change', (e) => { cam.rejilla = e.target.checked; actualizar(); });
+  $('#isoFondo').addEventListener('change', (e) => { cam.fondo = e.target.checked; actualizar(); encajar(); pedir(); });
   $('#isoAjustar').addEventListener('click', () => { encajar(); pedir(); });
   $('#isoCerrar').addEventListener('click', () => ctx.onCerrar && ctx.onCerrar());
   $('#isoSvg').addEventListener('click', () => {
