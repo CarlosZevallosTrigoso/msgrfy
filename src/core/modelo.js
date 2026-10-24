@@ -146,7 +146,11 @@ const validarSala = (s, obras, imagenes) => {
   return nuevaSala({
     id: str(s.id) || nuevoId('s'), nombre: str(s.nombre, 'Sala'), rotulo: pos(s.rotulo, 0.2),
     rejilla: num(s.rejilla, 0.05), imanes: bool(s.imanes, true), entidades: ents, calco: c,
-    iso: s.iso && typeof s.iso === 'object' ? { ...s.iso } : null, // cámara del modo 3D
+    iso: s.iso && typeof s.iso === 'object' ? { // cámara del modo 3D y vistas guardadas (puntos de vista con nombre)
+      ...s.iso,
+      vistas: (Array.isArray(s.iso.vistas) ? s.iso.vistas : []).filter((v) => v && typeof v === 'object' && typeof v.nombre === 'string' && v.cam && Number.isFinite(v.cam.giro) && Number.isFinite(v.cam.inclinacion))
+        .map((v) => ({ id: str(v.id) || nuevoId('v'), nombre: v.nombre, cam: { ...v.cam }, enc: v.enc && v.enc.rel > 0 && Number.isFinite(v.enc.X) && Number.isFinite(v.enc.Y) ? { rel: v.enc.rel, X: v.enc.X, Y: v.enc.Y } : null })),
+    } : null,
   });
 };
 const TIPOS_OTRO = new Set(['vano', 'persona', 'medida', 'nota']);

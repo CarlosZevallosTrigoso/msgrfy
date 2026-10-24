@@ -1019,7 +1019,7 @@ const alTeclado = (ev) => {
   if (enCampo) return;
   const k = ev.key; const kl = k.toLowerCase(); const mod = ev.ctrlKey || ev.metaKey;
   if (iso && iso.visible) { // en 3D la planta de debajo no se edita con el teclado
-    if (k === '3') cerrar3d(); else if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); } else if (mod && kl === 'y') { ev.preventDefault(); rehacer(); }
+    if (k === '3') cerrar3d(); else if (k === 'PageDown') { ev.preventDefault(); iso.vistaSiguiente(1); } else if (k === 'PageUp') { ev.preventDefault(); iso.vistaSiguiente(-1); } else if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); } else if (mod && kl === 'y') { ev.preventDefault(); rehacer(); }
     return;
   }
   if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); return; }

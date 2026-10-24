@@ -11,6 +11,24 @@ const rad = (g) => g * Math.PI / 180;
 // color hex con transparencia, como rgba() (los pintores y cualquier rasterizador lo entienden)
 const alfa = (hex, a) => { const m = /^#([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return hex; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
 export const camDefecto = () => ({ giro: 35, inclinacion: 35, muros: 'cortados', zocalo: 0.9, altoDefecto: 3, rejilla: true, fondo: true });
+const CAM_CAMPOS = ['giro', 'inclinacion', 'muros', 'zocalo', 'altoDefecto', 'rejilla', 'fondo'];
+// Solo los parámetros de cámara (sin vistas guardadas ni otros restos)
+export const soloCam = (c) => { const o = {}; for (const k of CAM_CAMPOS) if (c && c[k] !== undefined) o[k] = c[k]; return { ...camDefecto(), ...o }; };
+
+// ---------- vistas guardadas (puntos de vista con nombre) ----------
+// Una vista es la cámara más un encuadre relativo al «encajar»: rel = zoom / zoom de encaje, y el punto
+// proyectado (X, Y) que queda en el centro del lienzo. Así se reproduce igual en otra pantalla.
+// Viven en sala.iso.vistas[]. El SVG/PNG de escena completa y la base de Lectura usan solo la cámara.
+let _vseq = 0;
+export const nuevaVista = (nombre, cam, enc = null) => ({
+  id: 'v_' + Date.now().toString(36) + '_' + (_vseq++).toString(36), nombre: String(nombre || 'Vista').trim() || 'Vista',
+  cam: soloCam(cam), enc: enc && enc.rel > 0 && Number.isFinite(enc.X) && Number.isFinite(enc.Y) ? { rel: enc.rel, X: enc.X, Y: enc.Y } : null,
+});
+export const vistaValida = (v) => !!(v && typeof v === 'object' && typeof v.nombre === 'string' && v.cam && Number.isFinite(v.cam.giro) && Number.isFinite(v.cam.inclinacion));
+// Encuadre a partir del estado del lienzo: view {s, ox, oy}, tamaño {w, h}, escala de encaje sFit
+export const encuadreDe = (view, w, h, sFit) => (sFit > 0 && view.s > 0 ? { rel: view.s / sFit, X: (w / 2 - view.ox) / view.s, Y: (h / 2 - view.oy) / view.s } : null);
+// Estado del lienzo que reproduce un encuadre guardado con la escala de encaje actual
+export const viewDeEncuadre = (enc, w, h, sFit) => { const s = enc.rel * sFit; return { s, ox: w / 2 - enc.X * s, oy: h / 2 - enc.Y * s }; };
 
 // ---------- proyección ----------
 // Gira la planta `giro` grados y la mira con elevación `inclinacion`: X = x', Y = y'·sen φ − z·cos φ.

@@ -386,10 +386,17 @@ const agregarPlano = async (file) => {
 };
 const agregarPlanoDe = (tipo, obj) => {
   if (!obj) return;
-  const base = tipo === 'sala' ? { tipo: 'sala', salaId: obj.id, w: 0, h: 0 } : tipo === 'muro' ? { tipo: 'muro', muroId: obj.id, w: 0, h: 0 } : { tipo: 'iso', salaId: obj.id, cam: { ...I.camDefecto(), ...(obj.iso || {}) }, w: 0, h: 0 };
+  const base = tipo === 'sala' ? { tipo: 'sala', salaId: obj.id, w: 0, h: 0 } : tipo === 'muro' ? { tipo: 'muro', muroId: obj.id, w: 0, h: 0 } : { tipo: 'iso', salaId: obj.id, cam: I.soloCam(camIso(obj)), w: 0, h: 0 };
   const pl = M.nuevaAnotacion({ nombre: (obj.nombre || (tipo === 'muro' ? 'Muro' : 'Planta')) + (tipo === 'iso' ? ' · 3D' : ''), base });
   S.proyecto.planos.push(pl); activarPlano(pl.id);
   mensaje(tipo === 'sala' ? `Planta «${pl.nombre}» añadida, a escala` : tipo === 'muro' ? `Alzado «${pl.nombre}» añadido, a escala` : `Vista 3D «${pl.nombre}» añadida con el giro guardado en la planta`);
+};
+// cámara para la base 3D: la vista guardada que el usuario elija, o la cámara actual de la sala
+const camIso = (sala) => {
+  const vs = sala.iso && Array.isArray(sala.iso.vistas) ? sala.iso.vistas : [];
+  if (!vs.length) return sala.iso || {};
+  const r = prompt(['0. Cámara actual de la planta', ...vs.map((v, i) => (i + 1) + '. ' + v.nombre)].join('\n') + '\n\nNúmero de la vista:', '0');
+  if (r == null) return sala.iso || {}; const i = parseInt(r, 10); return i > 0 && vs[i - 1] ? vs[i - 1].cam : (sala.iso || {});
 };
 const elegir = (titulo, lista) => {
   if (!lista.length) { mensaje('El proyecto no tiene ' + (titulo === 'sala' ? 'salas' : 'muros') + ' todavía', true); return null; }

@@ -16,13 +16,16 @@ const MARKUP = `
   <label class="check iso-l"><input type="checkbox" id="isoRejilla"> rejilla</label>
   <label class="check iso-l"><input type="checkbox" id="isoFondo"> terreno</label>
   <span class="iso-sep"></span>
+  <label class="iso-l" title="Puntos de vista guardados de esta sala">vista <select id="isoVistas"><option value="">—</option></select></label>
+  <button id="isoVistaGuardar" title="Guardar la cámara y el encuadre actuales como punto de vista con nombre">＋ vista</button>
+  <button id="isoVistaQuitar" title="Quitar el punto de vista elegido" disabled>×</button>
   <button id="isoAjustar" title="Encajar en la ventana">⤢</button>
   <button id="isoPng" title="Descargar PNG">PNG</button>
   <button id="isoSvg" title="Descargar SVG">SVG</button>
   <button id="isoCerrar" title="Volver a la planta (Esc)">cerrar</button>
 </div>
 <canvas id="isoCv"></canvas>
-<div class="iso-pie">Arrastra para girar e inclinar · Shift + arrastrar desplaza · rueda acerca · las obras en planta y columnas toman su alto de la ficha</div>
+<div class="iso-pie">Arrastra para girar e inclinar · Shift + arrastrar desplaza · rueda acerca · «＋ vista» guarda este punto de vista con nombre; PgUp/PgDn recorre los guardados</div>
 `;
 
 // ctx: { root, proyecto, sala(), mensaje, onCambio, descargar(blob, nombre), nombreArchivo() }
@@ -30,7 +33,7 @@ export function montarIso(ctx) {
   const root = ctx.root; root.innerHTML = MARKUP;
   const $ = (s) => root.querySelector(s);
   const cv = $('#isoCv'), g2 = cv.getContext('2d');
-  let cam = I.camDefecto(), view = { s: 60, ox: 0, oy: 0 }, piezas = [], visible = false, raf = 0, encajado = false;
+  let cam = I.camDefecto(), view = { s: 60, ox: 0, oy: 0 }, piezas = [], visible = false, raf = 0, encajado = false, sFit = 60, vistaId = '';
   const imgCache = new Map();
   const getImage = (id) => {
     let e = imgCache.get(id);
@@ -38,8 +41,34 @@ export function montarIso(ctx) {
     return e.ok ? e.img : null;
   };
   const sala = () => ctx.sala();
-  const leerCam = () => { const s = sala(); if (s && s.iso) cam = { ...I.camDefecto(), ...s.iso }; else cam = I.camDefecto(); };
-  const guardarCam = () => { const s = sala(); if (s) { s.iso = { ...cam }; if (ctx.onCambio) ctx.onCambio(); } };
+  const leerCam = () => { const s = sala(); cam = I.soloCam(s && s.iso); };
+  // sala.iso guarda la cámara actual y, aparte, las vistas con nombre: no se pisan entre sí
+  const guardarCam = () => { const s = sala(); if (s) { s.iso = { ...(s.iso || {}), ...I.soloCam(cam) }; if (ctx.onCambio) ctx.onCambio(); } };
+  const vistas = () => { const s = sala(); return s && s.iso && Array.isArray(s.iso.vistas) ? s.iso.vistas : []; };
+  const renderVistas = () => {
+    const sel = $('#isoVistas'); const vs = vistas();
+    sel.innerHTML = '<option value="">' + (vs.length ? '— elegir —' : '— ninguna —') + '</option>' + vs.map((v) => `<option value="${v.id}" ${v.id === vistaId ? 'selected' : ''}>${String(v.nombre).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</option>`).join('');
+    sel.disabled = !vs.length; $('#isoVistaQuitar').disabled = !vistaId;
+  };
+  const irAVista = (id) => {
+    const v = vistas().find((x) => x.id === id); if (!v) { vistaId = ''; renderVistas(); return; }
+    vistaId = v.id; cam = I.soloCam(v.cam); reconstruir(); sync(); encajar();
+    if (v.enc) { const { w, h } = tam(); view = I.viewDeEncuadre(v.enc, w, h, sFit); }
+    renderVistas(); pedir(); guardarCam(); ctx.mensaje('Vista «' + v.nombre + '»');
+  };
+  const vistaSiguiente = (paso) => { const vs = vistas(); if (!vs.length) return; const i = vs.findIndex((v) => v.id === vistaId); irAVista(vs[((i < 0 ? (paso > 0 ? -1 : 0) : i) + paso + vs.length) % vs.length].id); };
+  const guardarVista = () => {
+    const s = sala(); if (!s) return;
+    const n = prompt('Nombre del punto de vista', 'Vista ' + (vistas().length + 1)); if (n == null) return;
+    const { w, h } = tam(); const v = I.nuevaVista(n, cam, I.encuadreDe(view, w, h, sFit));
+    s.iso = { ...(s.iso || {}), ...I.soloCam(cam), vistas: [...vistas(), v] }; vistaId = v.id; renderVistas();
+    if (ctx.onCambio) ctx.onCambio(); ctx.mensaje('Vista «' + v.nombre + '» guardada: aparece en el selector y en Lectura («+ 3D»)');
+  };
+  const quitarVista = () => {
+    const s = sala(); const v = vistas().find((x) => x.id === vistaId); if (!s || !v) return;
+    if (!confirm('¿Quitar la vista «' + v.nombre + '»?')) return;
+    s.iso = { ...s.iso, vistas: vistas().filter((x) => x.id !== v.id) }; vistaId = ''; renderVistas(); if (ctx.onCambio) ctx.onCambio();
+  };
   const sync = () => {
     $('#isoGiro').value = ((cam.giro % 360) + 360) % 360; $('#isoInc').value = cam.inclinacion;
     $('[data-v="giro"]').textContent = fmtNum(((cam.giro % 360) + 360) % 360, 0) + '°'; $('[data-v="inc"]').textContent = fmtNum(cam.inclinacion, 0) + '°';
@@ -50,7 +79,7 @@ export function montarIso(ctx) {
   const encajar = () => {
     const { w, h } = tam(); const b = I.limites(piezas); const m = 30;
     const sc = Math.max(1, Math.min((w - 2 * m) / Math.max(b.w, 0.1), (h - 2 * m) / Math.max(b.h, 0.1)));
-    view = { s: sc, ox: (w - b.w * sc) / 2 - b.x * sc, oy: (h - b.h * sc) / 2 - b.y * sc }; encajado = true;
+    view = { s: sc, ox: (w - b.w * sc) / 2 - b.x * sc, oy: (h - b.h * sc) / 2 - b.y * sc }; encajado = true; sFit = sc;
   };
   const dibujar = () => {
     raf = 0; if (!visible) return;
@@ -61,7 +90,7 @@ export function montarIso(ctx) {
     I.pintar(MD.canvasPainter(g2, getImage), piezas, view);
   };
   const pedir = () => { if (!raf) raf = requestAnimationFrame(dibujar); };
-  const actualizar = (persistir = true) => { reconstruir(); sync(); pedir(); if (persistir) guardarCam(); };
+  const actualizar = (persistir = true) => { reconstruir(); sync(); pedir(); if (persistir) guardarCam(); if (vistaId) { vistaId = ''; renderVistas(); } };
 
   // controles
   $('#isoGiro').addEventListener('input', (e) => { cam.giro = +e.target.value; actualizar(false); });
@@ -74,11 +103,15 @@ export function montarIso(ctx) {
   $('#isoRejilla').addEventListener('change', (e) => { cam.rejilla = e.target.checked; actualizar(); });
   $('#isoFondo').addEventListener('change', (e) => { cam.fondo = e.target.checked; actualizar(); encajar(); pedir(); });
   $('#isoAjustar').addEventListener('click', () => { encajar(); pedir(); });
+  $('#isoVistas').addEventListener('change', (e) => { if (e.target.value) irAVista(e.target.value); else { vistaId = ''; renderVistas(); } });
+  $('#isoVistaGuardar').addEventListener('click', guardarVista);
+  $('#isoVistaQuitar').addEventListener('click', quitarVista);
   $('#isoCerrar').addEventListener('click', () => ctx.onCerrar && ctx.onCerrar());
+  const sufijoVista = () => { const v = vistas().find((x) => x.id === vistaId); return v ? '-' + v.nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() : ''; };
   $('#isoSvg').addEventListener('click', () => {
     const s = sala(); if (!s) return;
     const r = I.svgDeIso(ctx.proyecto, s, cam, 120);
-    ctx.descargar(new Blob([r.svg], { type: 'image/svg+xml' }), ctx.nombreArchivo() + '-3d.svg'); ctx.mensaje('SVG exportado');
+    ctx.descargar(new Blob([r.svg], { type: 'image/svg+xml' }), ctx.nombreArchivo() + '-3d' + sufijoVista() + '.svg'); ctx.mensaje('SVG exportado');
   });
   $('#isoPng').addEventListener('click', () => {
     const s = sala(); if (!s) return;
@@ -88,7 +121,7 @@ export function montarIso(ctx) {
     if (!g) return ctx.mensaje('No se pudo crear el lienzo', true);
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
     I.pintar(MD.canvasPainter(g, getImage), piezas, { s: pxm, ox: (0.5 - b.x) * pxm, oy: (0.5 - b.y) * pxm });
-    c.toBlob((bl) => { if (bl) { ctx.descargar(bl, ctx.nombreArchivo() + '-3d.png'); ctx.mensaje('PNG exportado: ' + W + ' × ' + H + ' px'); } else ctx.mensaje('No se pudo generar el PNG', true); }, 'image/png');
+    c.toBlob((bl) => { if (bl) { ctx.descargar(bl, ctx.nombreArchivo() + '-3d' + sufijoVista() + '.png'); ctx.mensaje('PNG exportado: ' + W + ' × ' + H + ' px'); } else ctx.mensaje('No se pudo generar el PNG', true); }, 'image/png');
   });
 
   // puntero: arrastrar gira e inclina; Shift desplaza; rueda acerca
@@ -108,10 +141,11 @@ export function montarIso(ctx) {
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (visible) pedir(); }) : null; if (ro) ro.observe(root);
 
   return {
-    mostrar() { visible = true; root.hidden = false; leerCam(); imgCache.clear(); reconstruir(); sync(); if (!encajado) encajar(); pedir(); },
+    mostrar() { visible = true; root.hidden = false; leerCam(); imgCache.clear(); reconstruir(); sync(); if (!encajado) encajar(); vistaId = ''; renderVistas(); pedir(); },
+    vistaSiguiente,
     ocultar() { visible = false; root.hidden = true; },
     refrescar() { if (visible) { reconstruir(); pedir(); } },
-    salaCambiada() { encajado = false; if (visible) { const s = sala(); if (!s || !s.entidades.length) { ctx.mensaje('Esta sala está vacía: dibújala antes de verla en 3D'); if (ctx.onCerrar) ctx.onCerrar(); return; } leerCam(); reconstruir(); sync(); encajar(); pedir(); } },
+    salaCambiada() { encajado = false; if (visible) { const s = sala(); if (!s || !s.entidades.length) { ctx.mensaje('Esta sala está vacía: dibújala antes de verla en 3D'); if (ctx.onCerrar) ctx.onCerrar(); return; } leerCam(); reconstruir(); sync(); encajar(); vistaId = ''; renderVistas(); pedir(); } },
     get visible() { return visible; },
     destruir() { visible = false; if (ro) ro.disconnect(); if (raf) cancelAnimationFrame(raf); },
     _cam: () => cam, _piezas: () => piezas,

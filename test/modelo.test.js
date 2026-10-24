@@ -276,3 +276,12 @@ test('validar migra un calco antiguo con la imagen incrustada (src) al almacén'
   assert.ok(q.salas[0].calco.imagenId && q.imagenes[q.salas[0].calco.imagenId] === PNG);
   assert.equal(q.salas[0].calco.src, undefined);
 });
+
+test('validar conserva las vistas guardadas del 3D y descarta las rotas', () => {
+  const p = M.importar(fixPlanoSala()).proyecto;
+  p.salas[0].iso = { giro: 10, inclinacion: 30, vistas: [{ id: 'v1', nombre: 'Entrada', cam: { giro: 120, inclinacion: 40 }, enc: { rel: 1.5, X: 2, Y: 3 } }, { nombre: 'rota', cam: {} }, null] };
+  const q = M.validar(p);
+  assert.equal(q.salas[0].iso.vistas.length, 1);
+  assert.deepEqual(q.salas[0].iso.vistas[0], { id: 'v1', nombre: 'Entrada', cam: { giro: 120, inclinacion: 40 }, enc: { rel: 1.5, X: 2, Y: 3 } });
+  assert.equal(q.salas[0].iso.giro, 10);
+});

@@ -86,3 +86,18 @@ test('el cuadro toma el colgado del alzado si existe', async () => {
   // el espesor crece hacia fuera: la cara interior está en y = 0 y el cuadro sobresale 3 cm hacia la sala
   assert.ok(Math.abs(top - P(1, 0.03, 3 - 0.2).Y) < 1e-6, 'borde superior a 2,8 m, como dice el colgado');
 });
+
+test('vistas guardadas: el encuadre relativo se reproduce con otra escala de encaje y la cámara no arrastra las vistas', () => {
+  const view = { s: 90, ox: 120, oy: -40 }, w = 800, h = 600;
+  const enc = I.encuadreDe(view, w, h, 60);
+  assert.equal(enc.rel, 1.5);
+  const v2 = I.viewDeEncuadre(enc, 1600, 1200, 120); // pantalla doble: misma vista, doble píxel
+  assert.equal(v2.s, 180);
+  // el punto proyectado del centro es el mismo
+  assert.ok(Math.abs((1600 / 2 - v2.ox) / v2.s - enc.X) < 1e-9 && Math.abs((1200 / 2 - v2.oy) / v2.s - enc.Y) < 1e-9);
+  const v = I.nuevaVista(' Entrada ', { giro: 120, inclinacion: 40, vistas: [1, 2] }, enc);
+  assert.equal(v.nombre, 'Entrada'); assert.equal(v.cam.giro, 120); assert.equal(v.cam.vistas, undefined, 'la cámara de una vista no lleva vistas dentro');
+  assert.equal(v.cam.muros, 'cortados', 'completa con los valores por defecto');
+  assert.ok(I.vistaValida(v)); assert.ok(!I.vistaValida({ nombre: 'x', cam: {} }));
+  assert.equal(I.soloCam({ giro: 1, vistas: [v] }).vistas, undefined);
+});
