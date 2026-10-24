@@ -1,6 +1,7 @@
 // Lectura y reducción de imágenes a dataURL. Solo navegador.
 export const leerImagen = (file, maxLado = 1200) => new Promise((res, rej) => {
-  if (!file || !/^image\//.test(file.type)) return rej(new Error('El archivo no es una imagen'));
+  // sin tipo MIME (HEIC, arrastres desde algunas apps) se intenta igual: decide el decodificador del navegador
+  if (!file || (file.type && !/^image\//.test(file.type))) return rej(new Error('El archivo no es una imagen'));
   const url = URL.createObjectURL(file), img = new Image();
   img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Formato de imagen no soportado por el navegador')); };
   img.onload = () => {

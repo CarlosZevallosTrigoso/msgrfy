@@ -45,7 +45,7 @@ export function montarIso(ctx) {
     $('[data-v="giro"]').textContent = fmtNum(((cam.giro % 360) + 360) % 360, 0) + '°'; $('[data-v="inc"]').textContent = fmtNum(cam.inclinacion, 0) + '°';
     $('#isoMuros').value = cam.muros; $('#isoZocalo').value = fmtNum(cam.zocalo); $('#isoAlto').value = fmtNum(cam.altoDefecto); $('#isoRejilla').checked = !!cam.rejilla; $('#isoFondo').checked = cam.fondo !== false;
   };
-  const tam = () => ({ w: Math.max(1, root.clientWidth), h: Math.max(1, root.clientHeight - 36 - 22) });
+  const tam = () => ({ w: Math.max(1, root.clientWidth), h: Math.max(1, root.clientHeight - ($('.iso-barra').offsetHeight || 36) - ($('.iso-pie').offsetHeight || 22)) });
   const reconstruir = () => { const s = sala(); piezas = s ? I.escena(ctx.proyecto, s, cam) : []; };
   const encajar = () => {
     const { w, h } = tam(); const b = I.limites(piezas); const m = 30;
@@ -105,14 +105,15 @@ export function montarIso(ctx) {
   cv.addEventListener('pointerup', fin); cv.addEventListener('pointercancel', fin);
   cv.addEventListener('wheel', (e) => { e.preventDefault(); e.stopPropagation(); const r = cv.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top; const f = e.deltaY < 0 ? 1.15 : 1 / 1.15; view = { s: view.s * f, ox: px - (px - view.ox) * f, oy: py - (py - view.oy) * f }; pedir(); }, { passive: false });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
-  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { if (visible) pedir(); }).observe(root);
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (visible) pedir(); }) : null; if (ro) ro.observe(root);
 
   return {
     mostrar() { visible = true; root.hidden = false; leerCam(); imgCache.clear(); reconstruir(); sync(); if (!encajado) encajar(); pedir(); },
     ocultar() { visible = false; root.hidden = true; },
     refrescar() { if (visible) { reconstruir(); pedir(); } },
-    salaCambiada() { encajado = false; if (visible) { leerCam(); reconstruir(); sync(); encajar(); pedir(); } },
+    salaCambiada() { encajado = false; if (visible) { const s = sala(); if (!s || !s.entidades.length) { ctx.mensaje('Esta sala está vacía: dibújala antes de verla en 3D'); if (ctx.onCerrar) ctx.onCerrar(); return; } leerCam(); reconstruir(); sync(); encajar(); pedir(); } },
     get visible() { return visible; },
+    destruir() { visible = false; if (ro) ro.disconnect(); if (raf) cancelAnimationFrame(raf); },
     _cam: () => cam, _piezas: () => piezas,
   };
 }

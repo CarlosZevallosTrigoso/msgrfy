@@ -172,7 +172,7 @@ test('incorporar funde dos archivos antiguos en un proyecto sin colisiones de id
   const idsAntes = new Set(p.obras.map((o) => o.id));
   const r = M.incorporar(p, fixMuseoDraft());
   assert.equal(r.origen, 'museodraft');
-  assert.deepEqual(r.añadido, { obras: 2, salas: 0, muros: 1, anotaciones: 0 });
+  assert.deepEqual(r.añadido, { obras: 2, salas: 0, muros: 1, anotaciones: 0, biblioteca: 0 });
   assert.equal(p.obras.length, 4);
   assert.equal(new Set(p.obras.map((o) => o.id)).size, 4);
   for (const o of p.obras.slice(2)) assert.ok(!idsAntes.has(o.id));
@@ -197,4 +197,82 @@ test('consultas: usos, sin colocar, limpieza de imágenes', () => {
   M.borrarObra(p, o.id);
   assert.equal(p.muros[0].colgado.length, 1);
   assert.equal(M.obraDe(p, o.id), null);
+});
+
+// ---------- auditoría: regresiones que se detectaron leyendo el código ----------
+test('constructores: un id undefined no pisa el generado (duplicar con { ...o, id: undefined })', () => {
+  const o = M.nuevaObra({ nombre: 'x', id: undefined }); assert.ok(o.id && o.id.startsWith('o_'));
+  const c = M.nuevoColgado({ id: null }); assert.ok(c.id);
+  const m = M.nuevoMuro({ id: undefined }); assert.ok(m.id);
+});
+
+test('borrarObra quita también los cuadros y obras en planta que la representan', () => {
+  const p = M.importar(fixPlanoSala()).proyecto;
+  const cuadro = p.salas[0].entidades.find((e) => e.tipo === 'cuadro');
+  M.borrarObra(p, cuadro.obraId);
+  assert.ok(!p.salas[0].entidades.some((e) => e.id === cuadro.id));
+  assert.equal(p.salas[0].entidades.filter((e) => e.tipo === 'linea').length, 1, 'el resto sigue');
+});
+
+test('serializar no muta el proyecto ni borra imágenes que el deshacer pueda devolver', () => {
+  const p = M.importar(fixMuseoDraft()).proyecto;
+  p.imagenes.huerfana = PNG; const mod = p.modificado;
+  const txt = M.serializar(p);
+  assert.ok(p.imagenes.huerfana, 'la imagen huérfana sigue en memoria');
+  assert.equal(p.modificado, mod);
+  assert.ok(!JSON.parse(txt).imagenes.huerfana, 'pero no viaja al archivo');
+  const c = M.copiaLimpia(p); assert.ok(!c.imagenes.huerfana && p.imagenes.huerfana);
+});
+
+test('MuseoDraft: la nota que apunta a una obra conserva el enlace al importar', () => {
+  const p = M.importar(fixMuseoDraft()).proyecto;
+  const nota = p.muros[0].otros.find((o) => o.tipo === 'nota');
+  assert.ok(p.muros[0].colgado.some((c) => c.id === nota.apunta), 'apunta a un colgado real');
+  // y validar anula un apunta que no existe
+  const q = M.validar({ ...p, muros: [{ ...p.muros[0], otros: [{ ...nota, apunta: 'nada' }] }] });
+  assert.equal(q.muros[0].otros[0].apunta, null);
+});
+
+test('incorporar remapea enlaces internos de anotaciones, apunta de notas y la biblioteca', () => {
+  const base = M.nuevoProyecto('b');
+  const a = fixAnotador();
+  a.planos.push({ id: 'pl2', nombre: 'detalle', imagen: { dataURL: PNG, w: 500, h: 300 }, capas: [{ id: 'c2', nombre: 'base', visible: true }], capaActiva: 'c2', items: [] });
+  a.planos[0].items.push({ id: 'i9', tipo: 'marcador', capa: 'c1', x: 5, y: 5, num: 9, destino: { plano: 'pl2', item: null } });
+  M.incorporar(base, a);
+  const [p1, p2] = base.anotaciones;
+  const enlace = p1.items.find((i) => i.destino);
+  assert.equal(enlace.destino.plano, p2.id, 'el destino sigue al nuevo id del plano');
+  M.incorporar(base, fixMuseoDraft());
+  const nota = base.muros[0].otros.find((o) => o.tipo === 'nota');
+  assert.ok(base.muros[0].colgado.some((c) => c.id === nota.apunta));
+  const bib = M.validar({ ...M.nuevoProyecto('c'), biblioteca: [{ id: 'b1', nombre: 'Caja', l: 1, a: 1, h: 1, forma: 'caja' }] });
+  const r = M.incorporar(base, bib);
+  assert.equal(r.añadido.biblioteca, 1); assert.equal(base.biblioteca.length, 1); assert.notEqual(base.biblioteca[0].id, 'b1');
+});
+
+test('validar conserva un plano anotado cuya base desapareció y filtra ítems rotos', () => {
+  const p = M.importar(fixPlanoSala()).proyecto;
+  const salaId = p.salas[0].id;
+  p.anotaciones.push(M.nuevaAnotacion({ nombre: 'planta', base: { tipo: 'sala', salaId, w: 2400, h: 1500 }, escala: { pxPorMetro: 100 }, items: [
+    { id: 'ok', tipo: 'marcador', x: 1, y: 1, num: 1 }, { id: 'rota', tipo: 'dimension', puntos: null }, { id: 'zona0', tipo: 'zona', x: 0, y: 0, w: 0, h: 0 }, { id: 'raro', tipo: 'flecha', x: 1, y: 1 },
+  ] }));
+  p.salas = []; // la sala se borró
+  const q = M.validar(p);
+  assert.equal(q.anotaciones.length, 1, 'el plano no se descarta');
+  assert.equal(q.anotaciones[0].base.perdida, true);
+  assert.deepEqual(q.anotaciones[0].items.map((i) => i.id), ['ok']);
+  assert.equal(q.anotaciones[0].escala.automatica, true, 'sin referencia válida la escala queda como automática');
+  assert.equal(q.anotaciones[0].escala.ref, null);
+});
+
+test('detectar: una lista de planos vacía no es un archivo de anotador', () => {
+  assert.equal(M.detectar({ planos: [] }), null);
+});
+
+test('validar migra un calco antiguo con la imagen incrustada (src) al almacén', () => {
+  const p = M.importar(fixPlanoSala()).proyecto;
+  const calco = { ...p.salas[0].calco, src: PNG }; delete calco.imagenId;
+  const q = M.validar({ ...p, imagenes: {}, salas: [{ ...p.salas[0], calco }] });
+  assert.ok(q.salas[0].calco.imagenId && q.imagenes[q.salas[0].calco.imagenId] === PNG);
+  assert.equal(q.salas[0].calco.src, undefined);
 });

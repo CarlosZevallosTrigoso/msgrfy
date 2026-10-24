@@ -96,7 +96,7 @@ export const docDeMuro = (proyecto, mu) => {
     const w = o.ancho > 0 ? o.ancho : 0.5, h = o.alto > 0 ? o.alto : (o.imgRatio > 0 ? w / o.imgRatio : 0.7);
     if (o.imagenId && proyecto.imagenes[o.imagenId]) src.images[o.imagenId] = proyecto.imagenes[o.imagenId];
     src.items.push({
-      id: c.id, tipo: 'obra', nombre: o.nombre, x: mAcm(c.x), y: mAcm(c.y), w: mAcm(w), h: mAcm(h),
+      id: c.id, obraId: o.id, tipo: 'obra', nombre: o.nombre, x: mAcm(c.x), y: mAcm(c.y), w: mAcm(w), h: mAcm(h),
       marco: mAcm(c.marco), pp: mAcm(c.pp), prof: mAcm(c.prof), caida: mAcm(c.caida), rot: c.rot, lock: c.lock, bloqueado: c.bloqueado, oculto: c.oculto,
       imgId: o.imagenId && proyecto.imagenes[o.imagenId] ? o.imagenId : null, imgRatio: o.imgRatio,
       est: { w: !(o.ancho > 0) || o.estimado.ancho, h: !(o.alto > 0) || o.estimado.alto },

@@ -44,7 +44,7 @@ export const MARKUP = `
     <div id="ap-barraEscala"><span class="texto"></span><div class="linea"></div></div>
     <div id="ap-medida"></div>
     <div id="ap-ayuda">
-      <h3>anotador-planos</h3>
+      <h3>Lectura · planos anotados</h3>
       <table>
         <tr><td><kbd>V</kbd></td><td>Seleccionar / mover. Arrastrar el fondo desplaza la vista; rueda = zoom.</td></tr>
         <tr><td><kbd>M</kbd></td><td>Marcador numerado. Puede llevar nota y enlace.</td></tr>

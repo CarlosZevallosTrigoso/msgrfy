@@ -115,7 +115,7 @@ export const MARKUP = `
 
 <div id="ayuda" class="modal" role="dialog" aria-label="Ayuda">
   <div class="caja">
-    <h2>plano-sala</h2>
+    <h2>Planta</h2>
     <table>
       <tr><td><kbd>V</kbd> Elegir</td><td>Clic para seleccionar; arrastrar para mover. Con un muro seleccionado, arrastra sus puntos naranjas; doble clic sobre un tramo añade un punto; <kbd>Supr</kbd> borra el punto marcado o el elemento.</td></tr>
       <tr><td><kbd>L</kbd> Muro</td><td>Clic punto a punto. Mientras dibujas, <b>escribe una medida</b> (por ejemplo <kbd>3,4</kbd>) y <kbd>⏎</kbd>: el tramo sale exacto en la dirección del cursor. Clic en el primer punto cierra la figura. Doble clic o <kbd>⏎</kbd> termina. <kbd>⌫</kbd> quita el último punto.</td></tr>

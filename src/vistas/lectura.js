@@ -22,9 +22,9 @@ const vistaProyecto = { get planos() { return env.proyecto.anotaciones; }, get n
 const cacheFuente = new Map();
 const fuente = (pl) => {
   const b = pl.base;
-  if (b.tipo === 'imagen') return { href: env.proyecto.imagenes[b.imagenId] || '', w: b.w, h: b.h };
+  if (b.tipo === 'imagen') { const href = env.proyecto.imagenes[b.imagenId] || ''; return { href, w: b.w, h: b.h, perdida: !href }; }
   const obj = b.tipo === 'muro' ? M.muroDe(env.proyecto, b.muroId) : M.salaDe(env.proyecto, b.salaId);
-  if (!obj) return { href: '', w: b.w || 100, h: b.h || 100 };
+  if (!obj) return { href: '', w: b.w || 100, h: b.h || 100, perdida: true };
   const firma = JSON.stringify(b.tipo === 'muro' ? [obj, env.proyecto.obras.filter((o) => obj.colgado.some((c) => c.obraId === o.id))] : [obj, env.proyecto.obras, env.proyecto.muros, b.cam]);
   const c = cacheFuente.get(pl.id);
   if (c && c.firma === firma) return c;
@@ -215,7 +215,12 @@ const renderSvg = () => {
   el.svg.replaceChildren();
   el.vacio.style.display = pl ? 'none' : '';
   if (!pl) { aplicarVista(); return; }
-  el.svg.appendChild(svgEl('image', { href: fuente(pl).href, x: 0, y: 0, width: fuente(pl).w, height: fuente(pl).h, id: 'fondo' }));
+  const f = fuente(pl);
+  el.svg.appendChild(svgEl('image', { href: f.href, x: 0, y: 0, width: f.w, height: f.h, 'data-fondo': '1' }));
+  if (f.perdida) { // la sala, el muro o la imagen de base ya no existen: las anotaciones se conservan sobre un fondo vacío
+    el.svg.appendChild(svgEl('rect', { x: 0, y: 0, width: f.w, height: f.h, fill: '#f6f5f0', stroke: '#c9c5b8', 'stroke-dasharray': '8 6', 'pointer-events': 'none' }));
+    el.svg.appendChild(svgEl('text', { x: f.w / 2, y: 24, 'text-anchor': 'middle', 'font-size': 14, fill: '#8a8677', 'pointer-events': 'none' }, 'El fondo de este plano (' + (pl.base.tipo === 'imagen' ? 'imagen' : pl.base.tipo === 'muro' ? 'alzado' : 'sala') + ') ya no existe en el proyecto; las anotaciones se conservan'));
+  }
   const z = S.view.zoom;
   for (const it of pl.items) { if (!capaVisible(pl, it.capa)) continue; el.svg.appendChild(renderItem(it, pl, z)); }
   if (pl.escala && pl.escala.ref && S.modo === 'editor' && S.tool === 'calibrar') {
@@ -245,7 +250,7 @@ const renderPaneles = () => {
       const acc = e.target.dataset.acc;
       if (acc === 'renombrar') { const n = prompt('Nombre del plano', p.nombre); if (n) { p.nombre = n.trim() || p.nombre; cambio(); } }
       else if (acc === 'subir') { pr.planos.splice(i, 1); pr.planos.splice(i - 1, 0, p); cambio(); }
-      else if (acc === 'borrar') { if (confirm(`¿Borrar el plano «${p.nombre}» con sus ${p.items.length} anotaciones?`)) { pr.planos.splice(i, 1); cacheFuente.delete(p.id); M.limpiarImagenes(env.proyecto); if (S.planoId === p.id) { S.planoId = pr.planos[0]?.id || null; S.undo.length = 0; S.redo.length = 0; } cambio(); ajustarVista(); } }
+      else if (acc === 'borrar') { if (confirm(`¿Borrar el plano «${p.nombre}» con sus ${p.items.length} anotaciones?`)) { pr.planos.splice(i, 1); cacheFuente.delete(p.id); if (S.planoId === p.id) { S.planoId = pr.planos[0]?.id || null; S.undo.length = 0; S.redo.length = 0; } cambio(); ajustarVista(); } }
       else activarPlano(p.id);
     });
     el.listaPlanos.appendChild(li);
@@ -362,7 +367,7 @@ const agregarItem = (base) => {
   if (S.modo === 'editor' && it.tipo === 'texto') { const inp = $('[data-k="label"]', el.props); if (inp) { inp.focus(); inp.select(); } }
   return it;
 };
-const borrarSel = () => { const pl = plano(); if (!pl || !S.sel) return; snap(); pl.items = pl.items.filter(i => i.id !== S.sel); S.sel = null; M.limpiarImagenes(env.proyecto); cambio(); };
+const borrarSel = () => { const pl = plano(); if (!pl || !S.sel) return; snap(); pl.items = pl.items.filter(i => i.id !== S.sel); S.sel = null; cambio(); };
 const activarPlano = (id) => { if (id === S.planoId) return; S.planoId = id; S.proyecto.planoActivo = id; S.sel = null; S.draft = null; S.undo.length = 0; S.redo.length = 0; render(); if (S.activa) ajustarVista(); renderPaneles(); autosave(); };
 const irA = (destino) => {
   if (!destino) return;
@@ -506,8 +511,9 @@ el.lienzo.addEventListener('wheel', (e) => { if (!plano()) return; e.preventDefa
 el.lienzo.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // arrastrar y soltar archivos
-el.lienzo.addEventListener('dragover', (e) => { e.preventDefault(); });
+el.lienzo.addEventListener('dragover', (e) => { if (S.modo === 'editor') e.preventDefault(); });
 el.lienzo.addEventListener('drop', async (e) => {
+  if (S.modo !== 'editor') return; // el visor exportado no edita nada
   e.preventDefault(); const files = Array.from(e.dataTransfer.files || []); if (!files.length) return;
   for (const f of files) {
     if (f.name.endsWith('.json') || f.type === 'application/json') { if (env.onArchivoJson) env.onArchivoJson(f); continue; }
@@ -520,7 +526,7 @@ el.filePlano.addEventListener('change', async () => { for (const f of el.filePla
 el.fileImagen.addEventListener('change', async () => { const f = el.fileImagen.files[0]; if (f && S.pendienteImagen) await agregarImagenEn(f, S.pendienteImagen); S.pendienteImagen = null; el.fileImagen.value = ''; });
 
 // ── teclado
-document.addEventListener('keydown', (e) => {
+const alTeclado = (e) => {
   if (!S.activa || (document.activeElement && document.activeElement !== document.body && !root.contains(document.activeElement))) return;
   const enCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
   if (e.key === 'Escape') { if (enCampo) { document.activeElement.blur(); return; } if (el.ayuda.classList.contains('visible')) { el.ayuda.classList.remove('visible'); return; } cancelar(); return; }
@@ -535,7 +541,8 @@ document.addEventListener('keydown', (e) => {
   if (k === 'enter' && S.draft && S.draft.tool === 'poligono') { terminarPoligono(); return; }
   if (k === '0') ajustarVista(); else if (k === '+' || k === '=') zoomPaso(1.25); else if (k === '-') zoomPaso(0.8);
   else if (k === '?') el.ayuda.classList.toggle('visible');
-});
+};
+document.addEventListener('keydown', alTeclado);
 
 // ── barra superior
 $$('#ap-herramientas button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
@@ -552,7 +559,8 @@ $('#ap-btnExportHtml').addEventListener('click', () => { if (!S.proyecto.planos.
 $('#ap-btnExportPng').addEventListener('click', () => exportarPng());
 $('#ap-btnExportCsv').addEventListener('click', () => descargar(new Blob(['﻿' + G.csvMedidas(S.proyecto)], { type: 'text/csv;charset=utf-8' }), nombreArchivo() + '-medidas.csv'));
 $('#ap-btnEditar').addEventListener('click', () => { if (env.onEditar) env.onEditar(); });
-window.addEventListener('resize', () => { if (S.activa) aplicarVista(); });
+const alRedimensionar = () => { if (S.activa) aplicarVista(); };
+window.addEventListener('resize', alRedimensionar);
 
 // ── archivos
 const nombreArchivo = () => (env.proyecto.nombre || 'proyecto').replace(/[^\w\-áéíóúñü ]+/gi, '').trim().replace(/\s+/g, '-') || 'proyecto';
@@ -564,7 +572,10 @@ const exportarPng = () => {
   const clon = el.svg.cloneNode(true);
   clon.setAttribute('viewBox', `0 0 ${fuente(pl).w} ${fuente(pl).h}`); clon.setAttribute('width', fuente(pl).w); clon.setAttribute('height', fuente(pl).h);
   clon.removeAttribute('style'); clon.removeAttribute('id');
-  const estilo = document.createElementNS(SVGNS, 'style'); estilo.textContent = 'text{font-family:"Fira Code",ui-monospace,Menlo,monospace}'; clon.insertBefore(estilo, clon.firstChild);
+  // fuera de la página no hay CSS: los halos y las zonas de clic (sin fill) saldrían negros
+  clon.querySelectorAll('.halo,.hit,.asa').forEach((n) => n.remove());
+  clon.querySelectorAll('[data-fondo]').forEach((n) => n.removeAttribute('data-fondo'));
+  const estilo = document.createElementNS(SVGNS, 'style'); estilo.textContent = 'text{font-family:"Fira Code",ui-monospace,Menlo,monospace} .cota{vector-effect:non-scaling-stroke}'; clon.insertBefore(estilo, clon.firstChild);
   S.sel = sel; S.draft = draft; S.view = view; renderSvg();
   const src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(clon));
   const img = new Image();
@@ -588,8 +599,9 @@ const cargar = () => {
 };
 cargar();
 return {
-  activar(on) { const antes = S.activa; S.activa = !!on; if (on) { cacheFuente.clear(); render(); if (!antes || !S.vistoTodo) { S.vistoTodo = true; ajustarVista(); } } },
+  activar(on) { S.activa = !!on; if (on) { cacheFuente.clear(); render(); if (!S.vistoTodo) { S.vistoTodo = true; ajustarVista(); } } },
   setModo, refrescar() { cacheFuente.clear(); cargar(); },
+  destruir() { S.activa = false; document.removeEventListener('keydown', alTeclado); window.removeEventListener('resize', alRedimensionar); },
   agregarPlanoDe,
   _S: S, _clic: (p) => clicHerramienta(p, null), _setTool: setTool,
 };

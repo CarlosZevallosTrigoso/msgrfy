@@ -15,40 +15,78 @@ root.innerHTML = MARKUP;
 const $ = (id) => root.querySelector('#' + id);
 const cv = $('cv'), ctx = cv.getContext('2d'), work = $('md-work');
 let muro = env.muro;
-let activa = false;
+let activa = false, encajado = false;
+const oyentes = []; // listeners globales, para destruir()
+const enWindow = (t, f, o) => { window.addEventListener(t, f, o); oyentes.push([t, f]); };
 
 // ---------- puente proyecto ↔ documento ----------
 const P = () => env.proyecto;
 const construir = (mu) => (mu ? docDeMuro(P(), mu) : MD.newDoc());
 // doc → muro + obras del proyecto
+const CM = { vano: ['x', 'y', 'w', 'h', 'prof'], persona: ['x', 'y', 'h', 'w', 'dist'], medida: ['x1', 'y1', 'x2', 'y2'], nota: ['x', 'y', 'tam'] };
+const casi = (a, b) => Math.abs(a - b) < 1e-6;
+// Medidas de relleno que docDeMuro pone a una obra sin medidas (0,5 × 0,7 m, o según la proporción de la imagen)
+const relleno = (o) => { const w = o.ancho > 0 ? o.ancho : 0.5; return { w, h: o.alto > 0 ? o.alto : (o.imgRatio > 0 ? w / o.imgRatio : 0.7) }; };
 const volcar = () => {
   if (!muro) return;
-  muro.nombre = doc.titulo;
+  const renombrado = muro.nombre !== doc.titulo; muro.nombre = doc.titulo;
   muro.ancho = r6(cmAm(doc.wall.w)); muro.alto = r6(cmAm(doc.wall.h)); muro.eje = r6(cmAm(doc.wall.eje)); muro.grosor = r6(cmAm(doc.wall.grosor)); muro.color = doc.wall.color;
   muro.guias = { v: doc.guides.v.map((v) => r6(cmAm(v))), h: doc.guides.h.map((v) => r6(cmAm(v))) };
-  muro.opts = doc.opts;
-  const vistos = new Set(); const colgado = [];
-  const CM = { vano: ['x', 'y', 'w', 'h', 'prof'], persona: ['x', 'y', 'h', 'w', 'dist'], medida: ['x1', 'y1', 'x2', 'y2'], nota: ['x', 'y', 'tam'] };
-  const otros = [];
+  muro.opts = JSON.parse(JSON.stringify(doc.opts)); // copia: el doc no comparte objeto con el proyecto
+  const colgado = [], otros = [];
   for (const it of doc.items) {
     if (it.tipo !== 'obra') { const n = { ...it }; for (const k of CM[it.tipo] || []) if (Number.isFinite(n[k])) n[k] = r6(cmAm(n[k])); otros.push(n); continue; }
-    let c = muro.colgado.find((x) => x.id === it.id), o = c ? M.obraDe(P(), c.obraId) : null;
-    if (!o) { o = M.nuevaObra({ nombre: it.nombre || (it.ficha && it.ficha.titulo) || 'Obra' }); P().obras.push(o); c = M.nuevoColgado({ id: it.id, obraId: o.id }); }
+    // la obra del proyecto se localiza por it.obraId (sobrevive a deshacer/rehacer); el colgado por el id del ítem
+    let c = muro.colgado.find((x) => x.id === it.id) || null;
+    let o = (it.obraId && M.obraDe(P(), it.obraId)) || (c && M.obraDe(P(), c.obraId)) || null;
+    const f = it.ficha || {};
+    if (!o) { o = M.nuevaObra({ nombre: (f.titulo || '').trim() || it.nombre || 'Obra' }); P().obras.push(o); }
+    it.obraId = o.id;
+    if (!c) c = M.nuevoColgado({ id: it.id, obraId: o.id }); else c.obraId = o.id;
     // imagen nueva o reemplazada desde esta vista: pasa al almacén del proyecto con el mismo id
     if (it.imgId && doc.images[it.imgId] && !P().imagenes[it.imgId]) P().imagenes[it.imgId] = doc.images[it.imgId];
     o.imagenId = it.imgId && P().imagenes[it.imgId] ? it.imgId : null; if (it.imgRatio > 0) o.imgRatio = r6(it.imgRatio);
-    const f = it.ficha || {};
-    const nombre = f.titulo !== o.nombre ? f.titulo : it.nombre !== o.nombre ? it.nombre : o.nombre;
+    // nombre: la ficha manda; «nombre en capas» sigue a la ficha. Un título vacío no borra el nombre.
+    const t = (f.titulo || '').trim();
+    const nombre = t && t !== o.nombre ? t : (it.nombre && it.nombre !== o.nombre ? it.nombre : o.nombre);
     o.nombre = nombre; it.nombre = nombre; it.ficha = { ...f, titulo: nombre };
     o.autor = f.autor || ''; o.anio = f.anio || ''; o.tecnica = f.tecnica || ''; o.inv = f.inv || '';
-    o.ancho = r6(cmAm(it.w)); o.alto = r6(cmAm(it.h)); o.estimado = { ancho: !!(it.est && it.est.w), alto: !!(it.est && it.est.h) };
+    // medidas: si la obra no tenía medida y el ítem conserva el relleno sin tocar, sigue sin medida
+    const ph = relleno(o), w = cmAm(it.w), h = cmAm(it.h), estW = !!(it.est && it.est.w), estH = !!(it.est && it.est.h);
+    if (!(estW && !(o.ancho > 0) && casi(w, ph.w))) { o.ancho = r6(w); o.estimado.ancho = estW; }
+    if (!(estH && !(o.alto > 0) && casi(h, ph.h))) { o.alto = r6(h); o.estimado.alto = estH; }
     Object.assign(c, { x: r6(cmAm(it.x)), y: r6(cmAm(it.y)), marco: r6(cmAm(it.marco || 0)), pp: r6(cmAm(it.pp || 0)), prof: r6(cmAm(it.prof || 0)), caida: r6(cmAm(it.caida || 0)), rot: it.rot || 0, lock: !!it.lock, bloqueado: !!it.bloqueado, oculto: !!it.oculto });
-    colgado.push(c); vistos.add(o.id);
+    colgado.push(c);
   }
   muro.colgado = colgado; muro.otros = otros;
-  M.limpiarImagenes(P());
-  if (env.onCambio) env.onCambio();
-  if (env.onObraCambiada) env.onObraCambiada(null);
+  if (renombrado) renderMuros();
+  if (env.onCambio) env.onCambio(); // el cascarón refresca el panel de obras aquí
+};
+// Lo que el panel de obras cambió (nombre, ficha, medidas, imagen) entra al doc sin tocar el historial
+const obrasAlDoc = () => {
+  if (!muro) return false;
+  let hubo = false;
+  const vivos = new Set(muro.colgado.map((c) => c.id));
+  for (const it of doc.items) {
+    if (it.tipo !== 'obra') continue;
+    const o = it.obraId ? M.obraDe(P(), it.obraId) : null;
+    if (!o || !vivos.has(it.id)) { continue; }
+    const f = it.ficha || {};
+    if (o.nombre !== it.nombre || o.nombre !== f.titulo || o.autor !== (f.autor || '') || o.anio !== (f.anio || '') || o.tecnica !== (f.tecnica || '') || o.inv !== (f.inv || '')) {
+      it.nombre = o.nombre; it.ficha = { ...f, titulo: o.nombre, autor: o.autor, anio: o.anio, tecnica: o.tecnica, inv: o.inv }; hubo = true;
+    }
+    const ph = relleno(o), w = mAcm(ph.w), h = mAcm(ph.h), estW = !(o.ancho > 0) || o.estimado.ancho, estH = !(o.alto > 0) || o.estimado.alto;
+    if (!casi(it.w, w) || !casi(it.h, h) || it.est.w !== estW || it.est.h !== estH) { it.w = w; it.h = h; it.est = { w: estW, h: estH }; hubo = true; }
+    const img = o.imagenId && P().imagenes[o.imagenId] ? o.imagenId : null;
+    if (it.imgId !== img) { it.imgId = img; if (img) doc.images[img] = P().imagenes[img]; hubo = true; }
+    if (o.imgRatio > 0 && it.imgRatio !== o.imgRatio) { it.imgRatio = o.imgRatio; hubo = true; }
+  }
+  // colgados que el proyecto ya no tiene (obra borrada desde el panel)
+  const antes = doc.items.length;
+  doc.items = doc.items.filter((it) => it.tipo !== 'obra' || vivos.has(it.id));
+  if (doc.items.length !== antes) { hubo = true; sel = new Set([...sel].filter((id) => doc.items.some((i) => i.id === id))); }
+  if (hubo) { hist.last = MD.snapshot(doc); panelDirty = true; selChanged(); requestRender(); }
+  return hubo;
 };
 const RULER = 20;
 const fmt = MD.fmt;
@@ -92,7 +130,7 @@ function redo() {
   doc = MD.restore(hist.last, doc); dirty = true; afterDocChange(); volcar(); msg('Rehecho.');
 }
 function syncUndo() { $('b-undo').disabled = !hist.undo.length && !commitT; $('b-redo').disabled = !hist.redo.length; }
-function resetHistory() { hist.undo = []; hist.redo = []; hist.last = MD.snapshot(doc); syncUndo(); }
+function resetHistory() { clearTimeout(commitT); commitT = 0; hist.undo = []; hist.redo = []; hist.last = MD.snapshot(doc); syncUndo(); }
 
 // ---------- utilidades ----------
 const getItem = (id) => doc.items.find((i) => i.id === id);
@@ -193,6 +231,7 @@ function draw() {
   const dpr = window.devicePixelRatio || 1, { w, h } = workSize();
   const bw = Math.max(1, Math.round(w * dpr)), bh = Math.max(1, Math.round(h * dpr));
   if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
+  if (!ctx) return; // sin canvas 2D (navegador muy limitado o entorno de pruebas)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = MD.COL.paste; ctx.fillRect(0, 0, w, h);
   const P = MD.canvasPainter(ctx, getImage);
@@ -222,7 +261,8 @@ function draw() {
   if (!isIso()) drawRulers(w, h);
   if (panelDirty) { panelDirty = false; renderPanel(); }
   if (layersDirty) renderLayers();
-  $('empty').style.display = doc.items.some((i) => i.tipo !== 'persona') ? 'none' : '';
+  $('empty').style.display = !muro || doc.items.some((i) => i.tipo !== 'persona') ? 'none' : '';
+  $('sin-muro').hidden = !!muro; cv.style.visibility = muro ? '' : 'hidden';
 }
 function niceStep(s) { for (const v of [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]) if (v * s >= 56) return v; return 10000; }
 function drawRulers(w, h) {
@@ -561,7 +601,7 @@ function showPos(p, extra) {
 }
 
 // ---------- teclado ----------
-window.addEventListener('keydown', (e) => {
+enWindow('keydown', (e) => {
   if (!activa || (document.activeElement && document.activeElement !== document.body && !root.contains(document.activeElement))) return;
   if (root.querySelector('dialog[open]')) return;
   const t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
@@ -601,8 +641,8 @@ window.addEventListener('keydown', (e) => {
     if (l === 'v') setTool('select'); else if (l === 'h') setTool('hand'); else if (l === 'm') setTool('measure');
   }
 });
-window.addEventListener('keyup', (e) => { if (!activa) return; if (e.code === 'Space') { space = false; updateCursor(lastPx, lastPy); } });
-window.addEventListener('blur', () => { space = false; });
+enWindow('keyup', (e) => { if (!activa) return; if (e.code === 'Space') { space = false; updateCursor(lastPx, lastPy); } });
+enWindow('blur', () => { space = false; });
 
 function setVista(m, silent) {
   doc.opts.vista = m === 'iso' ? 'iso' : 'alzado';
@@ -657,6 +697,7 @@ function duplicate(ids, dx, dy) {
     if (!set.has(it.id)) continue;
     const c = MD.clone(it);
     c.id = MD.uid(it.tipo[0]); c.nombre = (it.nombre || '') + ' copia'; c.bloqueado = false;
+    if (c.tipo === 'obra') { delete c.obraId; if (c.ficha) c.ficha = { ...c.ficha, titulo: c.nombre }; } // el duplicado es una obra nueva del proyecto
     MD.moveItem(c, dx, dy); doc.items.push(c); out.push(c.id);
   }
   return out;
@@ -740,6 +781,7 @@ $('a-lista').onclick = () => {
   if (!muro) return;
   const en = new Set(muro.colgado.map((c) => c.obraId));
   const libres = P().obras.filter((o) => !en.has(o.id));
+  if (!P().obras.length) return msg('No hay obras en la lista: añádelas en el panel Obras o dibújalas en la planta.');
   if (!libres.length) return msg('Todas las obras de la lista ya están en este muro.');
   const dlg = $('dlg-lista'); const ul = dlg.querySelector('ul');
   ul.innerHTML = libres.map((o) => `<li data-id="${o.id}"><b>${esc(o.nombre || 'sin título')}</b> <span class="muted">${esc(o.autor || '')}${o.ancho > 0 || o.alto > 0 ? ' · ' + (o.ancho > 0 ? fmt(o.ancho * 100) : '?') + ' × ' + (o.alto > 0 ? fmt(o.alto * 100) : '?') + ' cm' : ''}</span></li>`).join('');
@@ -754,7 +796,7 @@ function colocarObra(obraId) {
   const w = o.ancho > 0 ? o.ancho : 0.5, h = o.alto > 0 ? o.alto : (o.imgRatio > 0 ? w / o.imgRatio : 0.7);
   const c = M.nuevoColgado({ obraId }); muro.colgado.push(c);
   if (o.imagenId && P().imagenes[o.imagenId]) doc.images[o.imagenId] = P().imagenes[o.imagenId];
-  const it = MD.makeObra({ id: c.id, nombre: o.nombre, w: mAcm(w), h: mAcm(h), imgId: o.imagenId, imgRatio: o.imgRatio, est: { w: !(o.ancho > 0) || o.estimado.ancho, h: !(o.alto > 0) || o.estimado.alto },
+  const it = MD.makeObra({ id: c.id, obraId: o.id, nombre: o.nombre, w: mAcm(w), h: mAcm(h), imgId: o.imagenId, imgRatio: o.imgRatio, est: { w: !(o.ancho > 0) || o.estimado.ancho, h: !(o.alto > 0) || o.estimado.alto },
     ficha: { titulo: o.nombre, autor: o.autor, anio: o.anio, tecnica: o.tecnica, inv: o.inv } });
   placeNew(it); doc.items.push(it); sel = new Set([it.id]); commit(); selChanged();
   msg('«' + (o.nombre || 'obra') + '» colocada en el muro.');
@@ -830,9 +872,8 @@ function renderPanel() {
       + '<div class="g2" style="margin-top:8px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
     else {
       const it = its[0];
-      if (it.tipo === 'obra') box.innerHTML =
-        TXT('nombre', 'Nombre en capas')
-        + '<h4>Ficha</h4><div class="stack">' + TXT('f.titulo', 'Título') + '<div class="g2">' + TXT('f.autor', 'Autor') + TXT('f.anio', 'Año') + TXT('f.tecnica', 'Técnica') + TXT('f.inv', 'N.º de inventario') + '</div></div>'
+      if (it.tipo === 'obra') box.innerHTML = // el nombre de la obra es su título (misma ficha que el panel Obras): un solo campo
+        '<h4>Ficha</h4><div class="stack">' + TXT('f.titulo', 'Título (nombre de la obra en el proyecto)') + '<div class="g2">' + TXT('f.autor', 'Autor') + TXT('f.anio', 'Año') + TXT('f.tecnica', 'Técnica') + TXT('f.inv', 'N.º de inventario') + '</div></div>'
         + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho obra', ' min="0.1"') + NUM('h', 'Alto obra', ' min="0.1"') + NUM('marco', 'Marco', ' min="0"') + NUM('pp', 'Paspartú', ' min="0"') + NUM('prof', 'Profundidad', ' min="0" title="Cuánto sobresale del muro: marco, bastidor o caja. Se ve en la vista isométrica."') + '</div>'
         + '<div class="g2"><label class="c" title="Calculada, arrastrada o tomada de la imagen: sale con ≈ y línea punteada"><input type="checkbox" data-b="est.w"> Ancho estimado</label><label class="c" title="Calculada, arrastrada o tomada de la imagen: sale con ≈ y línea punteada"><input type="checkbox" data-b="est.h"> Alto estimado</label></div>'
         + '<label class="c" title="Al escribir una medida, la otra se recalcula solo si está estimada"><input type="checkbox" data-b="lock"> Mantener proporción</label>'
@@ -1163,7 +1204,7 @@ function endArea(r) {
 function togglePreviewSize() { const d = $('dlg-export'); d.classList.toggle('big'); $('ex-zoom').textContent = d.classList.contains('big') ? 'Reducir' : 'Ampliar'; schedulePreview(); }
 $('ex-zoom').onclick = togglePreviewSize;
 $('ex-prev').onclick = togglePreviewSize;
-window.addEventListener('resize', () => { if ($('dlg-export').open) schedulePreview(); });
+enWindow('resize', () => { if ($('dlg-export').open) schedulePreview(); });
 $('ex-fmt').addEventListener('change', (e) => { doc.opts.exp.fmt = e.target.value; exInfo(); });
 $('ex-scope').addEventListener('change', (e) => { doc.opts.exp.scope = e.target.value; exInfo(); });
 $('ex-cota').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v > 0) { doc.opts.exp.cotaCm = v; exInfo(); } });
@@ -1217,7 +1258,7 @@ $('b-fit').onclick = fitView; $('b-100').onclick = () => zoomTo(calib); $('b-cen
 $('zoomv').addEventListener('change', (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (isFinite(v) && v > 0) zoomTo(calib * v / 100); else afterView(); });
 $('zoomv').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
 
-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestRender()).observe(work);
+const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => requestRender()) : null; if (ro) ro.observe(work);
 
 // ---------- inicio y API para el cascarón ----------
 const cargar = (mu) => {
@@ -1231,25 +1272,32 @@ const renderMuros = () => {
   const sala = muro && muro.salaId ? M.salaDe(P(), muro.salaId) : null;
   $('m-origen').textContent = muro ? (sala && muro.tramo ? 'de la planta: ' + (sala.nombre || 'sala') + ', tramo ' + (muro.tramo.i + 1) : 'muro suelto') : 'abre un alzado desde la planta o añade un muro';
   const vacio = !muro;
-  ['t-select', 't-hand', 't-measure', 'a-img', 'a-blank', 'a-lista', 'a-vano', 'a-persona', 'a-nota', 'f-export', 'f-csv', 'm-nombre', 'm-borrar'].forEach((id) => { $(id).disabled = vacio || (id.startsWith('t-') && isIso()); });
+  ['t-select', 't-hand', 't-measure', 'a-img', 'a-blank', 'a-lista', 'a-vano', 'a-persona', 'a-nota', 'f-export', 'f-csv', 'm-nombre', 'm-borrar', 'w-title', 'w-w', 'w-h', 'w-eje', 'w-color'].forEach((id) => { $(id).disabled = vacio || (id.startsWith('t-') && isIso()); });
+  $('md-panel').classList.toggle('sin-muro', vacio);
 };
-$('selMuro').addEventListener('change', (e) => { const m = M.muroDe(P(), e.target.value); if (m && m !== muro) { volcar(); cargar(m); } });
+$('selMuro').addEventListener('change', (e) => { const m = M.muroDe(P(), e.target.value); if (m && m !== muro) { if (commitT) commit(); cargar(m); } });
 $('m-nuevo').onclick = () => {
   const n = prompt('Nombre del muro', 'Muro ' + (P().muros.length + 1)); if (!n) return;
-  const m = M.nuevoMuro({ nombre: n.trim() || 'Muro' }); P().muros.push(m); volcar(); cargar(m); if (env.onCambio) env.onCambio();
+  const m = M.nuevoMuro({ nombre: n.trim() || 'Muro' }); P().muros.push(m); if (commitT) commit(); cargar(m); if (env.onCambio) env.onCambio();
 };
 $('m-nombre').onclick = () => { if (!muro) return; const n = prompt('Nombre del muro', muro.nombre); if (n) { doc.titulo = n.trim() || doc.titulo; $('w-title').value = doc.titulo; commit(); renderMuros(); } };
 $('m-borrar').onclick = () => {
-  if (!muro) return; if (!confirm(`¿Borrar el muro «${muro.nombre}»? Las obras siguen en la lista del proyecto.`)) return;
-  const i = P().muros.indexOf(muro); P().muros.splice(i, 1); M.limpiarImagenes(P()); const sig = P().muros[Math.max(0, i - 1)] || null;
+  if (!muro) return; const nl = P().anotaciones.filter((a) => a.base && a.base.muroId === muro.id).length;
+  if (!confirm(`¿Borrar el muro «${muro.nombre}»? Las obras siguen en la lista del proyecto.${nl ? ` ${nl} plano${nl > 1 ? 's' : ''} de Lectura usa${nl > 1 ? 'n' : ''} este alzado como fondo y se quedar${nl > 1 ? 'án' : 'á'} sin él.` : ''}`)) return;
+  const i = P().muros.indexOf(muro); P().muros.splice(i, 1); const sig = P().muros[Math.max(0, i - 1)] || null;
   muro = null; cargar(sig); if (env.onCambio) env.onCambio(); if (env.onObraCambiada) env.onObraCambiada(null);
 };
 cargar(muro);
 return {
-  activar(on) { const antes = activa; activa = !!on; if (on) { renderMuros(); if (!antes || !cv.width) fitView(); requestRender(); } else volcar(); },
-  abrir(mu) { if (mu !== muro) { volcar(); cargar(mu); } else renderMuros(); },
+  // al entrar: lo que haya cambiado en las obras desde otras vistas entra al doc; el encuadre solo la primera vez.
+  // Al salir: se confirma lo pendiente (cada commit ya vuelca; no se vuelca de nuevo para no tocar el proyecto sin cambios)
+  activar(on) { activa = !!on; if (on) { obrasAlDoc(); renderMuros(); if (!cv.width || !encajado) { fitView(); encajado = true; } requestRender(); } else if (commitT) commit(); },
+  abrir(mu) { if (mu !== muro) { if (commitT) commit(); cargar(mu); } else { obrasAlDoc(); renderMuros(); } },
   colocar(obraId) { colocarObra(obraId); },
-  refrescar() { if (muro) { const m = muro; muro = null; cargar(m); } else renderMuros(); },
+  // cambios en obras o muros hechos fuera de esta vista: se incorporan sin perder el historial
+  refrescar() { if (commitT) commit(); if (muro && !P().muros.includes(muro)) { muro = null; cargar(P().muros[0] || null); return; } if (muro) obrasAlDoc(); renderMuros(); },
+  obrasCambiadas() { if (muro) obrasAlDoc(); },
+  destruir() { activa = false; clearTimeout(commitT); commitT = 0; for (const [t, f] of oyentes) window.removeEventListener(t, f); if (ro) ro.disconnect(); },
   get muro() { return muro; },
   _doc: () => doc, _sel: () => sel, _commit: commit,
 };

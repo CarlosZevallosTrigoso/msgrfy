@@ -78,11 +78,17 @@ const guia = (paso, texto) => {
 };
 
 // ── deshacer (la imagen del calco no entra en la instantánea: solo sus parámetros)
-const instantanea = () => JSON.stringify({ entidades: S.doc.entidades, calco: S.doc.calco, obras: ctx.proyecto.obras });
+// Las obras del proyecto NO entran: son compartidas con el panel y los muros, y deshacer aquí las revertiría.
+// Si una entidad vuelve con un obraId que ya no existe, se recrea una obra vacía para que no quede sin ficha.
+const instantanea = () => JSON.stringify({ entidades: S.doc.entidades, calco: S.doc.calco, rotulo: S.doc.rotulo });
 const snap = () => { S.undo.push(instantanea()); if (S.undo.length > MAX_UNDO) S.undo.shift(); S.redo.length = 0; };
 const restaurar = (s) => {
-  const d = JSON.parse(s); S.doc.entidades = d.entidades; S.doc.calco = d.calco; ctx.proyecto.obras = d.obras;
-  S.sel = null; S.vsel = null; if (ctx.onObraCambiada) ctx.onObraCambiada(null);
+  const d = JSON.parse(s); S.doc.entidades = d.entidades; S.doc.calco = d.calco; if (d.rotulo > 0) S.doc.rotulo = d.rotulo;
+  let obrasNuevas = false;
+  for (const e of S.doc.entidades) if (G.esObra(e) && e.obraId && !M.obraDe(ctx.proyecto, e.obraId)) { const o = M.nuevaObra({ id: e.obraId, nombre: '' }); ctx.proyecto.obras.push(o); obrasNuevas = true; }
+  if (!ent()) S.sel = null; S.vsel = null;
+  S.inicioOculto = !!(S.doc.entidades.length || S.doc.calco) || S.inicioOculto;
+  if (ctx.onObraCambiada && (obrasNuevas || S.doc.entidades.some(G.esObra))) ctx.onObraCambiada(null);
 };
 const deshacer = () => { if (!S.undo.length) return; S.redo.push(instantanea()); restaurar(S.undo.pop()); cambio(); };
 const rehacer = () => { if (!S.redo.length) return; S.undo.push(instantanea()); restaurar(S.redo.pop()); cambio(); };
@@ -143,6 +149,7 @@ const renderSelPieza = (e, z) => {
   else if (e.tipo === 'texto') { const c = G.textoCaja(e); const p = 3 / z; s += `<rect x="${C(e.x - c.w / 2 - p)}" y="${C(e.y - c.h / 2 - p)}" width="${C(c.w + 2 * p)}" height="${C(c.h + 2 * p)}" ${st}${e.rot ? ` transform="rotate(${e.rot} ${C(e.x)} ${C(e.y)})"` : ''}/>`; }
   else if (e.tipo === 'cota') { const g = G.cotaGeom(e); s += `<line x1="${C(g.qmin.x)}" y1="${C(g.qmin.y)}" x2="${C(g.qmax.x)}" y2="${C(g.qmax.y)}" ${st}/>`; }
   else if (e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro') s += `<line x1="${C(e.a.x)}" y1="${C(e.a.y)}" x2="${C(e.b.x)}" y2="${C(e.b.y)}" ${st}/>`;
+  else if (G.esMueble(e)) { const pts = G.mueblePts(e); s += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" ${st}/>`; }
   G.asas(e).forEach((p, i) => { s += asaSvg(p, i === S.vsel, z); });
   return s;
 };
@@ -313,10 +320,11 @@ const renderPanel = () => {
       h += `<div class="btns"><button data-acc="rot90">⟲ 90°</button><button data-acc="rot0">horizontal</button></div><label>color</label>${swatches(e.color)}`;
     } else if (G.esObra(e)) {
       const o = obraDe(e);
-      const txt = (k, label, ph = '') => `<label>${label}</label><input type="text" data-ok="${k}" value="${esc(o ? o[k] || '' : '')}" placeholder="${ph}">`;
+      if (!o) h += `<div class="nota">Este ${e.tipo === 'cuadro' ? 'cuadro' : 'elemento'} no tiene obra asociada (se borró de la lista). <button data-acc="crearObra">crear ficha</button> o elige una de la lista más abajo.</div>`;
+      const txt = (k, label, ph = '') => `<label>${label}</label><input type="text" data-ok="${k}" value="${esc(o ? o[k] || '' : '')}" placeholder="${ph}"${o ? '' : ' disabled'}>`;
       h += `<div class="fila"><div style="flex:0 0 64px"><label>nº</label><input type="text" data-k="num" value="${esc(e.num ?? '')}"></div><div>${txt('nombre', 'título', 'sin título')}</div></div>`;
       h += txt('autor', 'autor') + `<div class="fila"><div style="flex:0 0 64px">${txt('anio', 'año')}</div><div>${txt('tecnica', 'técnica')}</div></div>`;
-      const dim = (k, label) => `<div><label>${label}</label><input type="text" inputmode="decimal" data-odim="${k}" value="${o && o[k] > 0 ? G.fmtNum(o[k]) : ''}" placeholder="?"></div>`;
+      const dim = (k, label) => `<div><label>${label}</label><input type="text" inputmode="decimal" data-odim="${k}" value="${o && o[k] > 0 ? G.fmtNum(o[k]) : ''}" placeholder="?"${o ? '' : ' disabled'}></div>`;
       h += `<div class="fila">${dim('ancho', 'ancho (m)')}${dim('alto', 'alto (m)')}</div>`;
       if (o && (o.estimado.ancho || o.estimado.alto)) h += `<div class="nota">≈ medida estimada: escribe la real para confirmarla.</div>`;
       h += `<label>nota</label><textarea data-ok="nota" rows="2">${esc(o ? o.nota || '' : '')}</textarea>`;
@@ -458,7 +466,7 @@ const enlazarPanel = (e) => {
   $$('[data-alzado]', P).forEach((b) => {
     b.addEventListener('mouseenter', () => { S.tramo = +b.dataset.alzado; pedirRender(); });
     b.addEventListener('mouseleave', () => { S.tramo = null; pedirRender(); });
-    b.addEventListener('click', () => { if (ctx.onAbrirAlzado) ctx.onAbrirAlzado(S.doc, e, +b.dataset.alzado); });
+    b.addEventListener('click', () => { S.tramo = null; pedirRender(); if (ctx.onAbrirAlzado) ctx.onAbrirAlzado(S.doc, e, +b.dataset.alzado); });
   });
   $$('[data-alto]', P).forEach((i) => {
     const t = +i.dataset.alto;
@@ -604,6 +612,7 @@ const accion = (acc, e, btn = null) => {
   else if (acc === 'etqTodas') { snap(); S.doc.entidades.forEach((x) => { delete x.etiq; }); cambio(); mensaje('Rótulos recolocados automáticamente'); }
   else if (acc === 'etqCentro') { snap(); delete e.etq; cambio(); }
   else if (acc === 'cara') { snap(); e.lado = e.lado === -1 ? 1 : -1; cambio(); }
+  else if (acc === 'crearObra') { if (!e || !G.esObra(e) || obraDe(e)) return; snap(); S.obraPendiente = null; asignarObra(e); cambio(); }
   else if (acc === 'csvObras') exportarCsvObras();
   else if (acc === 'csvMob') { if (!ctx.proyecto.salas.some((x) => x.entidades.some(G.esMueble))) return mensaje('Todavía no hay mobiliario', true); descargar(new Blob(['\ufeff' + csvMobiliario(ctx.proyecto)], { type: 'text/csv;charset=utf-8' }), nombreArchivo() + '-materiales.csv'); mensaje('Lista de materiales exportada'); }
   else if (acc === 'bibGuardar') { if (!e || e.tipo !== 'mueble') return; const n = prompt('Nombre en tu biblioteca', e.nombre); if (!n) return; ctx.proyecto.biblioteca.push({ ...entradaDesde(e, M.nuevoId('b')), nombre: n.trim() || e.nombre }); autosave(); mensaje(`«${n}» guardado en tu biblioteca`); }
@@ -612,7 +621,7 @@ const accion = (acc, e, btn = null) => {
   else if (acc === 'calcoSubir') abrirCalco();
   else if (acc === 'calibrar') { setTool('calibrar'); guia('Calibrar', 'Haz clic en dos puntos de la imagen cuya distancia real conozcas (por ejemplo, los extremos de una pared acotada) y escribe cuántos metros mide.'); }
   else if (acc === 'calcoMover') setTool(S.tool === 'calco' ? 'select' : 'calco');
-  else if (acc === 'calcoQuitar') { if (confirm('¿Quitar la imagen de calco? Lo que dibujaste se queda.')) { snap(); S.doc.calco = null; if (S.tool === 'calco' || S.tool === 'calibrar') S.tool = 'select'; guia(null); M.limpiarImagenes(ctx.proyecto); cambio(); } }
+  else if (acc === 'calcoQuitar') { if (confirm('¿Quitar la imagen de calco? Lo que dibujaste se queda.')) { snap(); S.doc.calco = null; if (S.tool === 'calco' || S.tool === 'calibrar') S.tool = 'select'; guia(null); cambio(); } }
 };
 
 // ── barra inferior: pistas por herramienta
@@ -677,13 +686,13 @@ const agregar = (base) => {
 const borrarSel = () => {
   const e = ent(); if (!e) return;
   snap();
-  if (G.esObra(e) && (S.vsel == null || e.tipo === 'cuadro')) { if (ctx.onObraCambiada) setTimeout(() => ctx.onObraCambiada(e.obraId), 0); mensaje('Quitada de la planta; la obra sigue en la lista'); }
   if (S.vsel != null && ((e.tipo === 'linea' && e.pts.length > 2) || (G.esPoligono(e) && e.pts.length > 3))) { G.borrarVertice(e, S.vsel); S.vsel = null; cambio(); return; }
+  if (G.esObra(e)) { if (ctx.onObraCambiada) setTimeout(() => ctx.onObraCambiada(e.obraId), 0); mensaje('Quitada de la planta; la obra sigue en la lista (panel Obras)'); }
   S.doc.entidades = S.doc.entidades.filter((x) => x !== e); S.sel = null; S.vsel = null; cambio();
 };
 const duplicar = () => {
   const e = ent(); if (!e) return; snap(); const c = G.mover(JSON.parse(JSON.stringify(e)), S.doc.rotulo * 2, S.doc.rotulo * 2); c.id = G.nuevoId();
-  if (G.esObra(c)) { c.num = String(G.numSiguiente(S.doc.entidades)); const o = obraDe(e); const n = M.nuevaObra(o ? { ...o, id: undefined, estimado: { ...o.estimado } } : {}); ctx.proyecto.obras.push(n); c.obraId = n.id; if (ctx.onObraCambiada) ctx.onObraCambiada(n.id); }
+  if (G.esObra(c)) { c.num = String(G.numSiguiente(S.doc.entidades)); const o = obraDe(e); const { id: _id, ...resto } = o || {}; const n = M.nuevaObra(o ? { ...resto, nombre: (o.nombre ? o.nombre + ' copia' : ''), estimado: { ...o.estimado } } : {}); ctx.proyecto.obras.push(n); c.obraId = n.id; if (ctx.onObraCambiada) ctx.onObraCambiada(n.id); }
   S.doc.entidades.push(c); S.sel = c.id; S.vsel = null; cambio();
 };
 
@@ -691,6 +700,7 @@ const duplicar = () => {
 const setTool = (t) => {
   if (S.draft && esPoli(S.draft.tool) && t !== S.draft.tool && S.draft.puntos.length >= (S.draft.tool === 'linea' ? 2 : 3)) terminarLinea(false);
   S.tool = t; S.draft = null; S.buffer = ''; if (t !== 'select') { S.vsel = null; }
+  if (t !== 'cuadro' && t !== 'obra' && S.obraPendiente) { S.obraPendiente = null; mensaje('Colocación cancelada: la obra sigue en la lista'); }
   if (t === 'calibrar' && !S.doc.calco) { S.tool = 'select'; mensaje('Primero sube una imagen de calco', true); }
   if (t !== 'calibrar' && S.guiaPaso === 'Calibrar') guia(null);
   render();
@@ -742,7 +752,7 @@ const clicDibujo = (p, arr) => {
   if (t === 'mueble') {
     if (!S.muebleTpl) { setTool('select'); return; }
     const m = muebleDesde(S.muebleTpl, p.x, p.y, G.nuevoId()); m.rot = S.muebleRot || 0;
-    agregar(m); return;
+    agregar(m); S.sel = null; mensaje(`«${m.nombre}» colocado · otro clic coloca otro igual · R gira · Esc termina`); render(); return;
   }
   if (t === 'texto') {
     const e = agregar({ tipo: 'texto', x: p.x, y: p.y, texto: 'Texto', tam: G.r6(S.doc.rotulo * 1.4), rot: 0 });
@@ -964,7 +974,7 @@ el.lienzo.addEventListener('pointerup', finPuntero);
 el.lienzo.addEventListener('pointercancel', () => { S.arr = null; el.lienzo.classList.remove('panning'); });
 el.lienzo.addEventListener('pointerleave', () => { if (!S.arr) { el.flot.style.display = 'none'; } });
 el.lienzo.addEventListener('dblclick', (ev) => {
-  if (enUi(ev.target)) return;
+  if (enUi(ev.target) || (iso && iso.visible)) return;
   if (esPoli(S.tool) && S.draft) { ev.preventDefault(); terminarLinea(false); return; }
   if (S.tool === 'cota' && S.draft && S.draft.cadena) {
     ev.preventDefault(); const e = ent(S.draft.cadena);
@@ -983,14 +993,14 @@ el.lienzo.addEventListener('wheel', (ev) => { ev.preventDefault(); zoomEn(ev.cli
 el.lienzo.addEventListener('contextmenu', (ev) => ev.preventDefault());
 el.lienzo.addEventListener('dragover', (ev) => ev.preventDefault());
 el.lienzo.addEventListener('drop', (ev) => {
-  ev.preventDefault(); const f = (ev.dataTransfer && ev.dataTransfer.files || [])[0]; if (!f) return;
+  ev.preventDefault(); if (iso && iso.visible) return; const f = (ev.dataTransfer && ev.dataTransfer.files || [])[0]; if (!f) return;
   if (/\.json$/i.test(f.name) || f.type === 'application/json') { if (ctx.onArchivoJson) ctx.onArchivoJson(f); else mensaje('Abre los .json desde la barra superior', true); }
   else if (/^image\//.test(f.type)) { if (S.doc.calco && !confirm('¿Reemplazar la imagen de calco actual?')) return; cargarCalco(f); }
   else mensaje('Arrastra una imagen o un proyecto .json', true);
 });
 
 // ── teclado
-document.addEventListener('keydown', (ev) => {
+const alTeclado = (ev) => {
   if (!S.activa || (document.activeElement && !root.contains(document.activeElement) && document.activeElement !== document.body)) return;
   const ae = document.activeElement; const enCampo = ae && ['INPUT', 'TEXTAREA', 'SELECT'].includes(ae.tagName);
   if (ev.key === 'Escape' && iso && iso.visible) { cerrar3d(); return; }
@@ -1008,6 +1018,10 @@ document.addEventListener('keydown', (ev) => {
   }
   if (enCampo) return;
   const k = ev.key; const kl = k.toLowerCase(); const mod = ev.ctrlKey || ev.metaKey;
+  if (iso && iso.visible) { // en 3D la planta de debajo no se edita con el teclado
+    if (k === '3') cerrar3d(); else if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); } else if (mod && kl === 'y') { ev.preventDefault(); rehacer(); }
+    return;
+  }
   if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); return; }
   if (mod && kl === 'y') { ev.preventDefault(); rehacer(); return; }
   if (mod && kl === 'd') { ev.preventDefault(); duplicar(); return; }
@@ -1036,8 +1050,11 @@ document.addEventListener('keydown', (ev) => {
   if (k === '0') verTodo(); else if (k === '+' || k === '=') { const { rect } = tam(); zoomEn(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.25); }
   else if (k === '-') { const { rect } = tam(); zoomEn(rect.left + rect.width / 2, rect.top + rect.height / 2, 0.8); }
   else if (k === '?') el.ayuda.classList.add('visible');
-});
-document.addEventListener('keyup', (ev) => { if (!S.activa) return; if (ev.key === ' ') { S.espacio = false; el.lienzo.classList.remove('pan'); if (S.tool === 'calco') el.lienzo.classList.add('pan'); } });
+};
+const alSoltar = (ev) => { if (!S.activa) return; if (ev.key === ' ') { S.espacio = false; el.lienzo.classList.remove('pan'); if (S.tool === 'calco') el.lienzo.classList.add('pan'); } };
+const alDesenfocar = () => { S.espacio = false; el.lienzo.classList.remove('pan'); };
+const alRedimensionar = () => { if (S.activa) pedirRender(); };
+document.addEventListener('keydown', alTeclado); document.addEventListener('keyup', alSoltar); window.addEventListener('blur', alDesenfocar);
 
 // ── inicio
 const crearSala = () => {
@@ -1063,7 +1080,7 @@ $('#bAjustar').addEventListener('click', verTodo);
 $('#bAyuda').addEventListener('click', () => el.ayuda.classList.add('visible'));
 $('#bCerrarAyuda').addEventListener('click', () => el.ayuda.classList.remove('visible'));
 el.fCalco.addEventListener('change', () => { const f = el.fCalco.files[0]; if (f) cargarCalco(f); el.fCalco.value = ''; });
-window.addEventListener('resize', () => { if (S.activa) pedirRender(); });
+window.addEventListener('resize', alRedimensionar);
 root.addEventListener('click', (ev) => { const b = ev.target.closest && ev.target.closest('button'); if (b) b.blur(); });
 // salas del proyecto
 const renderSalas = () => {
@@ -1085,7 +1102,7 @@ $('#bSalaBorrar').addEventListener('click', () => {
   if (!confirm(`¿Borrar la sala «${S.doc.nombre}» con sus ${S.doc.entidades.length} elementos? Las obras siguen en la lista.`)) return;
   const i = ctx.proyecto.salas.indexOf(S.doc); ctx.proyecto.salas.splice(i, 1);
   for (const m of ctx.proyecto.muros) if (m.salaId === S.doc.id) { m.salaId = null; m.tramo = null; }
-  M.limpiarImagenes(ctx.proyecto); const sig = ctx.proyecto.salas[Math.max(0, i - 1)]; S.doc = null; setSala(sig); if (ctx.onObraCambiada) ctx.onObraCambiada(null);
+  const sig = ctx.proyecto.salas[Math.max(0, i - 1)]; S.doc = null; setSala(sig); if (ctx.onObraCambiada) ctx.onObraCambiada(null);
 });
 
 // ── archivos
@@ -1142,16 +1159,17 @@ const cerrar3d = () => { iso.ocultar(); $('#b3d').classList.remove('activo'); re
 $('#b3d').addEventListener('click', () => (iso.visible ? cerrar3d() : abrir3d()));
 // ── arranque y API para el cascarón
 const activar = (on) => {
-  S.activa = !!on;
+  S.activa = !!on; S.espacio = false; el.lienzo.classList.remove('pan');
   if (on) { renderSalas(); render(); if (!S.vistoTodo) { S.vistoTodo = true; verTodo(); } }
 };
+const destruir = () => { S.activa = false; document.removeEventListener('keydown', alTeclado); document.removeEventListener('keyup', alSoltar); window.removeEventListener('blur', alDesenfocar); window.removeEventListener('resize', alRedimensionar); if (iso && iso.destruir) iso.destruir(); };
 S.inicioOculto = !!(S.doc.entidades.length || S.doc.calco);
 render();
 return {
-  activar, setSala, render, verTodo,
+  activar, destruir, setSala, render, verTodo,
   get sala() { return S.doc; },
   // desde el panel de obras: colocar una obra existente
-  colocar(obraId) { S.obraPendiente = obraId; setTool('cuadro'); mensaje('Haz clic en el muro donde cuelga la obra; dos clics marcan su ancho (o se usa el de la ficha)'); },
+  colocar(obraId) { S.obraPendiente = obraId; setTool('cuadro'); const o = M.obraDe(ctx.proyecto, obraId); mensaje(o && o.ancho > 0 ? 'Haz clic en el muro donde cuelga la obra; el segundo clic marca hacia qué lado (el ancho es el de la ficha). Esc cancela.' : 'Haz clic en el muro donde cuelga la obra; el segundo clic marca su ancho. Esc cancela.'); },
   irA(obraId) { const e = S.doc.entidades.find((x) => x.obraId === obraId); if (!e) return false; S.sel = e.id; S.vsel = null; render(); return true; },
   refrescar() { render(); },
   // para pruebas y depuración

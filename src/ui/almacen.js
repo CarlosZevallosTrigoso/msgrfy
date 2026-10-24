@@ -16,16 +16,18 @@ const tx = (db, modo, fn) => new Promise((res, rej) => {
 });
 
 // Devuelve el objeto guardado o null. Nunca lanza: si algo falla, devuelve null y lo anota en consola.
+// Si IndexedDB funciona, su respuesta manda (aunque sea null): una copia vieja en localStorage no debe «resucitar».
 export async function cargar() {
-  try { const db = await abrir(); const r = await tx(db, 'readonly', (st) => st.get(CLAVE)); db.close(); if (r) return r; }
+  let idbOk = false;
+  try { const db = await abrir(); const r = await tx(db, 'readonly', (st) => st.get(CLAVE)); db.close(); idbOk = true; if (r) return r; }
   catch (e) { console.warn('almacén:', e.message); }
-  try { const s = localStorage.getItem(LS); return s ? JSON.parse(s) : null; } catch (e) { return null; }
+  try { const s = localStorage.getItem(LS); if (!s) return null; if (idbOk) { localStorage.removeItem(LS); return null; } return JSON.parse(s); } catch (e) { return null; }
 }
 // Lanza si no se pudo guardar en ningún sitio (para avisar al usuario).
 export async function guardar(proyecto) {
   try { const db = await abrir(); await tx(db, 'readwrite', (st) => st.put(proyecto, CLAVE)); db.close(); return 'idb'; }
   catch (e) { console.warn('almacén:', e.message); }
-  localStorage.setItem(LS, JSON.stringify(proyecto)); return 'ls';
+  localStorage.setItem(LS, JSON.stringify(proyecto)); return 'ls'; // lanza (QuotaExceeded) si tampoco cabe aquí
 }
 export async function borrar() {
   try { const db = await abrir(); await tx(db, 'readwrite', (st) => st.delete(CLAVE)); db.close(); } catch (e) {}

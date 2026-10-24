@@ -22,8 +22,9 @@ button.peligro:hover{border-color:var(--rojo);color:var(--rojo)}
 button.primario{background:var(--moss2);border-color:var(--moss2);color:#fff}
 button.primario:hover{background:#4a5a3a}
 button:disabled{opacity:.4;cursor:default}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--steel);outline-offset:1px}
 input[type=text],input[type=number],select,textarea{border:1px solid var(--linea);padding:4px 6px;background:var(--bg);width:100%}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--steel)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--steel);box-shadow:0 0 0 2px rgba(79,107,130,.25)}
 textarea{resize:vertical;min-height:48px}
 label{display:block;color:var(--ink2);margin:8px 0 2px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
 label.check{display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--ink);margin:6px 0;cursor:pointer}
@@ -124,9 +125,8 @@ ul.obras li i{font-style:normal;color:var(--ink2);font-size:11px}
 
 /* ── cascarón ── */
 body{display:flex;flex-direction:column;overflow:hidden}
-#top{flex:none;display:flex;align-items:center;gap:6px;padding:0 10px;height:40px;border-bottom:1px solid var(--ink);background:var(--panel)}
-#brand{font-weight:700;letter-spacing:.04em;cursor:pointer;user-select:none;margin-right:4px}
-#brand:hover{color:var(--moss2)}
+#top{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:4px 10px;min-height:40px;border-bottom:1px solid var(--ink);background:var(--panel)}
+#brand{font-weight:700;letter-spacing:.04em;user-select:none;margin-right:4px}
 #nombreProyecto{width:220px;border:1px solid transparent;background:transparent;padding:3px 6px}
 #nombreProyecto:hover,#nombreProyecto:focus{border-color:var(--linea);background:var(--bg)}
 #tabs{display:flex;gap:2px;margin-left:8px}
@@ -134,7 +134,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 #tabs button.activo{background:var(--ink);color:#fff;border-color:var(--ink)}
 #tabs button[data-pronto]{color:var(--ink2)}
 #accTop{margin-left:auto;display:flex;gap:4px;align-items:center}
-#msgTop{color:var(--moss2);font-size:11px;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#msgTop{color:var(--moss2);font-size:11px;flex:1 1 200px;min-width:0;white-space:normal;line-height:1.3}
 #msgTop.error{color:var(--rojo)}
 #main{flex:1;display:flex;min-height:0}
 #vistas{flex:1;min-width:0;position:relative}
@@ -169,8 +169,6 @@ body.conObras #obras{display:block}
 
 /* barra superior */
 #md-top{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);flex:none;flex-wrap:wrap}
-#md-brand{background:none;border:0;padding:4px 6px 4px 0;font-weight:700;letter-spacing:.04em;cursor:pointer;font-size:13px}
-#md-brand span{font-weight:400;color:var(--dim);margin-left:6px;letter-spacing:0}
 #md .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
 #md .tb{background:#fff;border:1px solid var(--line);border-radius:2px;padding:4px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;min-height:28px}
 #md .tb:hover:not(:disabled){border-color:var(--ink)}
@@ -193,6 +191,12 @@ body.conObras #obras{display:block}
 #md #cv{position:absolute;inset:0;touch-action:none;display:block}
 #md #empty{position:absolute;left:50%;bottom:36px;transform:translateX(-50%);background:#fff;border:1px solid var(--line);border-radius:2px;padding:10px 14px;max-width:min(460px,90%);color:var(--dim);pointer-events:none;text-align:center}
 #md #empty b{color:var(--ink)}
+#md #sin-muro{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);background:#fff;border:1px solid var(--line);border-radius:2px;padding:16px 20px;max-width:min(440px,90%);color:var(--dim);text-align:center;line-height:1.45}
+#md #sin-muro b{color:var(--ink);display:block;margin-bottom:6px}
+#md #sin-muro p{margin:4px 0}
+#md #md-panel.sin-muro{opacity:.55}
+/* el label global va en versales; en el panel del muro las etiquetas son de formulario */
+#md label.f,#md label.c{text-transform:none;letter-spacing:0;margin:0}
 #md-work.drop::after{content:"Suelta aquí: imágenes para añadir obras, o un .json para abrir un proyecto";position:absolute;inset:12px;border:2px dashed var(--mossD);display:flex;align-items:center;justify-content:center;color:var(--mossD);background:rgba(255,255,255,.7);pointer-events:none}
 
 /* panel */
@@ -211,7 +215,7 @@ body.conObras #obras{display:block}
 #md #cota-ed{position:absolute;z-index:5;background:#fff;border:1px solid var(--ink);border-radius:2px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,.14);width:220px}
 #md #cota-ed[hidden]{display:none}
 #md #cota-ed .t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#md label.f input,label.f select{width:100%;border:1px solid var(--line);border-radius:2px;padding:4px 6px;background:#fff;color:var(--ink);min-height:26px}
+#md label.f input,#md label.f select{width:100%;border:1px solid var(--line);border-radius:2px;padding:4px 6px;background:#fff;color:var(--ink);min-height:26px}
 #md label.f input[type=color]{padding:1px 2px;height:26px}
 #md label.c{display:flex;align-items:center;gap:6px;cursor:pointer;margin:4px 0}
 #md label.c input{accent-color:var(--mossD);margin:0}
@@ -284,7 +288,7 @@ dialog .df{padding:10px 16px;border-top:1px solid var(--line);display:flex;justi
   #md-work{flex:1 1 56%;min-height:0}
   #md-panel{width:100%;flex:0 0 44%;border-left:0;border-top:1px solid var(--line);max-height:none;min-height:0}
   #md-top .lbl{display:none}
-  #st-pos{min-width:0}
+  #md #st-pos{min-width:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
@@ -298,14 +302,14 @@ dialog .df{padding:10px 16px;border-top:1px solid var(--line);display:flex;justi
 
 /* ── vista Lectura (de anotador-planos) ── */
 
-#ap button,input,select,textarea{font:inherit;color:inherit;border-radius:var(--r)}
+#ap button,#ap input,#ap select,#ap textarea{font:inherit;color:inherit;border-radius:var(--r)}
 #ap button{background:var(--bg);border:1px solid var(--linea);padding:4px 8px;cursor:pointer}
 #ap button:hover{border-color:var(--ink)}
 #ap button.activo{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 #ap button.peligro:hover{border-color:var(--rojo);color:var(--rojo)}
 #ap button:disabled{opacity:.4;cursor:default}
-#ap input[type=text],input[type=number],input[type=url],select,textarea{border:1px solid var(--linea);padding:4px 6px;background:var(--bg);width:100%}
-#ap input:focus,select:focus,textarea:focus{outline:none;border-color:var(--steel)}
+#ap input[type=text],#ap input[type=number],#ap input[type=url],#ap select,#ap textarea{border:1px solid var(--linea);padding:4px 6px;background:var(--bg);width:100%}
+#ap input:focus,#ap select:focus,#ap textarea:focus{outline:none;border-color:var(--steel)}
 #ap textarea{resize:vertical;min-height:54px}
 #ap label{display:block;color:var(--ink2);margin:8px 0 2px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
 #ap a{color:var(--steel)}
@@ -327,6 +331,7 @@ dialog .df{padding:10px 16px;border-top:1px solid var(--line);display:flex;justi
 #ap ul.lista li.activo{background:var(--bg);border-color:var(--ink)}
 #ap ul.lista li .nombre{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #ap ul.lista li .num{display:inline-block;min-width:18px;height:18px;line-height:17px;text-align:center;border-radius:9px;font-size:10px;color:#fff;background:var(--steel)}
+#ps .obras.bib li .mini{padding:0 6px;font-size:11px;line-height:18px;margin-left:auto}
 #ap ul.lista li .mini{padding:0 4px;font-size:11px;opacity:0;border-color:transparent}
 #ap ul.lista li:hover .mini{opacity:1}
 #ap ul.lista li input[type=checkbox]{margin:0}
@@ -391,7 +396,7 @@ body.lectura #tituloLectura{display:inline}
 /* ── modo 3D de la planta ── */
 #psIso{position:absolute;inset:0;background:#fff;z-index:3;display:flex;flex-direction:column}
 #psIso[hidden]{display:none}
-#psIso .iso-barra{flex:none;display:flex;align-items:center;gap:8px;padding:0 10px;height:36px;border-bottom:1px solid var(--linea);background:var(--panel);overflow-x:auto;white-space:nowrap}
+#psIso .iso-barra{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:4px 10px;min-height:36px;border-bottom:1px solid var(--linea);background:var(--panel)}
 #psIso .iso-tit{font-weight:700}
 #psIso .iso-l{display:inline-flex;align-items:center;gap:4px;margin:0;color:var(--ink2);font-size:11px;text-transform:none;letter-spacing:0}
 #psIso .iso-l input[type=range]{width:90px}
@@ -405,20 +410,19 @@ body.lectura #tituloLectura{display:inline}
 </style>
 </head>
 <body>
-<script>window.__ORIGEN_HTML = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;</script>
 <header id="top">
-  <span id="brand" title="Recargar" onclick="location.reload()">MuseoDraft</span>
+  <span id="brand">MuseoDraft</span>
   <input id="nombreProyecto" type="text" placeholder="nombre del proyecto" aria-label="Nombre del proyecto">
   <span id="tituloLectura"></span>
   <nav id="tabs" aria-label="Vistas">
-    <button data-vista="planta">Planta</button>
+    <button data-vista="planta" aria-pressed="true">Planta</button>
     <button data-vista="muro" title="Alzados de muro y hoja de montaje">Muro</button>
     <button data-vista="lectura" title="Planos anotados con marcadores y enlaces">Lectura</button>
   </nav>
   <div id="accTop">
     <span id="msgTop" role="status" aria-live="polite"></span>
     <button id="bEditar" title="Abrir este proyecto en el editor completo">Editar</button>
-    <button id="bObras" title="Lista de obras del proyecto">Obras</button>
+    <button id="bObras" title="Lista de obras del proyecto" aria-pressed="false">Obras</button>
     <button id="bAbrir" title="Abrir un proyecto o importar un .json de plano-sala, MuseoDraft o anotador-planos (Ctrl+O)">Abrir</button>
     <button id="bGuardar" title="Descargar el proyecto como .json (Ctrl+S)">Guardar</button>
     <button id="bNuevo" title="Empezar un proyecto nuevo">Nuevo</button>
@@ -519,33 +523,36 @@ const nuevoProyecto = (nombre = 'proyecto') => ({
   obras: [], salas: [], muros: [], anotaciones: [], imagenes: {}, biblioteca: [],
 });
 
-const nuevaObra = (o = {}) => ({
-  id: nuevoId('o'), nombre: 'Obra', autor: '', anio: '', tecnica: '', inv: '', nota: '',
+// Un id pasado como undefined/null (p. ej. al duplicar con { ...orig, id: undefined }) no debe pisar el generado
+const conId = (obj, pref) => { if (!obj.id) obj.id = nuevoId(pref); return obj; };
+
+const nuevaObra = (o = {}) => conId({
+  nombre: 'Obra', autor: '', anio: '', tecnica: '', inv: '', nota: '',
   ancho: null, alto: null, estimado: { ancho: true, alto: true }, imagenId: null, imgRatio: null,
   ...o,
-});
+}, 'o');
 
-const nuevaSala = (s = {}) => ({
-  id: nuevoId('s'), nombre: 'Sala', rotulo: 0.2, rejilla: 0.05, imanes: true, entidades: [], calco: null, iso: null, ...s,
-});
+const nuevaSala = (s = {}) => conId({
+  nombre: 'Sala', rotulo: 0.2, rejilla: 0.05, imanes: true, entidades: [], calco: null, iso: null, ...s,
+}, 's');
 
-const nuevoMuro = (m = {}) => ({
-  id: nuevoId('m'), nombre: 'Muro', salaId: null, tramo: null,
+const nuevoMuro = (m = {}) => conId({
+  nombre: 'Muro', salaId: null, tramo: null,
   ancho: 5, alto: 3, eje: 1.5, grosor: 0.15, color: '#ffffff',
   colgado: [], otros: [], guias: { v: [], h: [] }, opts: {},
   ...m,
-});
+}, 'm');
 
 // Una obra colgada en un muro. x, y: esquina superior izquierda del exterior (marco incluido), en m,
 // con origen arriba-izquierda del muro, como en MuseoDraft.
-const nuevoColgado = (c = {}) => ({
-  id: nuevoId('c'), obraId: null, x: 0, y: 0, marco: 0, pp: 0, prof: 0.03, caida: 0, rot: 0,
+const nuevoColgado = (c = {}) => conId({
+  obraId: null, x: 0, y: 0, marco: 0, pp: 0, prof: 0.03, caida: 0, rot: 0,
   lock: true, bloqueado: false, oculto: false, ...c,
-});
+}, 'c');
 
 const nuevaAnotacion = (a = {}) => {
   const capa = { id: nuevoId('k'), nombre: 'base', visible: true };
-  return { id: nuevoId('a'), nombre: 'Plano', base: null, escala: null, capas: [capa], capaActiva: capa.id, items: [], ...a };
+  return conId({ nombre: 'Plano', base: null, escala: null, capas: [capa], capaActiva: capa.id, items: [], ...a }, 'a');
 };
 
 // ---------- consultas ----------
@@ -574,17 +581,22 @@ const imagenesUsadas = (p) => {
 };
 
 // ---------- mutaciones básicas ----------
+// Borra la obra y todo lo que la representa: colgados en muros y cuadros/obras en planta
 const borrarObra = (p, obraId) => {
   p.obras = p.obras.filter((o) => o.id !== obraId);
   for (const m of p.muros) m.colgado = m.colgado.filter((c) => c.obraId !== obraId);
-  for (const s of p.salas) for (const e of s.entidades) if (e.obraId === obraId) e.obraId = null;
+  for (const s of p.salas) s.entidades = s.entidades.filter((e) => !((e.tipo === 'cuadro' || e.tipo === 'obra') && e.obraId === obraId));
   return p;
 };
+// Quita del almacén de imágenes las que nada referencia. Muta p: úsalo solo sobre una copia
+// (copiaLimpia) o cuando ninguna pila de deshacer pueda devolver una referencia a ellas.
 const limpiarImagenes = (p) => {
   const usadas = imagenesUsadas(p);
   for (const id of Object.keys(p.imagenes)) if (!usadas.has(id)) delete p.imagenes[id];
   return p;
 };
+// Copia superficial del proyecto sin imágenes huérfanas: lo que se guarda y se serializa. No muta p.
+const copiaLimpia = (p) => limpiarImagenes({ ...p, imagenes: { ...p.imagenes } });
 
 // ---------- validación / normalización ----------
 class ErrorProyecto extends Error {}
@@ -609,14 +621,16 @@ const entidadValida = (e) => e && TIPOS_ENTIDAD.has(e.tipo) && (
   ((e.tipo === 'obra' || e.tipo === 'region') && Array.isArray(e.pts) && e.pts.length >= 3 && e.pts.every(esPunto)) ||
   (e.tipo === 'proyeccion' && esPunto(e.a) && esPunto(e.b) && esPunto(e.p)) ||
   (e.tipo === 'mueble' && Number.isFinite(e.x) && Number.isFinite(e.y) && e.l > 0 && e.a > 0 && e.h > 0));
-const validarSala = (s, obras) => {
+const validarSala = (s, obras, imagenes) => {
   const ents = (Array.isArray(s.entidades) ? s.entidades : []).filter(entidadValida).map((e) => {
     const n = { ...e }; n.id = str(n.id) || nuevoId('e');
     if (n.tipo === 'cota' && !Array.isArray(n.pts)) { n.pts = [n.a, n.b]; delete n.a; delete n.b; }
     if (n.tipo === 'cuadro' || n.tipo === 'obra') n.obraId = n.obraId && obras.has(n.obraId) ? n.obraId : null;
     return n;
   });
-  const c = s.calco && typeof s.calco === 'object' && s.calco.w > 0 && s.calco.h > 0 && s.calco.mpp > 0 && (s.calco.imagenId || s.calco.src) ? { ...s.calco } : null;
+  let c = s.calco && typeof s.calco === 'object' && s.calco.w > 0 && s.calco.h > 0 && s.calco.mpp > 0 && (s.calco.imagenId || s.calco.src) ? { ...s.calco } : null;
+  if (c && c.src && !c.imagenId) { c.imagenId = nuevoId('img'); imagenes.set(c.imagenId, c.src); delete c.src; } // calco antiguo con la imagen incrustada
+  if (c && !imagenes.has(c.imagenId)) c = null;
   return nuevaSala({
     id: str(s.id) || nuevoId('s'), nombre: str(s.nombre, 'Sala'), rotulo: pos(s.rotulo, 0.2),
     rejilla: num(s.rejilla, 0.05), imanes: bool(s.imanes, true), entidades: ents, calco: c,
@@ -630,6 +644,7 @@ const otroValido = (o) => o && TIPOS_OTRO.has(o.tipo) && (
       : Number.isFinite(o.x) && Number.isFinite(o.y) && o.w > 0 && o.h > 0);
 const validarMuro = (m, obras, salas) => {
   const tramo = m.tramo && typeof m.tramo === 'object' && m.tramo.entidadId && Number.isInteger(m.tramo.i) ? { entidadId: str(m.tramo.entidadId), i: m.tramo.i, cara: m.tramo.cara === -1 ? -1 : 1 } : null;
+  const colgadoIds = new Set((Array.isArray(m.colgado) ? m.colgado : []).map((c) => c && c.id).filter(Boolean));
   return nuevoMuro({
     id: str(m.id) || nuevoId('m'), nombre: str(m.nombre, 'Muro'),
     salaId: m.salaId && salas.has(m.salaId) ? m.salaId : null, tramo: salas.has(m.salaId) ? tramo : null,
@@ -643,29 +658,44 @@ const validarMuro = (m, obras, salas) => {
         caida: Math.max(0, num(c.caida, 0)), rot: [0, 90, 180, 270].includes(c.rot) ? c.rot : 0,
         lock: bool(c.lock, true), bloqueado: bool(c.bloqueado), oculto: bool(c.oculto),
       })),
-    otros: (Array.isArray(m.otros) ? m.otros : []).filter(otroValido).map((o) => ({ ...o, id: str(o.id) || nuevoId(o.tipo[0]) })),
+    otros: (Array.isArray(m.otros) ? m.otros : []).filter(otroValido).map((o) => ({ ...o, id: str(o.id) || nuevoId(o.tipo[0]), ...(o.apunta != null && !colgadoIds.has(o.apunta) ? { apunta: null } : {}) })),
     guias: { v: (m.guias && Array.isArray(m.guias.v) ? m.guias.v : []).filter(Number.isFinite), h: (m.guias && Array.isArray(m.guias.h) ? m.guias.h : []).filter(Number.isFinite) },
     opts: m.opts && typeof m.opts === 'object' ? { ...m.opts } : {},
   });
 };
 // base: una imagen del almacén, o una sala o un muro del proyecto (se redibujan a escala al abrir)
+// Ítems de anotación: geometría mínima por tipo (un ítem roto haría fallar el render de todo el plano)
+const TIPOS_ITEM = new Set(['marcador', 'texto', 'imagen', 'dimension', 'poligono', 'zona']);
+const itemValido = (it) => it && TIPOS_ITEM.has(it.tipo) && (
+  ((it.tipo === 'marcador' || it.tipo === 'texto') && Number.isFinite(it.x) && Number.isFinite(it.y)) ||
+  ((it.tipo === 'imagen' || it.tipo === 'zona') && Number.isFinite(it.x) && Number.isFinite(it.y) && it.w > 0 && it.h > 0) ||
+  (it.tipo === 'dimension' && Array.isArray(it.puntos) && it.puntos.length === 2 && it.puntos.every(esPunto)) ||
+  (it.tipo === 'poligono' && Array.isArray(it.puntos) && it.puntos.length >= 3 && it.puntos.every(esPunto)));
+// La base puede haber desaparecido (sala o muro borrados, imagen perdida): el plano se conserva con sus
+// anotaciones y la vista lo muestra sin fondo, en vez de descartarlo en silencio al recargar.
 const validarAnotacion = (a, imagenes, salas, muros) => {
   const b = a.base || {};
-  const base = b.tipo === 'imagen' && imagenes.has(b.imagenId) && b.w > 0 && b.h > 0 ? { tipo: 'imagen', imagenId: b.imagenId, w: b.w, h: b.h }
-    : b.tipo === 'sala' && salas.has(b.salaId) ? { tipo: 'sala', salaId: b.salaId, w: pos(b.w, 0), h: pos(b.h, 0) }
-      : b.tipo === 'muro' && muros.has(b.muroId) ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0) }
-        : b.tipo === 'iso' && salas.has(b.salaId) ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0) } : null;
+  const base = b.tipo === 'imagen' && b.imagenId ? { tipo: 'imagen', imagenId: b.imagenId, w: pos(b.w, 100), h: pos(b.h, 100), perdida: !imagenes.has(b.imagenId) || undefined }
+    : b.tipo === 'sala' && b.salaId ? { tipo: 'sala', salaId: b.salaId, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined }
+      : b.tipo === 'muro' && b.muroId ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !muros.has(b.muroId) || undefined }
+        : b.tipo === 'iso' && b.salaId ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined } : null;
   if (!base) throw new ErrorProyecto(`El plano anotado «${str(a.nombre, '?')}» no tiene base válida`);
+  if (!base.perdida) delete base.perdida;
   const capas = (Array.isArray(a.capas) ? a.capas : []).filter((c) => c && c.id).map((c) => ({ id: str(c.id), nombre: str(c.nombre, 'capa'), visible: bool(c.visible, true) }));
   if (!capas.length) capas.push({ id: nuevoId('k'), nombre: 'base', visible: true });
   const capaIds = new Set(capas.map((c) => c.id));
-  const items = (Array.isArray(a.items) ? a.items : []).filter((it) => it && it.tipo).map((it) => {
+  const items = (Array.isArray(a.items) ? a.items : []).filter(itemValido).map((it) => {
     const n = { ...it }; n.id = str(n.id) || nuevoId('i');
     n.capa = capaIds.has(n.capa) ? n.capa : capas[0].id;
     if (n.tipo === 'imagen' && n.src && !n.imagenId) { n.imagenId = nuevoId('img'); imagenes.set(n.imagenId, n.src); delete n.src; }
+    if (n.tipo === 'imagen' && !imagenes.has(n.imagenId)) n.imagenId = null;
+    if (n.destino && typeof n.destino === 'object') n.destino = { plano: str(n.destino.plano, null) || null, item: str(n.destino.item, null) || null }; else n.destino = null;
     return n;
   });
-  const esc = a.escala && a.escala.pxPorMetro > 0 ? { ...a.escala } : null;
+  // escala: {pxPorMetro, ref:{x1,y1,x2,y2,metros}|null, automatica}; sin ref válida se marca automática
+  const e = a.escala;
+  const refOk = e && e.ref && ['x1', 'y1', 'x2', 'y2'].every((k) => Number.isFinite(e.ref[k])) && e.ref.metros > 0;
+  const esc = e && e.pxPorMetro > 0 ? { pxPorMetro: e.pxPorMetro, ref: refOk ? { ...e.ref } : null, automatica: refOk ? bool(e.automatica, false) : true } : null;
   return nuevaAnotacion({
     id: str(a.id) || nuevoId('a'), nombre: str(a.nombre, 'Plano'), base, escala: esc,
     capas, capaActiva: capaIds.has(a.capaActiva) ? a.capaActiva : capas[0].id, items,
@@ -679,7 +709,7 @@ const validar = (d) => {
   const obras = (Array.isArray(d.obras) ? d.obras : []).filter((o) => o && typeof o === 'object').map(validarObra);
   for (const o of obras) if (o.imagenId && !imagenes.has(o.imagenId)) o.imagenId = null;
   const obraIds = new Set(obras.map((o) => o.id));
-  const salas = (Array.isArray(d.salas) ? d.salas : []).filter((s) => s && typeof s === 'object').map((s) => validarSala(s, obraIds));
+  const salas = (Array.isArray(d.salas) ? d.salas : []).filter((s) => s && typeof s === 'object').map((s) => validarSala(s, obraIds, imagenes));
   const salaIds = new Set(salas.map((s) => s.id));
   const muros = (Array.isArray(d.muros) ? d.muros : []).filter((m) => m && typeof m === 'object').map((m) => validarMuro(m, obraIds, salaIds));
   const muroIds = new Set(muros.map((m) => m.id));
@@ -701,7 +731,7 @@ const detectar = (d) => {
   if (d.version === 2 && d.wall && Array.isArray(d.items)) return 'museodraft';
   if (d.wall && d.wall.width != null && Array.isArray(d.items)) return 'museodraft-v1';
   if (d.app === 'plano-sala' || (Array.isArray(d.entidades) && !Array.isArray(d.planos))) return 'plano-sala';
-  if (Array.isArray(d.planos) && d.planos.every((p) => p && p.imagen)) return 'anotador';
+  if (Array.isArray(d.planos) && d.planos.length && d.planos.every((p) => p && p.imagen)) return 'anotador';
   return null;
 };
 
@@ -763,6 +793,7 @@ const desdeMuseoDraft = (d) => {
       });
       p.obras.push(obra);
       muro.colgado.push(nuevoColgado({
+        id: str(it.id) || undefined, // las notas apuntan (apunta) al id del ítem: se conserva
         obraId: obra.id, x: m.x, y: m.y, marco: m.marco, pp: m.pp, prof: m.prof, caida: m.caida,
         rot: num(it.rot, 0) % 360, lock: bool(it.lock, true), bloqueado: bool(it.bloqueado), oculto: bool(it.oculto),
       }));
@@ -819,25 +850,30 @@ const incorporar = (p, d) => {
   for (const m of q.muros) p.muros.push({
     ...m, id: re(m.id, 'm'), salaId: re(m.salaId, 's'), tramo: m.tramo ? { ...m.tramo, entidadId: re(m.tramo.entidadId, 'e') } : null,
     colgado: m.colgado.map((c) => ({ ...c, id: re(c.id, 'c'), obraId: re(c.obraId, 'o') })),
-    otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]) })),
+    otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]), ...(o.apunta ? { apunta: re(o.apunta, 'c') } : {}) })),
   });
   for (const a of q.anotaciones) p.anotaciones.push({
     ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : (a.base.tipo === 'sala' || a.base.tipo === 'iso') ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
     capas: a.capas.map((c) => ({ ...c, id: re(c.id, 'k') })), capaActiva: re(a.capaActiva, 'k'),
-    items: a.items.map((it) => ({ ...it, id: re(it.id, 'i'), capa: re(it.capa, 'k'), ...(it.imagenId ? { imagenId: re(it.imagenId, 'img') } : {}) })),
+    items: a.items.map((it) => ({
+      ...it, id: re(it.id, 'i'), capa: re(it.capa, 'k'), ...(it.imagenId ? { imagenId: re(it.imagenId, 'img') } : {}),
+      destino: it.destino ? { plano: re(it.destino.plano, 'a'), item: re(it.destino.item, 'i') } : null, // enlaces internos entre planos
+    })),
   });
+  for (const b of q.biblioteca || []) p.biblioteca.push({ ...b, id: re(b.id, 'b') });
   p.modificado = ahora();
-  return { proyecto: p, origen, añadido: { obras: q.obras.length, salas: q.salas.length, muros: q.muros.length, anotaciones: q.anotaciones.length } };
+  return { proyecto: p, origen, añadido: { obras: q.obras.length, salas: q.salas.length, muros: q.muros.length, anotaciones: q.anotaciones.length, biblioteca: (q.biblioteca || []).length } };
 };
 
 // ---------- archivo ----------
-const serializar = (p) => { p.modificado = ahora(); return JSON.stringify(limpiarImagenes(p)); };
+// No muta el proyecto: la fecha de modificación la pone quien cambia el proyecto (cascarón), no quien lo guarda
+const serializar = (p) => JSON.stringify(copiaLimpia(p));
 const parsear = (texto) => {
   let d;
   try { d = JSON.parse(texto); } catch (e) { throw new ErrorProyecto('El archivo no es JSON válido'); }
   return importar(d);
 };
-return { VERSION, APP, nuevoId, nuevoProyecto, nuevaObra, nuevaSala, nuevoMuro, nuevoColgado, nuevaAnotacion, obraDe, salaDe, muroDe, murosDeSala, murosDeTramo, usosDeObra, obrasSinColocar, imagenesUsadas, borrarObra, limpiarImagenes, ErrorProyecto, validar, detectar, importar, incorporar, serializar, parsear };
+return { VERSION, APP, nuevoId, nuevoProyecto, nuevaObra, nuevaSala, nuevoMuro, nuevoColgado, nuevaAnotacion, obraDe, salaDe, muroDe, murosDeSala, murosDeTramo, usosDeObra, obrasSinColocar, imagenesUsadas, borrarObra, limpiarImagenes, copiaLimpia, ErrorProyecto, validar, detectar, importar, incorporar, serializar, parsear };
 })();
 
 // ── src/ui/almacen.js
@@ -860,16 +896,18 @@ const tx = (db, modo, fn) => new Promise((res, rej) => {
 });
 
 // Devuelve el objeto guardado o null. Nunca lanza: si algo falla, devuelve null y lo anota en consola.
+// Si IndexedDB funciona, su respuesta manda (aunque sea null): una copia vieja en localStorage no debe «resucitar».
 async function cargar() {
-  try { const db = await abrir(); const r = await tx(db, 'readonly', (st) => st.get(CLAVE)); db.close(); if (r) return r; }
+  let idbOk = false;
+  try { const db = await abrir(); const r = await tx(db, 'readonly', (st) => st.get(CLAVE)); db.close(); idbOk = true; if (r) return r; }
   catch (e) { console.warn('almacén:', e.message); }
-  try { const s = localStorage.getItem(LS); return s ? JSON.parse(s) : null; } catch (e) { return null; }
+  try { const s = localStorage.getItem(LS); if (!s) return null; if (idbOk) { localStorage.removeItem(LS); return null; } return JSON.parse(s); } catch (e) { return null; }
 }
 // Lanza si no se pudo guardar en ningún sitio (para avisar al usuario).
 async function guardar(proyecto) {
   try { const db = await abrir(); await tx(db, 'readwrite', (st) => st.put(proyecto, CLAVE)); db.close(); return 'idb'; }
   catch (e) { console.warn('almacén:', e.message); }
-  localStorage.setItem(LS, JSON.stringify(proyecto)); return 'ls';
+  localStorage.setItem(LS, JSON.stringify(proyecto)); return 'ls'; // lanza (QuotaExceeded) si tampoco cabe aquí
 }
 async function borrar() {
   try { const db = await abrir(); await tx(db, 'readwrite', (st) => st.delete(CLAVE)); db.close(); } catch (e) {}
@@ -1927,7 +1965,7 @@ const MARKUP = `
 
 <div id="ayuda" class="modal" role="dialog" aria-label="Ayuda">
   <div class="caja">
-    <h2>plano-sala</h2>
+    <h2>Planta</h2>
     <table>
       <tr><td><kbd>V</kbd> Elegir</td><td>Clic para seleccionar; arrastrar para mover. Con un muro seleccionado, arrastra sus puntos naranjas; doble clic sobre un tramo añade un punto; <kbd>Supr</kbd> borra el punto marcado o el elemento.</td></tr>
       <tr><td><kbd>L</kbd> Muro</td><td>Clic punto a punto. Mientras dibujas, <b>escribe una medida</b> (por ejemplo <kbd>3,4</kbd>) y <kbd>⏎</kbd>: el tramo sale exacto en la dirección del cursor. Clic en el primer punto cierra la figura. Doble clic o <kbd>⏎</kbd> termina. <kbd>⌫</kbd> quita el último punto.</td></tr>
@@ -3301,7 +3339,7 @@ const docDeMuro = (proyecto, mu) => {
     const w = o.ancho > 0 ? o.ancho : 0.5, h = o.alto > 0 ? o.alto : (o.imgRatio > 0 ? w / o.imgRatio : 0.7);
     if (o.imagenId && proyecto.imagenes[o.imagenId]) src.images[o.imagenId] = proyecto.imagenes[o.imagenId];
     src.items.push({
-      id: c.id, tipo: 'obra', nombre: o.nombre, x: mAcm(c.x), y: mAcm(c.y), w: mAcm(w), h: mAcm(h),
+      id: c.id, obraId: o.id, tipo: 'obra', nombre: o.nombre, x: mAcm(c.x), y: mAcm(c.y), w: mAcm(w), h: mAcm(h),
       marco: mAcm(c.marco), pp: mAcm(c.pp), prof: mAcm(c.prof), caida: mAcm(c.caida), rot: c.rot, lock: c.lock, bloqueado: c.bloqueado, oculto: c.oculto,
       imgId: o.imagenId && proyecto.imagenes[o.imagenId] ? o.imagenId : null, imgRatio: o.imgRatio,
       est: { w: !(o.ancho > 0) || o.estimado.ancho, h: !(o.alto > 0) || o.estimado.alto },
@@ -3636,7 +3674,7 @@ function montarIso(ctx) {
     $('[data-v="giro"]').textContent = fmtNum(((cam.giro % 360) + 360) % 360, 0) + '°'; $('[data-v="inc"]').textContent = fmtNum(cam.inclinacion, 0) + '°';
     $('#isoMuros').value = cam.muros; $('#isoZocalo').value = fmtNum(cam.zocalo); $('#isoAlto').value = fmtNum(cam.altoDefecto); $('#isoRejilla').checked = !!cam.rejilla; $('#isoFondo').checked = cam.fondo !== false;
   };
-  const tam = () => ({ w: Math.max(1, root.clientWidth), h: Math.max(1, root.clientHeight - 36 - 22) });
+  const tam = () => ({ w: Math.max(1, root.clientWidth), h: Math.max(1, root.clientHeight - ($('.iso-barra').offsetHeight || 36) - ($('.iso-pie').offsetHeight || 22)) });
   const reconstruir = () => { const s = sala(); piezas = s ? I.escena(ctx.proyecto, s, cam) : []; };
   const encajar = () => {
     const { w, h } = tam(); const b = I.limites(piezas); const m = 30;
@@ -3696,14 +3734,15 @@ function montarIso(ctx) {
   cv.addEventListener('pointerup', fin); cv.addEventListener('pointercancel', fin);
   cv.addEventListener('wheel', (e) => { e.preventDefault(); e.stopPropagation(); const r = cv.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top; const f = e.deltaY < 0 ? 1.15 : 1 / 1.15; view = { s: view.s * f, ox: px - (px - view.ox) * f, oy: py - (py - view.oy) * f }; pedir(); }, { passive: false });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
-  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { if (visible) pedir(); }).observe(root);
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (visible) pedir(); }) : null; if (ro) ro.observe(root);
 
   return {
     mostrar() { visible = true; root.hidden = false; leerCam(); imgCache.clear(); reconstruir(); sync(); if (!encajado) encajar(); pedir(); },
     ocultar() { visible = false; root.hidden = true; },
     refrescar() { if (visible) { reconstruir(); pedir(); } },
-    salaCambiada() { encajado = false; if (visible) { leerCam(); reconstruir(); sync(); encajar(); pedir(); } },
+    salaCambiada() { encajado = false; if (visible) { const s = sala(); if (!s || !s.entidades.length) { ctx.mensaje('Esta sala está vacía: dibújala antes de verla en 3D'); if (ctx.onCerrar) ctx.onCerrar(); return; } leerCam(); reconstruir(); sync(); encajar(); pedir(); } },
     get visible() { return visible; },
+    destruir() { visible = false; if (ro) ro.disconnect(); if (raf) cancelAnimationFrame(raf); },
     _cam: () => cam, _piezas: () => piezas,
   };
 }
@@ -3791,11 +3830,17 @@ const guia = (paso, texto) => {
 };
 
 // ── deshacer (la imagen del calco no entra en la instantánea: solo sus parámetros)
-const instantanea = () => JSON.stringify({ entidades: S.doc.entidades, calco: S.doc.calco, obras: ctx.proyecto.obras });
+// Las obras del proyecto NO entran: son compartidas con el panel y los muros, y deshacer aquí las revertiría.
+// Si una entidad vuelve con un obraId que ya no existe, se recrea una obra vacía para que no quede sin ficha.
+const instantanea = () => JSON.stringify({ entidades: S.doc.entidades, calco: S.doc.calco, rotulo: S.doc.rotulo });
 const snap = () => { S.undo.push(instantanea()); if (S.undo.length > MAX_UNDO) S.undo.shift(); S.redo.length = 0; };
 const restaurar = (s) => {
-  const d = JSON.parse(s); S.doc.entidades = d.entidades; S.doc.calco = d.calco; ctx.proyecto.obras = d.obras;
-  S.sel = null; S.vsel = null; if (ctx.onObraCambiada) ctx.onObraCambiada(null);
+  const d = JSON.parse(s); S.doc.entidades = d.entidades; S.doc.calco = d.calco; if (d.rotulo > 0) S.doc.rotulo = d.rotulo;
+  let obrasNuevas = false;
+  for (const e of S.doc.entidades) if (G.esObra(e) && e.obraId && !M.obraDe(ctx.proyecto, e.obraId)) { const o = M.nuevaObra({ id: e.obraId, nombre: '' }); ctx.proyecto.obras.push(o); obrasNuevas = true; }
+  if (!ent()) S.sel = null; S.vsel = null;
+  S.inicioOculto = !!(S.doc.entidades.length || S.doc.calco) || S.inicioOculto;
+  if (ctx.onObraCambiada && (obrasNuevas || S.doc.entidades.some(G.esObra))) ctx.onObraCambiada(null);
 };
 const deshacer = () => { if (!S.undo.length) return; S.redo.push(instantanea()); restaurar(S.undo.pop()); cambio(); };
 const rehacer = () => { if (!S.redo.length) return; S.undo.push(instantanea()); restaurar(S.redo.pop()); cambio(); };
@@ -3856,6 +3901,7 @@ const renderSelPieza = (e, z) => {
   else if (e.tipo === 'texto') { const c = G.textoCaja(e); const p = 3 / z; s += `<rect x="${C(e.x - c.w / 2 - p)}" y="${C(e.y - c.h / 2 - p)}" width="${C(c.w + 2 * p)}" height="${C(c.h + 2 * p)}" ${st}${e.rot ? ` transform="rotate(${e.rot} ${C(e.x)} ${C(e.y)})"` : ''}/>`; }
   else if (e.tipo === 'cota') { const g = G.cotaGeom(e); s += `<line x1="${C(g.qmin.x)}" y1="${C(g.qmin.y)}" x2="${C(g.qmax.x)}" y2="${C(g.qmax.y)}" ${st}/>`; }
   else if (e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro') s += `<line x1="${C(e.a.x)}" y1="${C(e.a.y)}" x2="${C(e.b.x)}" y2="${C(e.b.y)}" ${st}/>`;
+  else if (G.esMueble(e)) { const pts = G.mueblePts(e); s += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" ${st}/>`; }
   G.asas(e).forEach((p, i) => { s += asaSvg(p, i === S.vsel, z); });
   return s;
 };
@@ -4026,10 +4072,11 @@ const renderPanel = () => {
       h += `<div class="btns"><button data-acc="rot90">⟲ 90°</button><button data-acc="rot0">horizontal</button></div><label>color</label>${swatches(e.color)}`;
     } else if (G.esObra(e)) {
       const o = obraDe(e);
-      const txt = (k, label, ph = '') => `<label>${label}</label><input type="text" data-ok="${k}" value="${esc(o ? o[k] || '' : '')}" placeholder="${ph}">`;
+      if (!o) h += `<div class="nota">Este ${e.tipo === 'cuadro' ? 'cuadro' : 'elemento'} no tiene obra asociada (se borró de la lista). <button data-acc="crearObra">crear ficha</button> o elige una de la lista más abajo.</div>`;
+      const txt = (k, label, ph = '') => `<label>${label}</label><input type="text" data-ok="${k}" value="${esc(o ? o[k] || '' : '')}" placeholder="${ph}"${o ? '' : ' disabled'}>`;
       h += `<div class="fila"><div style="flex:0 0 64px"><label>nº</label><input type="text" data-k="num" value="${esc(e.num ?? '')}"></div><div>${txt('nombre', 'título', 'sin título')}</div></div>`;
       h += txt('autor', 'autor') + `<div class="fila"><div style="flex:0 0 64px">${txt('anio', 'año')}</div><div>${txt('tecnica', 'técnica')}</div></div>`;
-      const dim = (k, label) => `<div><label>${label}</label><input type="text" inputmode="decimal" data-odim="${k}" value="${o && o[k] > 0 ? G.fmtNum(o[k]) : ''}" placeholder="?"></div>`;
+      const dim = (k, label) => `<div><label>${label}</label><input type="text" inputmode="decimal" data-odim="${k}" value="${o && o[k] > 0 ? G.fmtNum(o[k]) : ''}" placeholder="?"${o ? '' : ' disabled'}></div>`;
       h += `<div class="fila">${dim('ancho', 'ancho (m)')}${dim('alto', 'alto (m)')}</div>`;
       if (o && (o.estimado.ancho || o.estimado.alto)) h += `<div class="nota">≈ medida estimada: escribe la real para confirmarla.</div>`;
       h += `<label>nota</label><textarea data-ok="nota" rows="2">${esc(o ? o.nota || '' : '')}</textarea>`;
@@ -4171,7 +4218,7 @@ const enlazarPanel = (e) => {
   $$('[data-alzado]', P).forEach((b) => {
     b.addEventListener('mouseenter', () => { S.tramo = +b.dataset.alzado; pedirRender(); });
     b.addEventListener('mouseleave', () => { S.tramo = null; pedirRender(); });
-    b.addEventListener('click', () => { if (ctx.onAbrirAlzado) ctx.onAbrirAlzado(S.doc, e, +b.dataset.alzado); });
+    b.addEventListener('click', () => { S.tramo = null; pedirRender(); if (ctx.onAbrirAlzado) ctx.onAbrirAlzado(S.doc, e, +b.dataset.alzado); });
   });
   $$('[data-alto]', P).forEach((i) => {
     const t = +i.dataset.alto;
@@ -4317,6 +4364,7 @@ const accion = (acc, e, btn = null) => {
   else if (acc === 'etqTodas') { snap(); S.doc.entidades.forEach((x) => { delete x.etiq; }); cambio(); mensaje('Rótulos recolocados automáticamente'); }
   else if (acc === 'etqCentro') { snap(); delete e.etq; cambio(); }
   else if (acc === 'cara') { snap(); e.lado = e.lado === -1 ? 1 : -1; cambio(); }
+  else if (acc === 'crearObra') { if (!e || !G.esObra(e) || obraDe(e)) return; snap(); S.obraPendiente = null; asignarObra(e); cambio(); }
   else if (acc === 'csvObras') exportarCsvObras();
   else if (acc === 'csvMob') { if (!ctx.proyecto.salas.some((x) => x.entidades.some(G.esMueble))) return mensaje('Todavía no hay mobiliario', true); descargar(new Blob(['\ufeff' + csvMobiliario(ctx.proyecto)], { type: 'text/csv;charset=utf-8' }), nombreArchivo() + '-materiales.csv'); mensaje('Lista de materiales exportada'); }
   else if (acc === 'bibGuardar') { if (!e || e.tipo !== 'mueble') return; const n = prompt('Nombre en tu biblioteca', e.nombre); if (!n) return; ctx.proyecto.biblioteca.push({ ...entradaDesde(e, M.nuevoId('b')), nombre: n.trim() || e.nombre }); autosave(); mensaje(`«${n}» guardado en tu biblioteca`); }
@@ -4325,7 +4373,7 @@ const accion = (acc, e, btn = null) => {
   else if (acc === 'calcoSubir') abrirCalco();
   else if (acc === 'calibrar') { setTool('calibrar'); guia('Calibrar', 'Haz clic en dos puntos de la imagen cuya distancia real conozcas (por ejemplo, los extremos de una pared acotada) y escribe cuántos metros mide.'); }
   else if (acc === 'calcoMover') setTool(S.tool === 'calco' ? 'select' : 'calco');
-  else if (acc === 'calcoQuitar') { if (confirm('¿Quitar la imagen de calco? Lo que dibujaste se queda.')) { snap(); S.doc.calco = null; if (S.tool === 'calco' || S.tool === 'calibrar') S.tool = 'select'; guia(null); M.limpiarImagenes(ctx.proyecto); cambio(); } }
+  else if (acc === 'calcoQuitar') { if (confirm('¿Quitar la imagen de calco? Lo que dibujaste se queda.')) { snap(); S.doc.calco = null; if (S.tool === 'calco' || S.tool === 'calibrar') S.tool = 'select'; guia(null); cambio(); } }
 };
 
 // ── barra inferior: pistas por herramienta
@@ -4390,13 +4438,13 @@ const agregar = (base) => {
 const borrarSel = () => {
   const e = ent(); if (!e) return;
   snap();
-  if (G.esObra(e) && (S.vsel == null || e.tipo === 'cuadro')) { if (ctx.onObraCambiada) setTimeout(() => ctx.onObraCambiada(e.obraId), 0); mensaje('Quitada de la planta; la obra sigue en la lista'); }
   if (S.vsel != null && ((e.tipo === 'linea' && e.pts.length > 2) || (G.esPoligono(e) && e.pts.length > 3))) { G.borrarVertice(e, S.vsel); S.vsel = null; cambio(); return; }
+  if (G.esObra(e)) { if (ctx.onObraCambiada) setTimeout(() => ctx.onObraCambiada(e.obraId), 0); mensaje('Quitada de la planta; la obra sigue en la lista (panel Obras)'); }
   S.doc.entidades = S.doc.entidades.filter((x) => x !== e); S.sel = null; S.vsel = null; cambio();
 };
 const duplicar = () => {
   const e = ent(); if (!e) return; snap(); const c = G.mover(JSON.parse(JSON.stringify(e)), S.doc.rotulo * 2, S.doc.rotulo * 2); c.id = G.nuevoId();
-  if (G.esObra(c)) { c.num = String(G.numSiguiente(S.doc.entidades)); const o = obraDe(e); const n = M.nuevaObra(o ? { ...o, id: undefined, estimado: { ...o.estimado } } : {}); ctx.proyecto.obras.push(n); c.obraId = n.id; if (ctx.onObraCambiada) ctx.onObraCambiada(n.id); }
+  if (G.esObra(c)) { c.num = String(G.numSiguiente(S.doc.entidades)); const o = obraDe(e); const { id: _id, ...resto } = o || {}; const n = M.nuevaObra(o ? { ...resto, nombre: (o.nombre ? o.nombre + ' copia' : ''), estimado: { ...o.estimado } } : {}); ctx.proyecto.obras.push(n); c.obraId = n.id; if (ctx.onObraCambiada) ctx.onObraCambiada(n.id); }
   S.doc.entidades.push(c); S.sel = c.id; S.vsel = null; cambio();
 };
 
@@ -4404,6 +4452,7 @@ const duplicar = () => {
 const setTool = (t) => {
   if (S.draft && esPoli(S.draft.tool) && t !== S.draft.tool && S.draft.puntos.length >= (S.draft.tool === 'linea' ? 2 : 3)) terminarLinea(false);
   S.tool = t; S.draft = null; S.buffer = ''; if (t !== 'select') { S.vsel = null; }
+  if (t !== 'cuadro' && t !== 'obra' && S.obraPendiente) { S.obraPendiente = null; mensaje('Colocación cancelada: la obra sigue en la lista'); }
   if (t === 'calibrar' && !S.doc.calco) { S.tool = 'select'; mensaje('Primero sube una imagen de calco', true); }
   if (t !== 'calibrar' && S.guiaPaso === 'Calibrar') guia(null);
   render();
@@ -4455,7 +4504,7 @@ const clicDibujo = (p, arr) => {
   if (t === 'mueble') {
     if (!S.muebleTpl) { setTool('select'); return; }
     const m = muebleDesde(S.muebleTpl, p.x, p.y, G.nuevoId()); m.rot = S.muebleRot || 0;
-    agregar(m); return;
+    agregar(m); S.sel = null; mensaje(`«${m.nombre}» colocado · otro clic coloca otro igual · R gira · Esc termina`); render(); return;
   }
   if (t === 'texto') {
     const e = agregar({ tipo: 'texto', x: p.x, y: p.y, texto: 'Texto', tam: G.r6(S.doc.rotulo * 1.4), rot: 0 });
@@ -4677,7 +4726,7 @@ el.lienzo.addEventListener('pointerup', finPuntero);
 el.lienzo.addEventListener('pointercancel', () => { S.arr = null; el.lienzo.classList.remove('panning'); });
 el.lienzo.addEventListener('pointerleave', () => { if (!S.arr) { el.flot.style.display = 'none'; } });
 el.lienzo.addEventListener('dblclick', (ev) => {
-  if (enUi(ev.target)) return;
+  if (enUi(ev.target) || (iso && iso.visible)) return;
   if (esPoli(S.tool) && S.draft) { ev.preventDefault(); terminarLinea(false); return; }
   if (S.tool === 'cota' && S.draft && S.draft.cadena) {
     ev.preventDefault(); const e = ent(S.draft.cadena);
@@ -4696,14 +4745,14 @@ el.lienzo.addEventListener('wheel', (ev) => { ev.preventDefault(); zoomEn(ev.cli
 el.lienzo.addEventListener('contextmenu', (ev) => ev.preventDefault());
 el.lienzo.addEventListener('dragover', (ev) => ev.preventDefault());
 el.lienzo.addEventListener('drop', (ev) => {
-  ev.preventDefault(); const f = (ev.dataTransfer && ev.dataTransfer.files || [])[0]; if (!f) return;
+  ev.preventDefault(); if (iso && iso.visible) return; const f = (ev.dataTransfer && ev.dataTransfer.files || [])[0]; if (!f) return;
   if (/\.json$/i.test(f.name) || f.type === 'application/json') { if (ctx.onArchivoJson) ctx.onArchivoJson(f); else mensaje('Abre los .json desde la barra superior', true); }
   else if (/^image\//.test(f.type)) { if (S.doc.calco && !confirm('¿Reemplazar la imagen de calco actual?')) return; cargarCalco(f); }
   else mensaje('Arrastra una imagen o un proyecto .json', true);
 });
 
 // ── teclado
-document.addEventListener('keydown', (ev) => {
+const alTeclado = (ev) => {
   if (!S.activa || (document.activeElement && !root.contains(document.activeElement) && document.activeElement !== document.body)) return;
   const ae = document.activeElement; const enCampo = ae && ['INPUT', 'TEXTAREA', 'SELECT'].includes(ae.tagName);
   if (ev.key === 'Escape' && iso && iso.visible) { cerrar3d(); return; }
@@ -4721,6 +4770,10 @@ document.addEventListener('keydown', (ev) => {
   }
   if (enCampo) return;
   const k = ev.key; const kl = k.toLowerCase(); const mod = ev.ctrlKey || ev.metaKey;
+  if (iso && iso.visible) { // en 3D la planta de debajo no se edita con el teclado
+    if (k === '3') cerrar3d(); else if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); } else if (mod && kl === 'y') { ev.preventDefault(); rehacer(); }
+    return;
+  }
   if (mod && kl === 'z') { ev.preventDefault(); ev.shiftKey ? rehacer() : deshacer(); return; }
   if (mod && kl === 'y') { ev.preventDefault(); rehacer(); return; }
   if (mod && kl === 'd') { ev.preventDefault(); duplicar(); return; }
@@ -4749,8 +4802,11 @@ document.addEventListener('keydown', (ev) => {
   if (k === '0') verTodo(); else if (k === '+' || k === '=') { const { rect } = tam(); zoomEn(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.25); }
   else if (k === '-') { const { rect } = tam(); zoomEn(rect.left + rect.width / 2, rect.top + rect.height / 2, 0.8); }
   else if (k === '?') el.ayuda.classList.add('visible');
-});
-document.addEventListener('keyup', (ev) => { if (!S.activa) return; if (ev.key === ' ') { S.espacio = false; el.lienzo.classList.remove('pan'); if (S.tool === 'calco') el.lienzo.classList.add('pan'); } });
+};
+const alSoltar = (ev) => { if (!S.activa) return; if (ev.key === ' ') { S.espacio = false; el.lienzo.classList.remove('pan'); if (S.tool === 'calco') el.lienzo.classList.add('pan'); } };
+const alDesenfocar = () => { S.espacio = false; el.lienzo.classList.remove('pan'); };
+const alRedimensionar = () => { if (S.activa) pedirRender(); };
+document.addEventListener('keydown', alTeclado); document.addEventListener('keyup', alSoltar); window.addEventListener('blur', alDesenfocar);
 
 // ── inicio
 const crearSala = () => {
@@ -4776,7 +4832,7 @@ $('#bAjustar').addEventListener('click', verTodo);
 $('#bAyuda').addEventListener('click', () => el.ayuda.classList.add('visible'));
 $('#bCerrarAyuda').addEventListener('click', () => el.ayuda.classList.remove('visible'));
 el.fCalco.addEventListener('change', () => { const f = el.fCalco.files[0]; if (f) cargarCalco(f); el.fCalco.value = ''; });
-window.addEventListener('resize', () => { if (S.activa) pedirRender(); });
+window.addEventListener('resize', alRedimensionar);
 root.addEventListener('click', (ev) => { const b = ev.target.closest && ev.target.closest('button'); if (b) b.blur(); });
 // salas del proyecto
 const renderSalas = () => {
@@ -4798,7 +4854,7 @@ $('#bSalaBorrar').addEventListener('click', () => {
   if (!confirm(`¿Borrar la sala «${S.doc.nombre}» con sus ${S.doc.entidades.length} elementos? Las obras siguen en la lista.`)) return;
   const i = ctx.proyecto.salas.indexOf(S.doc); ctx.proyecto.salas.splice(i, 1);
   for (const m of ctx.proyecto.muros) if (m.salaId === S.doc.id) { m.salaId = null; m.tramo = null; }
-  M.limpiarImagenes(ctx.proyecto); const sig = ctx.proyecto.salas[Math.max(0, i - 1)]; S.doc = null; setSala(sig); if (ctx.onObraCambiada) ctx.onObraCambiada(null);
+  const sig = ctx.proyecto.salas[Math.max(0, i - 1)]; S.doc = null; setSala(sig); if (ctx.onObraCambiada) ctx.onObraCambiada(null);
 });
 
 // ── archivos
@@ -4855,16 +4911,17 @@ const cerrar3d = () => { iso.ocultar(); $('#b3d').classList.remove('activo'); re
 $('#b3d').addEventListener('click', () => (iso.visible ? cerrar3d() : abrir3d()));
 // ── arranque y API para el cascarón
 const activar = (on) => {
-  S.activa = !!on;
+  S.activa = !!on; S.espacio = false; el.lienzo.classList.remove('pan');
   if (on) { renderSalas(); render(); if (!S.vistoTodo) { S.vistoTodo = true; verTodo(); } }
 };
+const destruir = () => { S.activa = false; document.removeEventListener('keydown', alTeclado); document.removeEventListener('keyup', alSoltar); window.removeEventListener('blur', alDesenfocar); window.removeEventListener('resize', alRedimensionar); if (iso && iso.destruir) iso.destruir(); };
 S.inicioOculto = !!(S.doc.entidades.length || S.doc.calco);
 render();
 return {
-  activar, setSala, render, verTodo,
+  activar, destruir, setSala, render, verTodo,
   get sala() { return S.doc; },
   // desde el panel de obras: colocar una obra existente
-  colocar(obraId) { S.obraPendiente = obraId; setTool('cuadro'); mensaje('Haz clic en el muro donde cuelga la obra; dos clics marcan su ancho (o se usa el de la ficha)'); },
+  colocar(obraId) { S.obraPendiente = obraId; setTool('cuadro'); const o = M.obraDe(ctx.proyecto, obraId); mensaje(o && o.ancho > 0 ? 'Haz clic en el muro donde cuelga la obra; el segundo clic marca hacia qué lado (el ancho es el de la ficha). Esc cancela.' : 'Haz clic en el muro donde cuelga la obra; el segundo clic marca su ancho. Esc cancela.'); },
   irA(obraId) { const e = S.doc.entidades.find((x) => x.obraId === obraId); if (!e) return false; S.sel = e.id; S.vsel = null; render(); return true; },
   refrescar() { render(); },
   // para pruebas y depuración
@@ -4914,6 +4971,7 @@ const MARKUP = `
     <canvas id="cv" tabindex="0" aria-label="Muro de montaje"></canvas>
     <div id="cota-ed" hidden></div>
     <div id="empty"><b>Arrastra imágenes de obras al muro</b>, usa «Obra» o «De la lista…». Todas las medidas están en centímetros; las obras nuevas se colocan con el centro en el eje visual.</div>
+    <div id="sin-muro" hidden><b>No hay ningún alzado todavía</b><p>Ábrelo desde la planta: en el panel de un muro, cada tramo tiene un botón ▭ que crea su alzado con el largo, la altura y los cuadros ya colocados.</p><p>O añade un muro suelto con «+ muro» en la barra superior.</p></div>
   </div>
 
   <aside id="md-panel">
@@ -4933,7 +4991,7 @@ const MARKUP = `
           <label class="f">Grosor del muro (cm)<input id="iso-grosor" type="number" min="0" step="1"></label>
         </div>
         <label class="c"><input type="checkbox" id="iso-grid"> Cuadrícula del piso cada 50 cm</label>
-        <p class="note">Vista de solo lectura: arrastra para desplazar, rueda con Ctrl/⌘ o pellizco para el zoom. Las obras se mueven en Alzado; la profundidad de obras y vanos y la distancia de las personas al muro se cambian en Selección.</p>
+        <p class="note">Vista de solo lectura: arrastra para desplazar, rueda con Ctrl/⌘ (o Alt) o pellizco para el zoom. Las obras se mueven en Alzado; la profundidad de obras y vanos y la distancia de las personas al muro se cambian en Selección.</p>
       </div>
     </details>
 
@@ -5150,7 +5208,8 @@ const MARKUP = `
       <tr><td>Supr / ⌫</td><td>Eliminar selección</td></tr>
       <tr><td>Ctrl/⌘ ] · [</td><td>Subir · bajar un nivel (con Shift: al frente · al fondo)</td></tr>
       <tr><td>Ctrl/⌘ Z · Shift Z</td><td>Deshacer · rehacer</td></tr>
-      <tr><td>Ctrl/⌘ S · O · E</td><td>Guardar · abrir · exportar</td></tr>
+      <tr><td>Ctrl/⌘ E</td><td>Exportar este alzado</td></tr>
+      <tr><td>Ctrl/⌘ S · O</td><td>Guardar el proyecto · abrir un .json (atajos de toda la app)</td></tr>
       <tr><td>Esc</td><td>Cancelar medida o quitar selección</td></tr>
       <tr><td>Reglas</td><td>Arrastra desde una regla para crear una guía; devuélvela a la regla para borrarla</td></tr>
     </table>
@@ -5180,40 +5239,78 @@ root.innerHTML = MARKUP;
 const $ = (id) => root.querySelector('#' + id);
 const cv = $('cv'), ctx = cv.getContext('2d'), work = $('md-work');
 let muro = env.muro;
-let activa = false;
+let activa = false, encajado = false;
+const oyentes = []; // listeners globales, para destruir()
+const enWindow = (t, f, o) => { window.addEventListener(t, f, o); oyentes.push([t, f]); };
 
 // ---------- puente proyecto ↔ documento ----------
 const P = () => env.proyecto;
 const construir = (mu) => (mu ? docDeMuro(P(), mu) : MD.newDoc());
 // doc → muro + obras del proyecto
+const CM = { vano: ['x', 'y', 'w', 'h', 'prof'], persona: ['x', 'y', 'h', 'w', 'dist'], medida: ['x1', 'y1', 'x2', 'y2'], nota: ['x', 'y', 'tam'] };
+const casi = (a, b) => Math.abs(a - b) < 1e-6;
+// Medidas de relleno que docDeMuro pone a una obra sin medidas (0,5 × 0,7 m, o según la proporción de la imagen)
+const relleno = (o) => { const w = o.ancho > 0 ? o.ancho : 0.5; return { w, h: o.alto > 0 ? o.alto : (o.imgRatio > 0 ? w / o.imgRatio : 0.7) }; };
 const volcar = () => {
   if (!muro) return;
-  muro.nombre = doc.titulo;
+  const renombrado = muro.nombre !== doc.titulo; muro.nombre = doc.titulo;
   muro.ancho = r6(cmAm(doc.wall.w)); muro.alto = r6(cmAm(doc.wall.h)); muro.eje = r6(cmAm(doc.wall.eje)); muro.grosor = r6(cmAm(doc.wall.grosor)); muro.color = doc.wall.color;
   muro.guias = { v: doc.guides.v.map((v) => r6(cmAm(v))), h: doc.guides.h.map((v) => r6(cmAm(v))) };
-  muro.opts = doc.opts;
-  const vistos = new Set(); const colgado = [];
-  const CM = { vano: ['x', 'y', 'w', 'h', 'prof'], persona: ['x', 'y', 'h', 'w', 'dist'], medida: ['x1', 'y1', 'x2', 'y2'], nota: ['x', 'y', 'tam'] };
-  const otros = [];
+  muro.opts = JSON.parse(JSON.stringify(doc.opts)); // copia: el doc no comparte objeto con el proyecto
+  const colgado = [], otros = [];
   for (const it of doc.items) {
     if (it.tipo !== 'obra') { const n = { ...it }; for (const k of CM[it.tipo] || []) if (Number.isFinite(n[k])) n[k] = r6(cmAm(n[k])); otros.push(n); continue; }
-    let c = muro.colgado.find((x) => x.id === it.id), o = c ? M.obraDe(P(), c.obraId) : null;
-    if (!o) { o = M.nuevaObra({ nombre: it.nombre || (it.ficha && it.ficha.titulo) || 'Obra' }); P().obras.push(o); c = M.nuevoColgado({ id: it.id, obraId: o.id }); }
+    // la obra del proyecto se localiza por it.obraId (sobrevive a deshacer/rehacer); el colgado por el id del ítem
+    let c = muro.colgado.find((x) => x.id === it.id) || null;
+    let o = (it.obraId && M.obraDe(P(), it.obraId)) || (c && M.obraDe(P(), c.obraId)) || null;
+    const f = it.ficha || {};
+    if (!o) { o = M.nuevaObra({ nombre: (f.titulo || '').trim() || it.nombre || 'Obra' }); P().obras.push(o); }
+    it.obraId = o.id;
+    if (!c) c = M.nuevoColgado({ id: it.id, obraId: o.id }); else c.obraId = o.id;
     // imagen nueva o reemplazada desde esta vista: pasa al almacén del proyecto con el mismo id
     if (it.imgId && doc.images[it.imgId] && !P().imagenes[it.imgId]) P().imagenes[it.imgId] = doc.images[it.imgId];
     o.imagenId = it.imgId && P().imagenes[it.imgId] ? it.imgId : null; if (it.imgRatio > 0) o.imgRatio = r6(it.imgRatio);
-    const f = it.ficha || {};
-    const nombre = f.titulo !== o.nombre ? f.titulo : it.nombre !== o.nombre ? it.nombre : o.nombre;
+    // nombre: la ficha manda; «nombre en capas» sigue a la ficha. Un título vacío no borra el nombre.
+    const t = (f.titulo || '').trim();
+    const nombre = t && t !== o.nombre ? t : (it.nombre && it.nombre !== o.nombre ? it.nombre : o.nombre);
     o.nombre = nombre; it.nombre = nombre; it.ficha = { ...f, titulo: nombre };
     o.autor = f.autor || ''; o.anio = f.anio || ''; o.tecnica = f.tecnica || ''; o.inv = f.inv || '';
-    o.ancho = r6(cmAm(it.w)); o.alto = r6(cmAm(it.h)); o.estimado = { ancho: !!(it.est && it.est.w), alto: !!(it.est && it.est.h) };
+    // medidas: si la obra no tenía medida y el ítem conserva el relleno sin tocar, sigue sin medida
+    const ph = relleno(o), w = cmAm(it.w), h = cmAm(it.h), estW = !!(it.est && it.est.w), estH = !!(it.est && it.est.h);
+    if (!(estW && !(o.ancho > 0) && casi(w, ph.w))) { o.ancho = r6(w); o.estimado.ancho = estW; }
+    if (!(estH && !(o.alto > 0) && casi(h, ph.h))) { o.alto = r6(h); o.estimado.alto = estH; }
     Object.assign(c, { x: r6(cmAm(it.x)), y: r6(cmAm(it.y)), marco: r6(cmAm(it.marco || 0)), pp: r6(cmAm(it.pp || 0)), prof: r6(cmAm(it.prof || 0)), caida: r6(cmAm(it.caida || 0)), rot: it.rot || 0, lock: !!it.lock, bloqueado: !!it.bloqueado, oculto: !!it.oculto });
-    colgado.push(c); vistos.add(o.id);
+    colgado.push(c);
   }
   muro.colgado = colgado; muro.otros = otros;
-  M.limpiarImagenes(P());
-  if (env.onCambio) env.onCambio();
-  if (env.onObraCambiada) env.onObraCambiada(null);
+  if (renombrado) renderMuros();
+  if (env.onCambio) env.onCambio(); // el cascarón refresca el panel de obras aquí
+};
+// Lo que el panel de obras cambió (nombre, ficha, medidas, imagen) entra al doc sin tocar el historial
+const obrasAlDoc = () => {
+  if (!muro) return false;
+  let hubo = false;
+  const vivos = new Set(muro.colgado.map((c) => c.id));
+  for (const it of doc.items) {
+    if (it.tipo !== 'obra') continue;
+    const o = it.obraId ? M.obraDe(P(), it.obraId) : null;
+    if (!o || !vivos.has(it.id)) { continue; }
+    const f = it.ficha || {};
+    if (o.nombre !== it.nombre || o.nombre !== f.titulo || o.autor !== (f.autor || '') || o.anio !== (f.anio || '') || o.tecnica !== (f.tecnica || '') || o.inv !== (f.inv || '')) {
+      it.nombre = o.nombre; it.ficha = { ...f, titulo: o.nombre, autor: o.autor, anio: o.anio, tecnica: o.tecnica, inv: o.inv }; hubo = true;
+    }
+    const ph = relleno(o), w = mAcm(ph.w), h = mAcm(ph.h), estW = !(o.ancho > 0) || o.estimado.ancho, estH = !(o.alto > 0) || o.estimado.alto;
+    if (!casi(it.w, w) || !casi(it.h, h) || it.est.w !== estW || it.est.h !== estH) { it.w = w; it.h = h; it.est = { w: estW, h: estH }; hubo = true; }
+    const img = o.imagenId && P().imagenes[o.imagenId] ? o.imagenId : null;
+    if (it.imgId !== img) { it.imgId = img; if (img) doc.images[img] = P().imagenes[img]; hubo = true; }
+    if (o.imgRatio > 0 && it.imgRatio !== o.imgRatio) { it.imgRatio = o.imgRatio; hubo = true; }
+  }
+  // colgados que el proyecto ya no tiene (obra borrada desde el panel)
+  const antes = doc.items.length;
+  doc.items = doc.items.filter((it) => it.tipo !== 'obra' || vivos.has(it.id));
+  if (doc.items.length !== antes) { hubo = true; sel = new Set([...sel].filter((id) => doc.items.some((i) => i.id === id))); }
+  if (hubo) { hist.last = MD.snapshot(doc); panelDirty = true; selChanged(); requestRender(); }
+  return hubo;
 };
 const RULER = 20;
 const fmt = MD.fmt;
@@ -5257,7 +5354,7 @@ function redo() {
   doc = MD.restore(hist.last, doc); dirty = true; afterDocChange(); volcar(); msg('Rehecho.');
 }
 function syncUndo() { $('b-undo').disabled = !hist.undo.length && !commitT; $('b-redo').disabled = !hist.redo.length; }
-function resetHistory() { hist.undo = []; hist.redo = []; hist.last = MD.snapshot(doc); syncUndo(); }
+function resetHistory() { clearTimeout(commitT); commitT = 0; hist.undo = []; hist.redo = []; hist.last = MD.snapshot(doc); syncUndo(); }
 
 // ---------- utilidades ----------
 const getItem = (id) => doc.items.find((i) => i.id === id);
@@ -5358,6 +5455,7 @@ function draw() {
   const dpr = window.devicePixelRatio || 1, { w, h } = workSize();
   const bw = Math.max(1, Math.round(w * dpr)), bh = Math.max(1, Math.round(h * dpr));
   if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
+  if (!ctx) return; // sin canvas 2D (navegador muy limitado o entorno de pruebas)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = MD.COL.paste; ctx.fillRect(0, 0, w, h);
   const P = MD.canvasPainter(ctx, getImage);
@@ -5387,7 +5485,8 @@ function draw() {
   if (!isIso()) drawRulers(w, h);
   if (panelDirty) { panelDirty = false; renderPanel(); }
   if (layersDirty) renderLayers();
-  $('empty').style.display = doc.items.some((i) => i.tipo !== 'persona') ? 'none' : '';
+  $('empty').style.display = !muro || doc.items.some((i) => i.tipo !== 'persona') ? 'none' : '';
+  $('sin-muro').hidden = !!muro; cv.style.visibility = muro ? '' : 'hidden';
 }
 function niceStep(s) { for (const v of [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]) if (v * s >= 56) return v; return 10000; }
 function drawRulers(w, h) {
@@ -5726,7 +5825,7 @@ function showPos(p, extra) {
 }
 
 // ---------- teclado ----------
-window.addEventListener('keydown', (e) => {
+enWindow('keydown', (e) => {
   if (!activa || (document.activeElement && document.activeElement !== document.body && !root.contains(document.activeElement))) return;
   if (root.querySelector('dialog[open]')) return;
   const t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
@@ -5766,8 +5865,8 @@ window.addEventListener('keydown', (e) => {
     if (l === 'v') setTool('select'); else if (l === 'h') setTool('hand'); else if (l === 'm') setTool('measure');
   }
 });
-window.addEventListener('keyup', (e) => { if (!activa) return; if (e.code === 'Space') { space = false; updateCursor(lastPx, lastPy); } });
-window.addEventListener('blur', () => { space = false; });
+enWindow('keyup', (e) => { if (!activa) return; if (e.code === 'Space') { space = false; updateCursor(lastPx, lastPy); } });
+enWindow('blur', () => { space = false; });
 
 function setVista(m, silent) {
   doc.opts.vista = m === 'iso' ? 'iso' : 'alzado';
@@ -5822,6 +5921,7 @@ function duplicate(ids, dx, dy) {
     if (!set.has(it.id)) continue;
     const c = MD.clone(it);
     c.id = MD.uid(it.tipo[0]); c.nombre = (it.nombre || '') + ' copia'; c.bloqueado = false;
+    if (c.tipo === 'obra') { delete c.obraId; if (c.ficha) c.ficha = { ...c.ficha, titulo: c.nombre }; } // el duplicado es una obra nueva del proyecto
     MD.moveItem(c, dx, dy); doc.items.push(c); out.push(c.id);
   }
   return out;
@@ -5905,6 +6005,7 @@ $('a-lista').onclick = () => {
   if (!muro) return;
   const en = new Set(muro.colgado.map((c) => c.obraId));
   const libres = P().obras.filter((o) => !en.has(o.id));
+  if (!P().obras.length) return msg('No hay obras en la lista: añádelas en el panel Obras o dibújalas en la planta.');
   if (!libres.length) return msg('Todas las obras de la lista ya están en este muro.');
   const dlg = $('dlg-lista'); const ul = dlg.querySelector('ul');
   ul.innerHTML = libres.map((o) => `<li data-id="${o.id}"><b>${esc(o.nombre || 'sin título')}</b> <span class="muted">${esc(o.autor || '')}${o.ancho > 0 || o.alto > 0 ? ' · ' + (o.ancho > 0 ? fmt(o.ancho * 100) : '?') + ' × ' + (o.alto > 0 ? fmt(o.alto * 100) : '?') + ' cm' : ''}</span></li>`).join('');
@@ -5919,7 +6020,7 @@ function colocarObra(obraId) {
   const w = o.ancho > 0 ? o.ancho : 0.5, h = o.alto > 0 ? o.alto : (o.imgRatio > 0 ? w / o.imgRatio : 0.7);
   const c = M.nuevoColgado({ obraId }); muro.colgado.push(c);
   if (o.imagenId && P().imagenes[o.imagenId]) doc.images[o.imagenId] = P().imagenes[o.imagenId];
-  const it = MD.makeObra({ id: c.id, nombre: o.nombre, w: mAcm(w), h: mAcm(h), imgId: o.imagenId, imgRatio: o.imgRatio, est: { w: !(o.ancho > 0) || o.estimado.ancho, h: !(o.alto > 0) || o.estimado.alto },
+  const it = MD.makeObra({ id: c.id, obraId: o.id, nombre: o.nombre, w: mAcm(w), h: mAcm(h), imgId: o.imagenId, imgRatio: o.imgRatio, est: { w: !(o.ancho > 0) || o.estimado.ancho, h: !(o.alto > 0) || o.estimado.alto },
     ficha: { titulo: o.nombre, autor: o.autor, anio: o.anio, tecnica: o.tecnica, inv: o.inv } });
   placeNew(it); doc.items.push(it); sel = new Set([it.id]); commit(); selChanged();
   msg('«' + (o.nombre || 'obra') + '» colocada en el muro.');
@@ -5995,9 +6096,8 @@ function renderPanel() {
       + '<div class="g2" style="margin-top:8px"><button class="pbtn" data-act="dup">Duplicar</button><button class="pbtn danger" data-act="del">Eliminar</button></div>';
     else {
       const it = its[0];
-      if (it.tipo === 'obra') box.innerHTML =
-        TXT('nombre', 'Nombre en capas')
-        + '<h4>Ficha</h4><div class="stack">' + TXT('f.titulo', 'Título') + '<div class="g2">' + TXT('f.autor', 'Autor') + TXT('f.anio', 'Año') + TXT('f.tecnica', 'Técnica') + TXT('f.inv', 'N.º de inventario') + '</div></div>'
+      if (it.tipo === 'obra') box.innerHTML = // el nombre de la obra es su título (misma ficha que el panel Obras): un solo campo
+        '<h4>Ficha</h4><div class="stack">' + TXT('f.titulo', 'Título (nombre de la obra en el proyecto)') + '<div class="g2">' + TXT('f.autor', 'Autor') + TXT('f.anio', 'Año') + TXT('f.tecnica', 'Técnica') + TXT('f.inv', 'N.º de inventario') + '</div></div>'
         + '<h4>Medidas (cm)</h4><div class="g2">' + NUM('w', 'Ancho obra', ' min="0.1"') + NUM('h', 'Alto obra', ' min="0.1"') + NUM('marco', 'Marco', ' min="0"') + NUM('pp', 'Paspartú', ' min="0"') + NUM('prof', 'Profundidad', ' min="0" title="Cuánto sobresale del muro: marco, bastidor o caja. Se ve en la vista isométrica."') + '</div>'
         + '<div class="g2"><label class="c" title="Calculada, arrastrada o tomada de la imagen: sale con ≈ y línea punteada"><input type="checkbox" data-b="est.w"> Ancho estimado</label><label class="c" title="Calculada, arrastrada o tomada de la imagen: sale con ≈ y línea punteada"><input type="checkbox" data-b="est.h"> Alto estimado</label></div>'
         + '<label class="c" title="Al escribir una medida, la otra se recalcula solo si está estimada"><input type="checkbox" data-b="lock"> Mantener proporción</label>'
@@ -6328,7 +6428,7 @@ function endArea(r) {
 function togglePreviewSize() { const d = $('dlg-export'); d.classList.toggle('big'); $('ex-zoom').textContent = d.classList.contains('big') ? 'Reducir' : 'Ampliar'; schedulePreview(); }
 $('ex-zoom').onclick = togglePreviewSize;
 $('ex-prev').onclick = togglePreviewSize;
-window.addEventListener('resize', () => { if ($('dlg-export').open) schedulePreview(); });
+enWindow('resize', () => { if ($('dlg-export').open) schedulePreview(); });
 $('ex-fmt').addEventListener('change', (e) => { doc.opts.exp.fmt = e.target.value; exInfo(); });
 $('ex-scope').addEventListener('change', (e) => { doc.opts.exp.scope = e.target.value; exInfo(); });
 $('ex-cota').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v > 0) { doc.opts.exp.cotaCm = v; exInfo(); } });
@@ -6382,7 +6482,7 @@ $('b-fit').onclick = fitView; $('b-100').onclick = () => zoomTo(calib); $('b-cen
 $('zoomv').addEventListener('change', (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (isFinite(v) && v > 0) zoomTo(calib * v / 100); else afterView(); });
 $('zoomv').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
 
-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestRender()).observe(work);
+const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => requestRender()) : null; if (ro) ro.observe(work);
 
 // ---------- inicio y API para el cascarón ----------
 const cargar = (mu) => {
@@ -6396,25 +6496,32 @@ const renderMuros = () => {
   const sala = muro && muro.salaId ? M.salaDe(P(), muro.salaId) : null;
   $('m-origen').textContent = muro ? (sala && muro.tramo ? 'de la planta: ' + (sala.nombre || 'sala') + ', tramo ' + (muro.tramo.i + 1) : 'muro suelto') : 'abre un alzado desde la planta o añade un muro';
   const vacio = !muro;
-  ['t-select', 't-hand', 't-measure', 'a-img', 'a-blank', 'a-lista', 'a-vano', 'a-persona', 'a-nota', 'f-export', 'f-csv', 'm-nombre', 'm-borrar'].forEach((id) => { $(id).disabled = vacio || (id.startsWith('t-') && isIso()); });
+  ['t-select', 't-hand', 't-measure', 'a-img', 'a-blank', 'a-lista', 'a-vano', 'a-persona', 'a-nota', 'f-export', 'f-csv', 'm-nombre', 'm-borrar', 'w-title', 'w-w', 'w-h', 'w-eje', 'w-color'].forEach((id) => { $(id).disabled = vacio || (id.startsWith('t-') && isIso()); });
+  $('md-panel').classList.toggle('sin-muro', vacio);
 };
-$('selMuro').addEventListener('change', (e) => { const m = M.muroDe(P(), e.target.value); if (m && m !== muro) { volcar(); cargar(m); } });
+$('selMuro').addEventListener('change', (e) => { const m = M.muroDe(P(), e.target.value); if (m && m !== muro) { if (commitT) commit(); cargar(m); } });
 $('m-nuevo').onclick = () => {
   const n = prompt('Nombre del muro', 'Muro ' + (P().muros.length + 1)); if (!n) return;
-  const m = M.nuevoMuro({ nombre: n.trim() || 'Muro' }); P().muros.push(m); volcar(); cargar(m); if (env.onCambio) env.onCambio();
+  const m = M.nuevoMuro({ nombre: n.trim() || 'Muro' }); P().muros.push(m); if (commitT) commit(); cargar(m); if (env.onCambio) env.onCambio();
 };
 $('m-nombre').onclick = () => { if (!muro) return; const n = prompt('Nombre del muro', muro.nombre); if (n) { doc.titulo = n.trim() || doc.titulo; $('w-title').value = doc.titulo; commit(); renderMuros(); } };
 $('m-borrar').onclick = () => {
-  if (!muro) return; if (!confirm(`¿Borrar el muro «${muro.nombre}»? Las obras siguen en la lista del proyecto.`)) return;
-  const i = P().muros.indexOf(muro); P().muros.splice(i, 1); M.limpiarImagenes(P()); const sig = P().muros[Math.max(0, i - 1)] || null;
+  if (!muro) return; const nl = P().anotaciones.filter((a) => a.base && a.base.muroId === muro.id).length;
+  if (!confirm(`¿Borrar el muro «${muro.nombre}»? Las obras siguen en la lista del proyecto.${nl ? ` ${nl} plano${nl > 1 ? 's' : ''} de Lectura usa${nl > 1 ? 'n' : ''} este alzado como fondo y se quedar${nl > 1 ? 'án' : 'á'} sin él.` : ''}`)) return;
+  const i = P().muros.indexOf(muro); P().muros.splice(i, 1); const sig = P().muros[Math.max(0, i - 1)] || null;
   muro = null; cargar(sig); if (env.onCambio) env.onCambio(); if (env.onObraCambiada) env.onObraCambiada(null);
 };
 cargar(muro);
 return {
-  activar(on) { const antes = activa; activa = !!on; if (on) { renderMuros(); if (!antes || !cv.width) fitView(); requestRender(); } else volcar(); },
-  abrir(mu) { if (mu !== muro) { volcar(); cargar(mu); } else renderMuros(); },
+  // al entrar: lo que haya cambiado en las obras desde otras vistas entra al doc; el encuadre solo la primera vez.
+  // Al salir: se confirma lo pendiente (cada commit ya vuelca; no se vuelca de nuevo para no tocar el proyecto sin cambios)
+  activar(on) { activa = !!on; if (on) { obrasAlDoc(); renderMuros(); if (!cv.width || !encajado) { fitView(); encajado = true; } requestRender(); } else if (commitT) commit(); },
+  abrir(mu) { if (mu !== muro) { if (commitT) commit(); cargar(mu); } else { obrasAlDoc(); renderMuros(); } },
   colocar(obraId) { colocarObra(obraId); },
-  refrescar() { if (muro) { const m = muro; muro = null; cargar(m); } else renderMuros(); },
+  // cambios en obras o muros hechos fuera de esta vista: se incorporan sin perder el historial
+  refrescar() { if (commitT) commit(); if (muro && !P().muros.includes(muro)) { muro = null; cargar(P().muros[0] || null); return; } if (muro) obrasAlDoc(); renderMuros(); },
+  obrasCambiadas() { if (muro) obrasAlDoc(); },
+  destruir() { activa = false; clearTimeout(commitT); commitT = 0; for (const [t, f] of oyentes) window.removeEventListener(t, f); if (ro) ro.disconnect(); },
   get muro() { return muro; },
   _doc: () => doc, _sel: () => sel, _commit: commit,
 };
@@ -6619,7 +6726,7 @@ const MARKUP = `
     <div id="ap-barraEscala"><span class="texto"></span><div class="linea"></div></div>
     <div id="ap-medida"></div>
     <div id="ap-ayuda">
-      <h3>anotador-planos</h3>
+      <h3>Lectura · planos anotados</h3>
       <table>
         <tr><td><kbd>V</kbd></td><td>Seleccionar / mover. Arrastrar el fondo desplaza la vista; rueda = zoom.</td></tr>
         <tr><td><kbd>M</kbd></td><td>Marcador numerado. Puede llevar nota y enlace.</td></tr>
@@ -6683,9 +6790,9 @@ const vistaProyecto = { get planos() { return env.proyecto.anotaciones; }, get n
 const cacheFuente = new Map();
 const fuente = (pl) => {
   const b = pl.base;
-  if (b.tipo === 'imagen') return { href: env.proyecto.imagenes[b.imagenId] || '', w: b.w, h: b.h };
+  if (b.tipo === 'imagen') { const href = env.proyecto.imagenes[b.imagenId] || ''; return { href, w: b.w, h: b.h, perdida: !href }; }
   const obj = b.tipo === 'muro' ? M.muroDe(env.proyecto, b.muroId) : M.salaDe(env.proyecto, b.salaId);
-  if (!obj) return { href: '', w: b.w || 100, h: b.h || 100 };
+  if (!obj) return { href: '', w: b.w || 100, h: b.h || 100, perdida: true };
   const firma = JSON.stringify(b.tipo === 'muro' ? [obj, env.proyecto.obras.filter((o) => obj.colgado.some((c) => c.obraId === o.id))] : [obj, env.proyecto.obras, env.proyecto.muros, b.cam]);
   const c = cacheFuente.get(pl.id);
   if (c && c.firma === firma) return c;
@@ -6876,7 +6983,12 @@ const renderSvg = () => {
   el.svg.replaceChildren();
   el.vacio.style.display = pl ? 'none' : '';
   if (!pl) { aplicarVista(); return; }
-  el.svg.appendChild(svgEl('image', { href: fuente(pl).href, x: 0, y: 0, width: fuente(pl).w, height: fuente(pl).h, id: 'fondo' }));
+  const f = fuente(pl);
+  el.svg.appendChild(svgEl('image', { href: f.href, x: 0, y: 0, width: f.w, height: f.h, 'data-fondo': '1' }));
+  if (f.perdida) { // la sala, el muro o la imagen de base ya no existen: las anotaciones se conservan sobre un fondo vacío
+    el.svg.appendChild(svgEl('rect', { x: 0, y: 0, width: f.w, height: f.h, fill: '#f6f5f0', stroke: '#c9c5b8', 'stroke-dasharray': '8 6', 'pointer-events': 'none' }));
+    el.svg.appendChild(svgEl('text', { x: f.w / 2, y: 24, 'text-anchor': 'middle', 'font-size': 14, fill: '#8a8677', 'pointer-events': 'none' }, 'El fondo de este plano (' + (pl.base.tipo === 'imagen' ? 'imagen' : pl.base.tipo === 'muro' ? 'alzado' : 'sala') + ') ya no existe en el proyecto; las anotaciones se conservan'));
+  }
   const z = S.view.zoom;
   for (const it of pl.items) { if (!capaVisible(pl, it.capa)) continue; el.svg.appendChild(renderItem(it, pl, z)); }
   if (pl.escala && pl.escala.ref && S.modo === 'editor' && S.tool === 'calibrar') {
@@ -6906,7 +7018,7 @@ const renderPaneles = () => {
       const acc = e.target.dataset.acc;
       if (acc === 'renombrar') { const n = prompt('Nombre del plano', p.nombre); if (n) { p.nombre = n.trim() || p.nombre; cambio(); } }
       else if (acc === 'subir') { pr.planos.splice(i, 1); pr.planos.splice(i - 1, 0, p); cambio(); }
-      else if (acc === 'borrar') { if (confirm(`¿Borrar el plano «${p.nombre}» con sus ${p.items.length} anotaciones?`)) { pr.planos.splice(i, 1); cacheFuente.delete(p.id); M.limpiarImagenes(env.proyecto); if (S.planoId === p.id) { S.planoId = pr.planos[0]?.id || null; S.undo.length = 0; S.redo.length = 0; } cambio(); ajustarVista(); } }
+      else if (acc === 'borrar') { if (confirm(`¿Borrar el plano «${p.nombre}» con sus ${p.items.length} anotaciones?`)) { pr.planos.splice(i, 1); cacheFuente.delete(p.id); if (S.planoId === p.id) { S.planoId = pr.planos[0]?.id || null; S.undo.length = 0; S.redo.length = 0; } cambio(); ajustarVista(); } }
       else activarPlano(p.id);
     });
     el.listaPlanos.appendChild(li);
@@ -7023,7 +7135,7 @@ const agregarItem = (base) => {
   if (S.modo === 'editor' && it.tipo === 'texto') { const inp = $('[data-k="label"]', el.props); if (inp) { inp.focus(); inp.select(); } }
   return it;
 };
-const borrarSel = () => { const pl = plano(); if (!pl || !S.sel) return; snap(); pl.items = pl.items.filter(i => i.id !== S.sel); S.sel = null; M.limpiarImagenes(env.proyecto); cambio(); };
+const borrarSel = () => { const pl = plano(); if (!pl || !S.sel) return; snap(); pl.items = pl.items.filter(i => i.id !== S.sel); S.sel = null; cambio(); };
 const activarPlano = (id) => { if (id === S.planoId) return; S.planoId = id; S.proyecto.planoActivo = id; S.sel = null; S.draft = null; S.undo.length = 0; S.redo.length = 0; render(); if (S.activa) ajustarVista(); renderPaneles(); autosave(); };
 const irA = (destino) => {
   if (!destino) return;
@@ -7167,8 +7279,9 @@ el.lienzo.addEventListener('wheel', (e) => { if (!plano()) return; e.preventDefa
 el.lienzo.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // arrastrar y soltar archivos
-el.lienzo.addEventListener('dragover', (e) => { e.preventDefault(); });
+el.lienzo.addEventListener('dragover', (e) => { if (S.modo === 'editor') e.preventDefault(); });
 el.lienzo.addEventListener('drop', async (e) => {
+  if (S.modo !== 'editor') return; // el visor exportado no edita nada
   e.preventDefault(); const files = Array.from(e.dataTransfer.files || []); if (!files.length) return;
   for (const f of files) {
     if (f.name.endsWith('.json') || f.type === 'application/json') { if (env.onArchivoJson) env.onArchivoJson(f); continue; }
@@ -7181,7 +7294,7 @@ el.filePlano.addEventListener('change', async () => { for (const f of el.filePla
 el.fileImagen.addEventListener('change', async () => { const f = el.fileImagen.files[0]; if (f && S.pendienteImagen) await agregarImagenEn(f, S.pendienteImagen); S.pendienteImagen = null; el.fileImagen.value = ''; });
 
 // ── teclado
-document.addEventListener('keydown', (e) => {
+const alTeclado = (e) => {
   if (!S.activa || (document.activeElement && document.activeElement !== document.body && !root.contains(document.activeElement))) return;
   const enCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
   if (e.key === 'Escape') { if (enCampo) { document.activeElement.blur(); return; } if (el.ayuda.classList.contains('visible')) { el.ayuda.classList.remove('visible'); return; } cancelar(); return; }
@@ -7196,7 +7309,8 @@ document.addEventListener('keydown', (e) => {
   if (k === 'enter' && S.draft && S.draft.tool === 'poligono') { terminarPoligono(); return; }
   if (k === '0') ajustarVista(); else if (k === '+' || k === '=') zoomPaso(1.25); else if (k === '-') zoomPaso(0.8);
   else if (k === '?') el.ayuda.classList.toggle('visible');
-});
+};
+document.addEventListener('keydown', alTeclado);
 
 // ── barra superior
 $$('#ap-herramientas button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
@@ -7213,7 +7327,8 @@ $('#ap-btnExportHtml').addEventListener('click', () => { if (!S.proyecto.planos.
 $('#ap-btnExportPng').addEventListener('click', () => exportarPng());
 $('#ap-btnExportCsv').addEventListener('click', () => descargar(new Blob(['﻿' + G.csvMedidas(S.proyecto)], { type: 'text/csv;charset=utf-8' }), nombreArchivo() + '-medidas.csv'));
 $('#ap-btnEditar').addEventListener('click', () => { if (env.onEditar) env.onEditar(); });
-window.addEventListener('resize', () => { if (S.activa) aplicarVista(); });
+const alRedimensionar = () => { if (S.activa) aplicarVista(); };
+window.addEventListener('resize', alRedimensionar);
 
 // ── archivos
 const nombreArchivo = () => (env.proyecto.nombre || 'proyecto').replace(/[^\w\-áéíóúñü ]+/gi, '').trim().replace(/\s+/g, '-') || 'proyecto';
@@ -7225,7 +7340,10 @@ const exportarPng = () => {
   const clon = el.svg.cloneNode(true);
   clon.setAttribute('viewBox', `0 0 ${fuente(pl).w} ${fuente(pl).h}`); clon.setAttribute('width', fuente(pl).w); clon.setAttribute('height', fuente(pl).h);
   clon.removeAttribute('style'); clon.removeAttribute('id');
-  const estilo = document.createElementNS(SVGNS, 'style'); estilo.textContent = 'text{font-family:"Fira Code",ui-monospace,Menlo,monospace}'; clon.insertBefore(estilo, clon.firstChild);
+  // fuera de la página no hay CSS: los halos y las zonas de clic (sin fill) saldrían negros
+  clon.querySelectorAll('.halo,.hit,.asa').forEach((n) => n.remove());
+  clon.querySelectorAll('[data-fondo]').forEach((n) => n.removeAttribute('data-fondo'));
+  const estilo = document.createElementNS(SVGNS, 'style'); estilo.textContent = 'text{font-family:"Fira Code",ui-monospace,Menlo,monospace} .cota{vector-effect:non-scaling-stroke}'; clon.insertBefore(estilo, clon.firstChild);
   S.sel = sel; S.draft = draft; S.view = view; renderSvg();
   const src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(clon));
   const img = new Image();
@@ -7249,8 +7367,9 @@ const cargar = () => {
 };
 cargar();
 return {
-  activar(on) { const antes = S.activa; S.activa = !!on; if (on) { cacheFuente.clear(); render(); if (!antes || !S.vistoTodo) { S.vistoTodo = true; ajustarVista(); } } },
+  activar(on) { S.activa = !!on; if (on) { cacheFuente.clear(); render(); if (!S.vistoTodo) { S.vistoTodo = true; ajustarVista(); } } },
   setModo, refrescar() { cacheFuente.clear(); cargar(); },
+  destruir() { S.activa = false; document.removeEventListener('keydown', alTeclado); window.removeEventListener('resize', alRedimensionar); },
   agregarPlanoDe,
   _S: S, _clic: (p) => clicHerramienta(p, null), _setTool: setTool,
 };
@@ -7262,7 +7381,8 @@ return { montarLectura };
 const __m_src_ui_imagenes = (() => {
 // Lectura y reducción de imágenes a dataURL. Solo navegador.
 const leerImagen = (file, maxLado = 1200) => new Promise((res, rej) => {
-  if (!file || !/^image\//.test(file.type)) return rej(new Error('El archivo no es una imagen'));
+  // sin tipo MIME (HEIC, arrastres desde algunas apps) se intenta igual: decide el decodificador del navegador
+  if (!file || (file.type && !/^image\//.test(file.type))) return rej(new Error('El archivo no es una imagen'));
   const url = URL.createObjectURL(file), img = new Image();
   img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Formato de imagen no soportado por el navegador')); };
   img.onload = () => {
@@ -7313,35 +7433,47 @@ function montarObras(ctx) {
     h += `<ul class="ob-lista">` + obras.map((x) => {
       const u = M.usosDeObra(p(), x.id); const colocada = u.salas.length || u.muros.length;
       const img = x.imagenId && p().imagenes[x.imagenId] ? `<img src="${p().imagenes[x.imagenId]}" alt="">` : `<span class="ob-sin"></span>`;
-      return `<li data-id="${x.id}" class="${x.id === sel ? 'activo' : ''}">${img}<div class="ob-txt"><b>${esc(x.nombre || 'sin título')}</b><span>${esc(x.autor || '')}${x.autor && x.anio ? ', ' : ''}${esc(x.anio || '')}</span><i>${dims(x)}${colocada ? '' : ' · <em>sin colocar</em>'}</i></div></li>`;
+      return `<li data-id="${x.id}" class="${x.id === sel ? 'activo' : ''}" tabindex="0" role="button" aria-pressed="${x.id === sel}">${img}<div class="ob-txt"><b>${esc(x.nombre || 'sin título')}</b><span>${esc(x.autor || '')}${x.autor && x.anio ? ', ' : ''}${esc(x.anio || '')}</span><i>${dims(x)}${colocada ? '' : ' · <em>sin colocar</em>'}</i></div></li>`;
     }).join('') + `</ul>`;
     if (o) {
       const u = M.usosDeObra(p(), o.id);
-      const txt = (k, label) => `<label>${label}</label><input type="text" data-ok="${k}" value="${esc(o[k] || '')}">`;
-      const dim = (k, label) => `<div><label>${label}</label><input type="text" inputmode="decimal" data-odim="${k}" value="${o[k] > 0 ? fmtNum(o[k]) : ''}" placeholder="?"></div>`;
+      const txt = (k, label) => `<label for="ob-${k}">${label}</label><input type="text" id="ob-${k}" data-ok="${k}" value="${esc(o[k] || '')}">`;
+      const dim = (k, label) => `<div><label for="ob-${k}">${label}</label><input type="text" id="ob-${k}" inputmode="decimal" data-odim="${k}" value="${o[k] > 0 ? fmtNum(o[k]) : ''}" placeholder="?"></div>`;
       h += `<div class="ob-ficha"><h3>ficha</h3>`;
       h += `<div class="ob-img">${o.imagenId && p().imagenes[o.imagenId] ? `<img src="${p().imagenes[o.imagenId]}" alt="">` : '<span class="nota">sin imagen</span>'}<div class="btns"><button data-acc="imagen">${o.imagenId ? 'cambiar imagen' : 'poner imagen'}</button>${o.imagenId ? '<button data-acc="quitarImagen">quitar</button>' : ''}</div></div>`;
       h += txt('nombre', 'título') + txt('autor', 'autor') + `<div class="fila"><div style="flex:0 0 70px">${txt('anio', 'año')}</div><div>${txt('tecnica', 'técnica')}</div></div>`;
       h += `<div class="fila">${dim('ancho', 'ancho (m)')}${dim('alto', 'alto (m)')}</div>`;
       if (o.estimado.ancho || o.estimado.alto) h += `<div class="nota">≈ estimada: escribe la medida real para confirmarla.</div>`;
       if (o.imgRatio && (!(o.alto > 0) || o.estimado.alto) && o.ancho > 0) h += `<div class="btns"><button data-acc="altoImagen">alto según la imagen (${fmtNum(o.ancho / o.imgRatio)} m)</button></div>`;
-      h += txt('inv', 'n.º de inventario') + `<label>nota</label><textarea data-ok="nota" rows="2">${esc(o.nota || '')}</textarea>`;
+      h += txt('inv', 'n.º de inventario') + `<label for="ob-nota">nota</label><textarea id="ob-nota" data-ok="nota" rows="2">${esc(o.nota || '')}</textarea>`;
       h += `<div class="dato">${u.salas.length ? `en ${u.salas.length} sala${u.salas.length > 1 ? 's' : ''}` : 'sin colocar en planta'}${u.muros.length ? ` · en ${u.muros.length} muro${u.muros.length > 1 ? 's' : ''}` : ''}</div>`;
       h += `<div class="btns"><button data-acc="colocar" class="primario" title="Dibujarla como cuadro en la sala activa">colocar en planta</button>${ctx.hayMuro && ctx.hayMuro() ? '<button data-acc="colocarMuro" title="Colgarla en el muro abierto en la vista Muro">colocar en muro</button>' : ''}${u.salas.length ? '<button data-acc="ir">ver en la planta</button>' : ''}<button data-acc="borrar" class="peligro">borrar obra</button></div></div>`;
     }
-    root.querySelector('.ob-cuerpo').innerHTML = h;
+    // el render destruye los campos: si uno tenía el foco (p. ej. al pasar con Tab de ancho a alto), se devuelve al equivalente
+    const B = root.querySelector('.ob-cuerpo');
+    const af = document.activeElement, foco = af && B.contains(af) ? af.id : null;
+    const scroll = B.scrollTop;
+    B.innerHTML = h;
+    B.scrollTop = scroll;
     enlazar(o);
+    if (foco) { const n = B.querySelector('#' + foco); if (n) n.focus({ preventScroll: true }); }
   };
 
   const enlazar = (o) => {
     const B = root.querySelector('.ob-cuerpo');
-    B.querySelectorAll('li[data-id]').forEach((li) => li.addEventListener('click', () => { sel = li.dataset.id; render(); }));
+    B.querySelectorAll('li[data-id]').forEach((li) => {
+      li.addEventListener('click', () => { sel = li.dataset.id; render(); });
+      li.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); sel = li.dataset.id; render(); } });
+    });
     B.querySelectorAll('[data-ok]').forEach((i) => i.addEventListener('input', () => { if (!o) return; o[i.dataset.ok] = i.value; ctx.onCambio(); const li = B.querySelector(`li[data-id="${o.id}"] b`); if (li && i.dataset.ok === 'nombre') li.textContent = o.nombre || 'sin título'; }));
     B.querySelectorAll('[data-odim]').forEach((i) => {
       const aplicar = () => {
         if (!o) return; const k = i.dataset.odim, txt = i.value.trim(), v = parseNum(txt);
-        if (txt && !(v > 0)) { ctx.mensaje('Medida no válida', true); render(); return; }
-        o[k] = txt ? r6(v) : null; o.estimado[k] = !txt; ctx.onCambio(); render();
+        if (txt && !(v > 0)) { ctx.mensaje('Medida no válida: escribe metros, por ejemplo 1,20', true); render(); return; }
+        const antes = o[k], antesEst = o.estimado[k];
+        o[k] = txt ? r6(v) : null; o.estimado[k] = !txt;
+        if (o[k] === antes && o.estimado[k] === antesEst) return; // nada cambió: no se re-renderiza (y no se pierde el Tab al siguiente campo)
+        ctx.onCambio(); render();
       };
       i.addEventListener('change', aplicar);
       i.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); i.blur(); } });
@@ -7354,15 +7486,16 @@ function montarObras(ctx) {
     if (acc === 'nueva') { const n = M.nuevaObra({ nombre: 'Obra ' + (p().obras.length + 1) }); p().obras.push(n); sel = n.id; ctx.onCambio(); render(); const i = root.querySelector('[data-ok="nombre"]'); if (i) { i.focus(); i.select(); } }
     else if (acc === 'imagenes') { pendiente = { modo: 'nuevas' }; fImg.multiple = true; fImg.value = ''; fImg.click(); }
     else if (acc === 'imagen') { if (!o) return; pendiente = { modo: 'reemplazar', id: o.id }; fImg.multiple = false; fImg.value = ''; fImg.click(); }
-    else if (acc === 'quitarImagen') { if (!o) return; o.imagenId = null; o.imgRatio = null; M.limpiarImagenes(p()); ctx.onCambio(); render(); }
+    else if (acc === 'quitarImagen') { if (!o) return; o.imagenId = null; o.imgRatio = null; ctx.onCambio(); render(); }
     else if (acc === 'altoImagen') { if (!o || !o.imgRatio || !(o.ancho > 0)) return; o.alto = r6(o.ancho / o.imgRatio); o.estimado.alto = true; ctx.onCambio(); render(); }
     else if (acc === 'colocar') { if (o) ctx.onColocar(o.id); }
     else if (acc === 'colocarMuro') { if (o && ctx.onColocarMuro) ctx.onColocarMuro(o.id); }
     else if (acc === 'ir') { if (o && !ctx.onIrA(o.id)) ctx.mensaje('Está en otra sala: cámbiala en el selector de la planta'); }
     else if (acc === 'borrar') {
       if (!o) return; const u = M.usosDeObra(p(), o.id);
-      if (!confirm(`¿Borrar «${o.nombre || 'sin título'}»?${u.salas.length || u.muros.length ? ' También desaparece de la planta y los muros.' : ''}`)) return;
-      M.borrarObra(p(), o.id); M.limpiarImagenes(p()); sel = null; ctx.onCambio(); render(); if (ctx.onPlantaCambiada) ctx.onPlantaCambiada();
+      const donde = [u.salas.length ? `de ${u.salas.length} sala${u.salas.length > 1 ? 's' : ''}` : '', u.muros.length ? `de ${u.muros.length} muro${u.muros.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' y ');
+      if (!confirm(`¿Borrar «${o.nombre || 'sin título'}»?${donde ? ` También se quita ${donde}.` : ''}`)) return;
+      M.borrarObra(p(), o.id); sel = null; ctx.onCambio(); render(); if (ctx.onPlantaCambiada) ctx.onPlantaCambiada();
     }
   };
   fImg.addEventListener('change', async () => {
@@ -7375,7 +7508,7 @@ function montarObras(ctx) {
         const n = M.nuevaObra({ nombre: f.name.replace(/\.[^.]+$/, ''), imagenId: id, imgRatio: r6(im.ratio) }); p().obras.push(n); sel = n.id; ok++;
       } catch (e) { fallos.push(f.name); }
     }
-    M.limpiarImagenes(p()); ctx.onCambio(); render();
+    ctx.onCambio(); render();
     ctx.mensaje((ok ? (modo.modo === 'reemplazar' ? 'Imagen cambiada.' : ok + (ok === 1 ? ' obra añadida.' : ' obras añadidas.')) + ' Escribe las medidas reales en la ficha.' : '') + (fallos.length ? ' No se pudo leer: ' + fallos.join(', ') : ''), !ok);
   });
 
@@ -7397,6 +7530,7 @@ const { montarMuro } = __m_src_vistas_muro;
 const { montarLectura } = __m_src_vistas_lectura;
 const puente = __m_src_core_puente;
 const { montarObras } = __m_src_ui_obras;
+const { fmtNum } = __m_src_core_unidades;
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -7411,7 +7545,8 @@ let saveT = 0, saveFallo = false;
 const guardarAuto = () => {
   clearTimeout(saveT);
   saveT = setTimeout(async () => {
-    try { await almacen.guardar(proyecto); saveFallo = false; }
+    saveT = 0;
+    try { await almacen.guardar(M.copiaLimpia(proyecto)); saveFallo = false; }
     catch (e) { if (!saveFallo) { saveFallo = true; mensaje('No se pudo guardar en el navegador: descarga el .json con «Guardar»', true); } }
   }, 500);
 };
@@ -7426,13 +7561,13 @@ const leerTexto = (file) => new Promise((res, rej) => { const fr = new FileReade
 // ---------- vistas ----------
 const montar = () => {
   if (!proyecto.salas.length) proyecto.salas.push(M.nuevaSala({ nombre: 'Sala 1' }));
-  $('#nombreProyecto').value = proyecto.nombre || '';
+  $('#nombreProyecto').value = proyecto.nombre || ''; $('#tituloLectura').textContent = proyecto.nombre || '';
   document.title = (proyecto.nombre ? proyecto.nombre + ' · ' : '') + 'MuseoDraft';
   planta = montarPlanta({
     root: $('#vista-planta'), proyecto, sala: proyecto.salas[0],
     onCambio: () => { cambio(); obras.refrescar(); },
     onGuardar: guardarJson,
-    onObraCambiada: (id) => { obras.refrescar(); if (id) obras.seleccionar(id); },
+    onObraCambiada: (id) => { if (id) obras.seleccionar(id); else obras.refrescar(); },
     onArchivoJson: abrirArchivo,
     onAbrirAlzado: abrirAlzado,
   });
@@ -7450,12 +7585,12 @@ const montar = () => {
   });
   obras = montarObras({
     root: $('#obras'), proyecto, mensaje,
-    onCambio: () => { cambio(); planta.refrescar(); },
-    onColocar: (id) => { setVista('planta'); planta.colocar(id); },
-    onIrA: (id) => { setVista('planta'); return planta.irA(id); },
+    onCambio: () => { cambio(); planta.refrescar(); muro.obrasCambiadas(); },
+    onColocar: (id) => { irAVista('planta'); planta.colocar(id); },
+    onIrA: (id) => { irAVista('planta'); return planta.irA(id); },
     onPlantaCambiada: () => { planta.refrescar(); muro.refrescar(); },
     hayMuro: () => !!muro.muro,
-    onColocarMuro: (id) => { setVista('muro'); muro.colocar(id); },
+    onColocarMuro: (id) => { irAVista('muro'); muro.colocar(id); },
   });
   setVista(vistaActiva);
 };
@@ -7465,15 +7600,21 @@ const desmontar = () => {
   for (const id of ['#vista-planta', '#vista-muro', '#vista-lectura', '#obras']) $(id).innerHTML = '';
   planta = null; muro = null; lectura = null; obras = null;
 };
+const panelEstrecho = () => typeof matchMedia === 'function' && matchMedia('(max-width: 900px)').matches;
+const mostrarObras = (on) => { document.body.classList.toggle('conObras', on); $('#bObras').classList.toggle('activo', on); $('#bObras').setAttribute('aria-pressed', String(on)); };
 const setVista = (v) => {
   vistaActiva = v;
-  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('activo', b.dataset.vista === v));
+  document.querySelectorAll('#tabs button').forEach((b) => { const on = b.dataset.vista === v; b.classList.toggle('activo', on); b.setAttribute('aria-pressed', String(on)); });
   document.querySelectorAll('.vista').forEach((d) => { d.hidden = d.id !== 'vista-' + v; });
+  // el foco se queda en la pestaña pulsada y las vistas ignoran el teclado mientras esté fuera de su raíz: se suelta
+  const ae = document.activeElement; if (ae && ae !== document.body && ae.closest && ae.closest('#top')) ae.blur();
   if (planta) planta.activar(v === 'planta');
   if (muro) muro.activar(v === 'muro');
   if (lectura) lectura.activar(v === 'lectura');
   if (obras && v !== 'planta') obras.refrescar();
 };
+// ir a una vista para trabajar en ella: en pantallas estrechas el panel de obras la taparía, así que se cierra
+const irAVista = (v) => { if (panelEstrecho() && document.body.classList.contains('conObras')) mostrarObras(false); setVista(v); };
 // desde un tramo de la planta: abre su alzado (lo crea si no existe) en la vista Muro
 const abrirAlzado = (sala, linea, i) => {
   let m = puente.muroDelTramo(proyecto, sala, linea, i);
@@ -7481,21 +7622,21 @@ const abrirAlzado = (sala, linea, i) => {
     m = puente.muroDesdeTramo(proyecto, sala, linea, i);
     if (!m) return mensaje('Ese tramo no tiene longitud', true);
     proyecto.muros.push(m); cambio();
-    mensaje(`Alzado creado: ${m.ancho} × ${m.alto} m, ${m.colgado.length} obra${m.colgado.length === 1 ? '' : 's'} colocada${m.colgado.length === 1 ? '' : 's'}`);
+    mensaje(`Alzado creado: ${fmtNum(m.ancho)} × ${fmtNum(m.alto)} m, ${m.colgado.length} obra${m.colgado.length === 1 ? '' : 's'} colocada${m.colgado.length === 1 ? '' : 's'}`);
   }
-  setVista('muro'); muro.abrir(m); obras.refrescar();
+  irAVista('muro'); muro.abrir(m); obras.refrescar();
 };
 
 // ---------- archivos ----------
 const abrirArchivo = async (file) => {
   try {
     const { proyecto: q, origen } = M.parsear(await leerTexto(file));
+    const vacio = !proyecto.obras.length && !proyecto.salas.some((s) => s.entidades.length || s.calco) && !proyecto.muros.length && !proyecto.anotaciones.length;
     if (origen === 'proyecto') {
-      if (proyecto.obras.length + proyecto.salas.reduce((n, s) => n + s.entidades.length, 0) > 0 && !confirm('¿Reemplazar el proyecto actual por el del archivo? Lo que no hayas guardado se pierde.')) return;
+      if (!vacio && !confirm('¿Reemplazar el proyecto actual por el del archivo? Lo que no hayas descargado como .json se pierde.')) return;
       proyecto = q; desmontar(); montar(); cambio(); mensaje(`Proyecto «${proyecto.nombre}» abierto`);
     } else {
       // un archivo de las herramientas anteriores: se incorpora al proyecto actual (o lo sustituye si está vacío)
-      const vacio = !proyecto.obras.length && !proyecto.salas.some((s) => s.entidades.length || s.calco) && !proyecto.muros.length && !proyecto.anotaciones.length;
       if (vacio) { proyecto = q; if (!proyecto.nombre || proyecto.nombre === 'proyecto') proyecto.nombre = file.name.replace(/\.[^.]+$/, ''); }
       else { const r = M.incorporar(proyecto, q); mensaje(`Incorporado desde ${origen}: ${r.añadido.obras} obras, ${r.añadido.salas} salas, ${r.añadido.muros} muros, ${r.añadido.anotaciones} planos anotados`); }
       desmontar(); montar(); cambio();
@@ -7521,9 +7662,13 @@ const exportarLectura = async () => {
     descargar(new Blob([html], { type: 'text/html;charset=utf-8' }), nombreArchivo() + '-lectura.html'); mensaje('HTML de lectura exportado');
   } catch (e) { mensaje(e.message, true); }
 };
+let saliendo = false;
 const salirDeLectura = async () => {
-  const previo = await almacen.cargar();
-  if (previo && !confirm('Al editar, este proyecto pasa a guardarse en el navegador y reemplaza al que había. ¿Continuar?')) return;
+  if (saliendo || !modoLectura) return; saliendo = true;
+  try {
+    const previo = await almacen.cargar();
+    if (previo && previo.creado !== proyecto.creado && !confirm('Al editar, este proyecto pasa a guardarse en el navegador y reemplaza al que había. ¿Continuar?')) return;
+  } finally { saliendo = false; }
   modoLectura = false; document.body.classList.remove('lectura');
   lectura.setModo('editor'); cambio(); mensaje('Modo edición. Guarda con .json cuando termines.');
 };
@@ -7533,13 +7678,26 @@ const proyectoIncrustado = () => {
 };
 
 // ---------- arranque ----------
+const domListo = () => new Promise((res) => { if (document.readyState !== 'loading') res(); else document.addEventListener('DOMContentLoaded', () => res(), { once: true }); });
 const arrancar = async () => {
+  await domListo(); // en app.html la copia del documento (__ORIGEN_HTML) se toma al final del body, antes de montar
   const incrustado = proyectoIncrustado();
   const meta = document.querySelector('meta[name="' + META_MODO + '"]');
-  if (incrustado) { proyecto = incrustado; modoLectura = !!(meta && meta.content === 'lectura'); }
-  else {
-    const d = await almacen.cargar();
-    if (d) { try { proyecto = M.validar(d); mensaje('Proyecto recuperado del navegador'); } catch (e) { console.warn(e); } }
+  const d = await almacen.cargar();
+  if (incrustado) {
+    // si este mismo proyecto ya se pasó a edición («Editar») y se guardó en el navegador, se sigue con esa copia, no con la incrustada
+    if (d && d.creado === incrustado.creado && String(d.modificado || '') >= String(incrustado.modificado || '')) {
+      try { proyecto = M.validar(d); mensaje('Proyecto recuperado del navegador (edición de este HTML)'); } catch (e) { console.warn(e); }
+    }
+    if (!proyecto) { proyecto = incrustado; modoLectura = !!(meta && meta.content === 'lectura'); }
+  } else if (d) {
+    try { proyecto = M.validar(d); mensaje('Proyecto recuperado del navegador'); }
+    catch (e) {
+      console.warn(e);
+      // no se sobrescribe en silencio lo que había: se ofrece el .json crudo antes de que el guardado automático lo reemplace
+      try { descargar(new Blob([JSON.stringify(d)], { type: 'application/json' }), 'museodraft-recuperado.json'); } catch (e2) { /* nada */ }
+      mensaje('El proyecto guardado en el navegador no se pudo leer; se descargó como museodraft-recuperado.json', true);
+    }
   }
   if (!proyecto) proyecto = M.nuevoProyecto('proyecto');
   if (modoLectura) { document.body.classList.add('lectura'); $('#tituloLectura').textContent = proyecto.nombre || ''; vistaActiva = 'lectura'; }
@@ -7548,7 +7706,7 @@ const arrancar = async () => {
 
   document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => setVista(b.dataset.vista)));
   $('#nombreProyecto').addEventListener('input', (e) => { proyecto.nombre = e.target.value; document.title = (proyecto.nombre ? proyecto.nombre + ' · ' : '') + 'MuseoDraft'; cambio(); });
-  $('#bObras').addEventListener('click', () => { document.body.classList.toggle('conObras'); $('#bObras').classList.toggle('activo', document.body.classList.contains('conObras')); if (planta) planta.refrescar(); });
+  $('#bObras').addEventListener('click', () => { mostrarObras(!document.body.classList.contains('conObras')); if (planta) planta.refrescar(); });
   $('#bGuardar').addEventListener('click', guardarJson);
   $('#bAbrir').addEventListener('click', () => { const f = $('#fJson'); f.value = ''; f.click(); });
   $('#fJson').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) abrirArchivo(f); });
@@ -7559,10 +7717,15 @@ const arrancar = async () => {
   $('#bAyudaTop').addEventListener('click', () => $('#ayudaTop').classList.toggle('visible'));
   $('#bCerrarAyudaTop').addEventListener('click', () => $('#ayudaTop').classList.remove('visible'));
   document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); guardarJson(); }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); $('#bAbrir').click(); }
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === 's') { e.preventDefault(); guardarJson(); }
+    else if (k === 'o' && !modoLectura) { e.preventDefault(); $('#bAbrir').click(); }
   });
-  window.addEventListener('beforeunload', () => { if (saveT) { clearTimeout(saveT); almacen.guardar(proyecto).catch(() => {}); } });
+  window.addEventListener('beforeunload', (e) => {
+    if (saveT) { clearTimeout(saveT); saveT = 0; almacen.guardar(M.copiaLimpia(proyecto)).catch(() => {}); }
+    if (saveFallo && !modoLectura) { e.preventDefault(); e.returnValue = ''; } // el navegador no pudo guardar: que el usuario confirme la salida
+  });
   window.MD3 = { get proyecto() { return proyecto; }, get planta() { return planta; }, get muro() { return muro; }, get lectura() { return lectura; }, get obras() { return obras; }, get modoLectura() { return modoLectura; }, M, puente, setVista, abrirArchivo, abrirAlzado, exportarLectura, cambio, listo: true };
 };
 arrancar();
@@ -7570,5 +7733,6 @@ return {  };
 })();
 })();
 </script>
+<script>window.__ORIGEN_HTML = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;</script>
 </body>
 </html>

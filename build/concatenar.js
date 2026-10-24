@@ -48,8 +48,10 @@ if (css.includes('</style')) throw new Error('El CSS contiene "</style"');
 // reemplazos con función: en una cadena de reemplazo, «$$» y «$&» tienen significado especial
 html = html.replace('<link rel="stylesheet" href="src/ui/estilo.css">', () => '<style>\n' + css.trim() + '\n</style>');
 html = html.replace('<script type="module" src="src/ui/cascaron.js"></script>', () => '<script>\n(() => {\n' + bundle + '\n})();\n</script>');
-// copia del documento tal como se sirvió: base de la exportación HTML de lectura
-html = html.replace(/(<body[^>]*>)/, "$1\n<script>window.__ORIGEN_HTML = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;</script>");
+// copia del documento tal como se sirvió: base de la exportación HTML de lectura.
+// Va al final del body (con todo ya leído, incluido el bundle) y antes de que el cascarón monte nada:
+// cascaron.js espera a DOMContentLoaded antes de tocar el DOM.
+html = html.replace(/<\/body>/, () => "<script>window.__ORIGEN_HTML = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;</script>\n</body>");
 if (html.includes('src="src/')) throw new Error('Quedan referencias a src/ en app.html');
 fs.writeFileSync(path.join(raiz, 'app.html'), html);
 console.log(`app.html: ${orden.length} módulos, ${(html.length / 1024).toFixed(0)} KB`);

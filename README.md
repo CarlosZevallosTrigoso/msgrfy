@@ -15,7 +15,9 @@ Unifica tres herramientas que antes eran archivos sueltos (plano-sala, MuseoDraf
 
 - **Biblioteca de objetos (hecha):** mobiliario museográfico con medidas reales (pedestales, vitrinas, paneles, bancas, señalética, técnica, figuras de referencia) que se coloca en la planta con un clic, se ajusta y se guarda en una biblioteca propia exportable; aparece en el 3D y en la lista de materiales.
 
-Las cuatro fases del plan están hechas, más el modo 3D y la biblioteca. La mesa de montaje anterior sigue intacta en `legacy/museodraft.html`.
+- **Auditoría (hecha):** revisión completa de errores y usabilidad: puente planta↔muro sin pérdida de datos al deshacer, deshacer de la planta que no toca las fichas compartidas, HTML de lectura exportable desde `app.html`, planos anotados que sobreviven al borrado de su sala o muro, atajos únicos por app, estados vacíos y foco. Detalle en `AUDITORIA.md`.
+
+Las cuatro fases del plan están hechas, más el modo 3D, la biblioteca y la auditoría. La mesa de montaje anterior sigue intacta en `legacy/museodraft.html`.
 
 Dos formas de abrir la app:
 - `index.html` en GitHub Pages (o cualquier servidor; en local, `python3 -m http.server`). Usa módulos ES, así que con doble clic desde el disco se queda en blanco.
@@ -58,13 +60,13 @@ test/                  node --test (sin dependencias)
 
 ### Cómo se conectan obras y planta
 
-Las entidades `cuadro` y `obra` de la planta llevan `obraId` y no guardan ficha. Al dibujar un cuadro se crea una obra en la lista con el ancho del tramo; si antes se eligió una obra en el panel («colocar en planta»), se usa esa y el cuadro toma el ancho de su ficha. Borrar un cuadro de la planta no borra la obra: queda «sin colocar». El título, autor y medidas se editan en cualquiera de los dos sitios y son el mismo dato.
+Las entidades `cuadro` y `obra` de la planta llevan `obraId` y no guardan ficha. Al dibujar un cuadro se crea una obra en la lista con el ancho del tramo; si antes se eligió una obra en el panel («colocar en planta»), se usa esa y el cuadro toma el ancho de su ficha. Borrar un cuadro de la planta no borra la obra: queda «sin colocar». Borrar la obra desde el panel sí quita sus cuadros de la planta y sus colgados de los muros. El título, autor y medidas se editan en cualquiera de los dos sitios y son el mismo dato; por eso el deshacer de la planta solo cubre el dibujo (entidades, calco, rótulos), nunca las fichas.
 
 ### Cómo se conectan planta y muro
 
 En el panel de un muro de la planta, cada tramo tiene un botón ▭ que abre su alzado en la vista Muro. Si no existe, se crea con el largo del tramo, su altura y los cuadros que cuelgan de la cara interior, colocados desde la izquierda tal como se ven desde dentro de la sala, centrados en el eje visual. A las obras sin alto conocido se les asigna uno estimado (≈). El alzado queda ligado al tramo (`muro.tramo = {entidadId, i, cara}`), así que el botón vuelve a abrir el mismo muro.
 
-La vista Muro guarda posición, marco, caída y demás en `muro.colgado[]` y las medidas y la ficha en la obra compartida: cambiar un ancho en el muro cambia la ficha que ve la planta. Lo que se añade en el muro (vanos, personas, notas, medidas) vive solo en el muro. Mover un cuadro en la planta después de crear el alzado no lo mueve en el muro: son dos decisiones distintas (dónde va en la sala, cómo cuelga).
+La vista Muro guarda posición, marco, caída y demás en `muro.colgado[]` y las medidas y la ficha en la obra compartida: cambiar un ancho en el muro cambia la ficha que ve la planta, y al revés (lo que se edita en el panel Obras entra al alzado sin perder su historial). Cada ítem del alzado lleva `obraId`, así que deshacer y rehacer no crean obras duplicadas. Una obra sin medidas se dibuja con 0,5 × 0,7 m de relleno, pero sigue «sin medidas» hasta que alguien escribe una. Lo que se añade en el muro (vanos, personas, notas, medidas) vive solo en el muro. Mover un cuadro en la planta después de crear el alzado no lo mueve en el muro: son dos decisiones distintas (dónde va en la sala, cómo cuelga).
 
 ### Modo 3D
 
@@ -76,7 +78,7 @@ Entidad `mueble` en la planta: `{ x, y (centro), l, a, h, rot, forma: 'caja'|'ci
 
 ### Cómo se conecta la lectura con el resto
 
-Un plano anotado tiene una base: una imagen suelta, o una sala o un muro del proyecto. Las bases «sala» y «muro» se redibujan a partir del proyecto cada vez que se abren (la planta a 2400 px de ancho, el alzado a 8 px/cm, o menos si no cabe en 16 Mpx), ya con la escala puesta, así que no hay que calibrar. Las anotaciones se guardan en píxeles de esa imagen: si después la planta crece mucho (otra sala al lado, por ejemplo), el dibujo se reencuadra y los marcadores pueden quedar desplazados; para planos cerrados es más seguro anotar al final.
+Un plano anotado tiene una base: una imagen suelta, o una sala o un muro del proyecto. Las bases «sala» y «muro» se redibujan a partir del proyecto cada vez que se abren (la planta a 2400 px de ancho, el alzado a 8 px/cm, o menos si no cabe en 16 Mpx), ya con la escala puesta, así que no hay que calibrar. Las anotaciones se guardan en píxeles de esa imagen: si después la planta crece mucho (otra sala al lado, por ejemplo), el dibujo se reencuadra y los marcadores pueden quedar desplazados; para planos cerrados es más seguro anotar al final. Si la sala o el muro de base se borran, el plano se conserva con sus anotaciones sobre un fondo vacío (`base.perdida`).
 
 ## Modelo (versión 3)
 
@@ -95,7 +97,7 @@ proyecto { app:'museodraft', version:3, nombre, creado, modificado,
   anotaciones[]  { id, nombre, base, escala, capas[], capaActiva, items[] }
                    base: {tipo:'imagen', imagenId, w, h} | {tipo:'sala', salaId} | {tipo:'muro', muroId} | {tipo:'iso', salaId, cam}
                    items en el formato de anotador-planos (px de la imagen base); las imágenes incrustadas por imagenId
-  imagenes{}     id → dataURL
+  imagenes{}     id → dataURL (las huérfanas se quitan al guardar, nunca en memoria: el deshacer puede necesitarlas)
   biblioteca[]   objetos propios de mobiliario }
 ```
 

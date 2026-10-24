@@ -35,33 +35,36 @@ export const nuevoProyecto = (nombre = 'proyecto') => ({
   obras: [], salas: [], muros: [], anotaciones: [], imagenes: {}, biblioteca: [],
 });
 
-export const nuevaObra = (o = {}) => ({
-  id: nuevoId('o'), nombre: 'Obra', autor: '', anio: '', tecnica: '', inv: '', nota: '',
+// Un id pasado como undefined/null (p. ej. al duplicar con { ...orig, id: undefined }) no debe pisar el generado
+const conId = (obj, pref) => { if (!obj.id) obj.id = nuevoId(pref); return obj; };
+
+export const nuevaObra = (o = {}) => conId({
+  nombre: 'Obra', autor: '', anio: '', tecnica: '', inv: '', nota: '',
   ancho: null, alto: null, estimado: { ancho: true, alto: true }, imagenId: null, imgRatio: null,
   ...o,
-});
+}, 'o');
 
-export const nuevaSala = (s = {}) => ({
-  id: nuevoId('s'), nombre: 'Sala', rotulo: 0.2, rejilla: 0.05, imanes: true, entidades: [], calco: null, iso: null, ...s,
-});
+export const nuevaSala = (s = {}) => conId({
+  nombre: 'Sala', rotulo: 0.2, rejilla: 0.05, imanes: true, entidades: [], calco: null, iso: null, ...s,
+}, 's');
 
-export const nuevoMuro = (m = {}) => ({
-  id: nuevoId('m'), nombre: 'Muro', salaId: null, tramo: null,
+export const nuevoMuro = (m = {}) => conId({
+  nombre: 'Muro', salaId: null, tramo: null,
   ancho: 5, alto: 3, eje: 1.5, grosor: 0.15, color: '#ffffff',
   colgado: [], otros: [], guias: { v: [], h: [] }, opts: {},
   ...m,
-});
+}, 'm');
 
 // Una obra colgada en un muro. x, y: esquina superior izquierda del exterior (marco incluido), en m,
 // con origen arriba-izquierda del muro, como en MuseoDraft.
-export const nuevoColgado = (c = {}) => ({
-  id: nuevoId('c'), obraId: null, x: 0, y: 0, marco: 0, pp: 0, prof: 0.03, caida: 0, rot: 0,
+export const nuevoColgado = (c = {}) => conId({
+  obraId: null, x: 0, y: 0, marco: 0, pp: 0, prof: 0.03, caida: 0, rot: 0,
   lock: true, bloqueado: false, oculto: false, ...c,
-});
+}, 'c');
 
 export const nuevaAnotacion = (a = {}) => {
   const capa = { id: nuevoId('k'), nombre: 'base', visible: true };
-  return { id: nuevoId('a'), nombre: 'Plano', base: null, escala: null, capas: [capa], capaActiva: capa.id, items: [], ...a };
+  return conId({ nombre: 'Plano', base: null, escala: null, capas: [capa], capaActiva: capa.id, items: [], ...a }, 'a');
 };
 
 // ---------- consultas ----------
@@ -90,17 +93,22 @@ export const imagenesUsadas = (p) => {
 };
 
 // ---------- mutaciones básicas ----------
+// Borra la obra y todo lo que la representa: colgados en muros y cuadros/obras en planta
 export const borrarObra = (p, obraId) => {
   p.obras = p.obras.filter((o) => o.id !== obraId);
   for (const m of p.muros) m.colgado = m.colgado.filter((c) => c.obraId !== obraId);
-  for (const s of p.salas) for (const e of s.entidades) if (e.obraId === obraId) e.obraId = null;
+  for (const s of p.salas) s.entidades = s.entidades.filter((e) => !((e.tipo === 'cuadro' || e.tipo === 'obra') && e.obraId === obraId));
   return p;
 };
+// Quita del almacén de imágenes las que nada referencia. Muta p: úsalo solo sobre una copia
+// (copiaLimpia) o cuando ninguna pila de deshacer pueda devolver una referencia a ellas.
 export const limpiarImagenes = (p) => {
   const usadas = imagenesUsadas(p);
   for (const id of Object.keys(p.imagenes)) if (!usadas.has(id)) delete p.imagenes[id];
   return p;
 };
+// Copia superficial del proyecto sin imágenes huérfanas: lo que se guarda y se serializa. No muta p.
+export const copiaLimpia = (p) => limpiarImagenes({ ...p, imagenes: { ...p.imagenes } });
 
 // ---------- validación / normalización ----------
 export class ErrorProyecto extends Error {}
@@ -125,14 +133,16 @@ const entidadValida = (e) => e && TIPOS_ENTIDAD.has(e.tipo) && (
   ((e.tipo === 'obra' || e.tipo === 'region') && Array.isArray(e.pts) && e.pts.length >= 3 && e.pts.every(esPunto)) ||
   (e.tipo === 'proyeccion' && esPunto(e.a) && esPunto(e.b) && esPunto(e.p)) ||
   (e.tipo === 'mueble' && Number.isFinite(e.x) && Number.isFinite(e.y) && e.l > 0 && e.a > 0 && e.h > 0));
-const validarSala = (s, obras) => {
+const validarSala = (s, obras, imagenes) => {
   const ents = (Array.isArray(s.entidades) ? s.entidades : []).filter(entidadValida).map((e) => {
     const n = { ...e }; n.id = str(n.id) || nuevoId('e');
     if (n.tipo === 'cota' && !Array.isArray(n.pts)) { n.pts = [n.a, n.b]; delete n.a; delete n.b; }
     if (n.tipo === 'cuadro' || n.tipo === 'obra') n.obraId = n.obraId && obras.has(n.obraId) ? n.obraId : null;
     return n;
   });
-  const c = s.calco && typeof s.calco === 'object' && s.calco.w > 0 && s.calco.h > 0 && s.calco.mpp > 0 && (s.calco.imagenId || s.calco.src) ? { ...s.calco } : null;
+  let c = s.calco && typeof s.calco === 'object' && s.calco.w > 0 && s.calco.h > 0 && s.calco.mpp > 0 && (s.calco.imagenId || s.calco.src) ? { ...s.calco } : null;
+  if (c && c.src && !c.imagenId) { c.imagenId = nuevoId('img'); imagenes.set(c.imagenId, c.src); delete c.src; } // calco antiguo con la imagen incrustada
+  if (c && !imagenes.has(c.imagenId)) c = null;
   return nuevaSala({
     id: str(s.id) || nuevoId('s'), nombre: str(s.nombre, 'Sala'), rotulo: pos(s.rotulo, 0.2),
     rejilla: num(s.rejilla, 0.05), imanes: bool(s.imanes, true), entidades: ents, calco: c,
@@ -146,6 +156,7 @@ const otroValido = (o) => o && TIPOS_OTRO.has(o.tipo) && (
       : Number.isFinite(o.x) && Number.isFinite(o.y) && o.w > 0 && o.h > 0);
 const validarMuro = (m, obras, salas) => {
   const tramo = m.tramo && typeof m.tramo === 'object' && m.tramo.entidadId && Number.isInteger(m.tramo.i) ? { entidadId: str(m.tramo.entidadId), i: m.tramo.i, cara: m.tramo.cara === -1 ? -1 : 1 } : null;
+  const colgadoIds = new Set((Array.isArray(m.colgado) ? m.colgado : []).map((c) => c && c.id).filter(Boolean));
   return nuevoMuro({
     id: str(m.id) || nuevoId('m'), nombre: str(m.nombre, 'Muro'),
     salaId: m.salaId && salas.has(m.salaId) ? m.salaId : null, tramo: salas.has(m.salaId) ? tramo : null,
@@ -159,29 +170,44 @@ const validarMuro = (m, obras, salas) => {
         caida: Math.max(0, num(c.caida, 0)), rot: [0, 90, 180, 270].includes(c.rot) ? c.rot : 0,
         lock: bool(c.lock, true), bloqueado: bool(c.bloqueado), oculto: bool(c.oculto),
       })),
-    otros: (Array.isArray(m.otros) ? m.otros : []).filter(otroValido).map((o) => ({ ...o, id: str(o.id) || nuevoId(o.tipo[0]) })),
+    otros: (Array.isArray(m.otros) ? m.otros : []).filter(otroValido).map((o) => ({ ...o, id: str(o.id) || nuevoId(o.tipo[0]), ...(o.apunta != null && !colgadoIds.has(o.apunta) ? { apunta: null } : {}) })),
     guias: { v: (m.guias && Array.isArray(m.guias.v) ? m.guias.v : []).filter(Number.isFinite), h: (m.guias && Array.isArray(m.guias.h) ? m.guias.h : []).filter(Number.isFinite) },
     opts: m.opts && typeof m.opts === 'object' ? { ...m.opts } : {},
   });
 };
 // base: una imagen del almacén, o una sala o un muro del proyecto (se redibujan a escala al abrir)
+// Ítems de anotación: geometría mínima por tipo (un ítem roto haría fallar el render de todo el plano)
+const TIPOS_ITEM = new Set(['marcador', 'texto', 'imagen', 'dimension', 'poligono', 'zona']);
+const itemValido = (it) => it && TIPOS_ITEM.has(it.tipo) && (
+  ((it.tipo === 'marcador' || it.tipo === 'texto') && Number.isFinite(it.x) && Number.isFinite(it.y)) ||
+  ((it.tipo === 'imagen' || it.tipo === 'zona') && Number.isFinite(it.x) && Number.isFinite(it.y) && it.w > 0 && it.h > 0) ||
+  (it.tipo === 'dimension' && Array.isArray(it.puntos) && it.puntos.length === 2 && it.puntos.every(esPunto)) ||
+  (it.tipo === 'poligono' && Array.isArray(it.puntos) && it.puntos.length >= 3 && it.puntos.every(esPunto)));
+// La base puede haber desaparecido (sala o muro borrados, imagen perdida): el plano se conserva con sus
+// anotaciones y la vista lo muestra sin fondo, en vez de descartarlo en silencio al recargar.
 const validarAnotacion = (a, imagenes, salas, muros) => {
   const b = a.base || {};
-  const base = b.tipo === 'imagen' && imagenes.has(b.imagenId) && b.w > 0 && b.h > 0 ? { tipo: 'imagen', imagenId: b.imagenId, w: b.w, h: b.h }
-    : b.tipo === 'sala' && salas.has(b.salaId) ? { tipo: 'sala', salaId: b.salaId, w: pos(b.w, 0), h: pos(b.h, 0) }
-      : b.tipo === 'muro' && muros.has(b.muroId) ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0) }
-        : b.tipo === 'iso' && salas.has(b.salaId) ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0) } : null;
+  const base = b.tipo === 'imagen' && b.imagenId ? { tipo: 'imagen', imagenId: b.imagenId, w: pos(b.w, 100), h: pos(b.h, 100), perdida: !imagenes.has(b.imagenId) || undefined }
+    : b.tipo === 'sala' && b.salaId ? { tipo: 'sala', salaId: b.salaId, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined }
+      : b.tipo === 'muro' && b.muroId ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !muros.has(b.muroId) || undefined }
+        : b.tipo === 'iso' && b.salaId ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined } : null;
   if (!base) throw new ErrorProyecto(`El plano anotado «${str(a.nombre, '?')}» no tiene base válida`);
+  if (!base.perdida) delete base.perdida;
   const capas = (Array.isArray(a.capas) ? a.capas : []).filter((c) => c && c.id).map((c) => ({ id: str(c.id), nombre: str(c.nombre, 'capa'), visible: bool(c.visible, true) }));
   if (!capas.length) capas.push({ id: nuevoId('k'), nombre: 'base', visible: true });
   const capaIds = new Set(capas.map((c) => c.id));
-  const items = (Array.isArray(a.items) ? a.items : []).filter((it) => it && it.tipo).map((it) => {
+  const items = (Array.isArray(a.items) ? a.items : []).filter(itemValido).map((it) => {
     const n = { ...it }; n.id = str(n.id) || nuevoId('i');
     n.capa = capaIds.has(n.capa) ? n.capa : capas[0].id;
     if (n.tipo === 'imagen' && n.src && !n.imagenId) { n.imagenId = nuevoId('img'); imagenes.set(n.imagenId, n.src); delete n.src; }
+    if (n.tipo === 'imagen' && !imagenes.has(n.imagenId)) n.imagenId = null;
+    if (n.destino && typeof n.destino === 'object') n.destino = { plano: str(n.destino.plano, null) || null, item: str(n.destino.item, null) || null }; else n.destino = null;
     return n;
   });
-  const esc = a.escala && a.escala.pxPorMetro > 0 ? { ...a.escala } : null;
+  // escala: {pxPorMetro, ref:{x1,y1,x2,y2,metros}|null, automatica}; sin ref válida se marca automática
+  const e = a.escala;
+  const refOk = e && e.ref && ['x1', 'y1', 'x2', 'y2'].every((k) => Number.isFinite(e.ref[k])) && e.ref.metros > 0;
+  const esc = e && e.pxPorMetro > 0 ? { pxPorMetro: e.pxPorMetro, ref: refOk ? { ...e.ref } : null, automatica: refOk ? bool(e.automatica, false) : true } : null;
   return nuevaAnotacion({
     id: str(a.id) || nuevoId('a'), nombre: str(a.nombre, 'Plano'), base, escala: esc,
     capas, capaActiva: capaIds.has(a.capaActiva) ? a.capaActiva : capas[0].id, items,
@@ -195,7 +221,7 @@ export const validar = (d) => {
   const obras = (Array.isArray(d.obras) ? d.obras : []).filter((o) => o && typeof o === 'object').map(validarObra);
   for (const o of obras) if (o.imagenId && !imagenes.has(o.imagenId)) o.imagenId = null;
   const obraIds = new Set(obras.map((o) => o.id));
-  const salas = (Array.isArray(d.salas) ? d.salas : []).filter((s) => s && typeof s === 'object').map((s) => validarSala(s, obraIds));
+  const salas = (Array.isArray(d.salas) ? d.salas : []).filter((s) => s && typeof s === 'object').map((s) => validarSala(s, obraIds, imagenes));
   const salaIds = new Set(salas.map((s) => s.id));
   const muros = (Array.isArray(d.muros) ? d.muros : []).filter((m) => m && typeof m === 'object').map((m) => validarMuro(m, obraIds, salaIds));
   const muroIds = new Set(muros.map((m) => m.id));
@@ -217,7 +243,7 @@ export const detectar = (d) => {
   if (d.version === 2 && d.wall && Array.isArray(d.items)) return 'museodraft';
   if (d.wall && d.wall.width != null && Array.isArray(d.items)) return 'museodraft-v1';
   if (d.app === 'plano-sala' || (Array.isArray(d.entidades) && !Array.isArray(d.planos))) return 'plano-sala';
-  if (Array.isArray(d.planos) && d.planos.every((p) => p && p.imagen)) return 'anotador';
+  if (Array.isArray(d.planos) && d.planos.length && d.planos.every((p) => p && p.imagen)) return 'anotador';
   return null;
 };
 
@@ -279,6 +305,7 @@ const desdeMuseoDraft = (d) => {
       });
       p.obras.push(obra);
       muro.colgado.push(nuevoColgado({
+        id: str(it.id) || undefined, // las notas apuntan (apunta) al id del ítem: se conserva
         obraId: obra.id, x: m.x, y: m.y, marco: m.marco, pp: m.pp, prof: m.prof, caida: m.caida,
         rot: num(it.rot, 0) % 360, lock: bool(it.lock, true), bloqueado: bool(it.bloqueado), oculto: bool(it.oculto),
       }));
@@ -335,19 +362,24 @@ export const incorporar = (p, d) => {
   for (const m of q.muros) p.muros.push({
     ...m, id: re(m.id, 'm'), salaId: re(m.salaId, 's'), tramo: m.tramo ? { ...m.tramo, entidadId: re(m.tramo.entidadId, 'e') } : null,
     colgado: m.colgado.map((c) => ({ ...c, id: re(c.id, 'c'), obraId: re(c.obraId, 'o') })),
-    otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]) })),
+    otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]), ...(o.apunta ? { apunta: re(o.apunta, 'c') } : {}) })),
   });
   for (const a of q.anotaciones) p.anotaciones.push({
     ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : (a.base.tipo === 'sala' || a.base.tipo === 'iso') ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
     capas: a.capas.map((c) => ({ ...c, id: re(c.id, 'k') })), capaActiva: re(a.capaActiva, 'k'),
-    items: a.items.map((it) => ({ ...it, id: re(it.id, 'i'), capa: re(it.capa, 'k'), ...(it.imagenId ? { imagenId: re(it.imagenId, 'img') } : {}) })),
+    items: a.items.map((it) => ({
+      ...it, id: re(it.id, 'i'), capa: re(it.capa, 'k'), ...(it.imagenId ? { imagenId: re(it.imagenId, 'img') } : {}),
+      destino: it.destino ? { plano: re(it.destino.plano, 'a'), item: re(it.destino.item, 'i') } : null, // enlaces internos entre planos
+    })),
   });
+  for (const b of q.biblioteca || []) p.biblioteca.push({ ...b, id: re(b.id, 'b') });
   p.modificado = ahora();
-  return { proyecto: p, origen, añadido: { obras: q.obras.length, salas: q.salas.length, muros: q.muros.length, anotaciones: q.anotaciones.length } };
+  return { proyecto: p, origen, añadido: { obras: q.obras.length, salas: q.salas.length, muros: q.muros.length, anotaciones: q.anotaciones.length, biblioteca: (q.biblioteca || []).length } };
 };
 
 // ---------- archivo ----------
-export const serializar = (p) => { p.modificado = ahora(); return JSON.stringify(limpiarImagenes(p)); };
+// No muta el proyecto: la fecha de modificación la pone quien cambia el proyecto (cascarón), no quien lo guarda
+export const serializar = (p) => JSON.stringify(copiaLimpia(p));
 export const parsear = (texto) => {
   let d;
   try { d = JSON.parse(texto); } catch (e) { throw new ErrorProyecto('El archivo no es JSON válido'); }

@@ -36,6 +36,7 @@ export const MARKUP = `
     <canvas id="cv" tabindex="0" aria-label="Muro de montaje"></canvas>
     <div id="cota-ed" hidden></div>
     <div id="empty"><b>Arrastra imágenes de obras al muro</b>, usa «Obra» o «De la lista…». Todas las medidas están en centímetros; las obras nuevas se colocan con el centro en el eje visual.</div>
+    <div id="sin-muro" hidden><b>No hay ningún alzado todavía</b><p>Ábrelo desde la planta: en el panel de un muro, cada tramo tiene un botón ▭ que crea su alzado con el largo, la altura y los cuadros ya colocados.</p><p>O añade un muro suelto con «+ muro» en la barra superior.</p></div>
   </div>
 
   <aside id="md-panel">
@@ -55,7 +56,7 @@ export const MARKUP = `
           <label class="f">Grosor del muro (cm)<input id="iso-grosor" type="number" min="0" step="1"></label>
         </div>
         <label class="c"><input type="checkbox" id="iso-grid"> Cuadrícula del piso cada 50 cm</label>
-        <p class="note">Vista de solo lectura: arrastra para desplazar, rueda con Ctrl/⌘ o pellizco para el zoom. Las obras se mueven en Alzado; la profundidad de obras y vanos y la distancia de las personas al muro se cambian en Selección.</p>
+        <p class="note">Vista de solo lectura: arrastra para desplazar, rueda con Ctrl/⌘ (o Alt) o pellizco para el zoom. Las obras se mueven en Alzado; la profundidad de obras y vanos y la distancia de las personas al muro se cambian en Selección.</p>
       </div>
     </details>
 
@@ -272,7 +273,8 @@ export const MARKUP = `
       <tr><td>Supr / ⌫</td><td>Eliminar selección</td></tr>
       <tr><td>Ctrl/⌘ ] · [</td><td>Subir · bajar un nivel (con Shift: al frente · al fondo)</td></tr>
       <tr><td>Ctrl/⌘ Z · Shift Z</td><td>Deshacer · rehacer</td></tr>
-      <tr><td>Ctrl/⌘ S · O · E</td><td>Guardar · abrir · exportar</td></tr>
+      <tr><td>Ctrl/⌘ E</td><td>Exportar este alzado</td></tr>
+      <tr><td>Ctrl/⌘ S · O</td><td>Guardar el proyecto · abrir un .json (atajos de toda la app)</td></tr>
       <tr><td>Esc</td><td>Cancelar medida o quitar selección</td></tr>
       <tr><td>Reglas</td><td>Arrastra desde una regla para crear una guía; devuélvela a la regla para borrarla</td></tr>
     </table>
