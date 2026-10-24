@@ -665,6 +665,13 @@ function canvasPainter(ctx, getImage) {
       ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh); ctx.restore();
       return true;
     },
+    // imagen con matriz afín, recortada a un polígono (celdas de una imagen en perspectiva)
+    imagePoly(id, m, w, h, poly) {
+      const img = getImage(id); if (!img) return false;
+      ctx.save(); ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.clip();
+      ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); ctx.drawImage(img, 0, 0, w, h); ctx.restore();
+      return true;
+    },
     image(id, x, y, w, h, rot) {
       const img = getImage(id); if (!img) return false;
       const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h;
@@ -704,6 +711,14 @@ function svgPainter(images) {
       parts.push('<g transform="matrix(' + m.map((q) => Math.round(q * 1e4) / 1e4).join(' ') + ')">'
         + '<image href="' + src + '" xlink:href="' + src + '" x="' + n(w / 2 - sw / 2) + '" y="' + n(h / 2 - sh / 2) + '" width="' + n(sw) + '" height="' + n(sh)
         + '" preserveAspectRatio="none"' + (r ? ' transform="rotate(' + r + ' ' + n(w / 2) + ' ' + n(h / 2) + ')"' : '') + '/></g>');
+      return true;
+    },
+    imagePoly(id, m, w, h, poly) {
+      const src = images[id]; if (!src) return false;
+      const cid = 'recorte' + (parts.length + 1);
+      parts.push('<clipPath id="' + cid + '"><polygon points="' + poly.map((p) => n(p[0]) + ',' + n(p[1])).join(' ') + '"/></clipPath>'
+        + '<g clip-path="url(#' + cid + ')"><g transform="matrix(' + m.map((q) => Math.round(q * 1e4) / 1e4).join(' ') + ')">'
+        + '<image href="' + src + '" xlink:href="' + src + '" x="0" y="0" width="' + n(w) + '" height="' + n(h) + '" preserveAspectRatio="none"/></g></g>');
       return true;
     },
     image(id, x, y, w, h, rot) {

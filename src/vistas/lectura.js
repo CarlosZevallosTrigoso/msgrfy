@@ -4,6 +4,7 @@ import { A as G } from '../core/anotacion.js';
 import * as M from '../core/modelo.js';
 import { svgDeSala, svgDeMuro } from '../core/puente.js';
 import * as I from '../core/isometrica.js';
+import * as V from '../core/perspectiva.js';
 import { MARKUP } from './lectura-markup.js';
 
 // env: { root, proyecto, modo: 'editor'|'lectura', onCambio(), onGuardar(), onExportarHtml(), onEditar(), onArchivoJson(f), mensaje }
@@ -24,15 +25,16 @@ const fuente = (pl) => {
   const b = pl.base;
   if (b.tipo === 'imagen') { const href = env.proyecto.imagenes[b.imagenId] || ''; return { href, w: b.w, h: b.h, perdida: !href }; }
   const obj = b.tipo === 'muro' ? M.muroDe(env.proyecto, b.muroId) : M.salaDe(env.proyecto, b.salaId);
-  if (!obj) return { href: '', w: b.w || 100, h: b.h || 100, perdida: true };
+  const fig = obj && b.tipo === 'pov' ? obj.entidades.find((e) => e.id === b.figuraId) || null : null;
+  if (!obj || (b.tipo === 'pov' && !fig)) return { href: '', w: b.w || 100, h: b.h || 100, perdida: true };
   const firma = JSON.stringify(b.tipo === 'muro' ? [obj, env.proyecto.obras.filter((o) => obj.colgado.some((c) => c.obraId === o.id))] : [obj, env.proyecto.obras, env.proyecto.muros, b.cam]);
   const c = cacheFuente.get(pl.id);
   if (c && c.firma === firma) return c;
-  const r = b.tipo === 'sala' ? svgDeSala(env.proyecto, obj) : b.tipo === 'muro' ? svgDeMuro(env.proyecto, obj) : I.svgDeIso(env.proyecto, obj, { ...I.camDefecto(), ...(b.cam || obj.iso || {}) }, 120);
+  const r = b.tipo === 'sala' ? svgDeSala(env.proyecto, obj) : b.tipo === 'muro' ? svgDeMuro(env.proyecto, obj) : b.tipo === 'pov' ? V.svgDePov(env.proyecto, obj, fig, 2000, I.soloCam(obj.iso)) : I.svgDeIso(env.proyecto, obj, { ...I.camDefecto(), ...(b.cam || obj.iso || {}) }, 120);
   if (!r) return { href: '', w: b.w || 100, h: b.h || 100 };
   const f = { firma, href: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(r.svg), w: r.w, h: r.h };
   cacheFuente.set(pl.id, f);
-  b.w = r.w; b.h = r.h; pl.escala = b.tipo === 'iso' ? null : { pxPorMetro: r.pxPorMetro, ref: null, automatica: true };
+  b.w = r.w; b.h = r.h; pl.escala = b.tipo === 'iso' || b.tipo === 'pov' ? null : { pxPorMetro: r.pxPorMetro, ref: null, automatica: true };
   return f;
 };
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -219,7 +221,7 @@ const renderSvg = () => {
   el.svg.appendChild(svgEl('image', { href: f.href, x: 0, y: 0, width: f.w, height: f.h, 'data-fondo': '1' }));
   if (f.perdida) { // la sala, el muro o la imagen de base ya no existen: las anotaciones se conservan sobre un fondo vacío
     el.svg.appendChild(svgEl('rect', { x: 0, y: 0, width: f.w, height: f.h, fill: '#f6f5f0', stroke: '#c9c5b8', 'stroke-dasharray': '8 6', 'pointer-events': 'none' }));
-    el.svg.appendChild(svgEl('text', { x: f.w / 2, y: 24, 'text-anchor': 'middle', 'font-size': 14, fill: '#8a8677', 'pointer-events': 'none' }, 'El fondo de este plano (' + (pl.base.tipo === 'imagen' ? 'imagen' : pl.base.tipo === 'muro' ? 'alzado' : 'sala') + ') ya no existe en el proyecto; las anotaciones se conservan'));
+    el.svg.appendChild(svgEl('text', { x: f.w / 2, y: 24, 'text-anchor': 'middle', 'font-size': 14, fill: '#8a8677', 'pointer-events': 'none' }, 'El fondo de este plano (' + (pl.base.tipo === 'imagen' ? 'imagen' : pl.base.tipo === 'muro' ? 'alzado' : pl.base.tipo === 'pov' ? 'figura o sala' : 'sala') + ') ya no existe en el proyecto; las anotaciones se conservan'));
   }
   const z = S.view.zoom;
   for (const it of pl.items) { if (!capaVisible(pl, it.capa)) continue; el.svg.appendChild(renderItem(it, pl, z)); }
@@ -386,17 +388,25 @@ const agregarPlano = async (file) => {
 };
 const agregarPlanoDe = (tipo, obj) => {
   if (!obj) return;
-  const base = tipo === 'sala' ? { tipo: 'sala', salaId: obj.id, w: 0, h: 0 } : tipo === 'muro' ? { tipo: 'muro', muroId: obj.id, w: 0, h: 0 } : { tipo: 'iso', salaId: obj.id, cam: I.soloCam(camIso(obj)), w: 0, h: 0 };
-  const pl = M.nuevaAnotacion({ nombre: (obj.nombre || (tipo === 'muro' ? 'Muro' : 'Planta')) + (tipo === 'iso' ? ' · 3D' : ''), base });
+  let base, sufijo = '';
+  if (tipo === 'sala') base = { tipo: 'sala', salaId: obj.id, w: 0, h: 0 };
+  else if (tipo === 'muro') base = { tipo: 'muro', muroId: obj.id, w: 0, h: 0 };
+  else { const el = camIso(obj); if (!el) return; if (el.figura) { base = { tipo: 'pov', salaId: obj.id, figuraId: el.figura.id, w: 0, h: 0 }; sufijo = ' · desde ' + (el.figura.nombre || 'figura'); } else { base = { tipo: 'iso', salaId: obj.id, cam: I.soloCam(el.cam), w: 0, h: 0 }; sufijo = ' · 3D'; } }
+  const pl = M.nuevaAnotacion({ nombre: (obj.nombre || (tipo === 'muro' ? 'Muro' : 'Planta')) + sufijo, base });
   S.proyecto.planos.push(pl); activarPlano(pl.id);
-  mensaje(tipo === 'sala' ? `Planta «${pl.nombre}» añadida, a escala` : tipo === 'muro' ? `Alzado «${pl.nombre}» añadido, a escala` : `Vista 3D «${pl.nombre}» añadida con el giro guardado en la planta`);
+  mensaje(tipo === 'sala' ? `Planta «${pl.nombre}» añadida, a escala` : tipo === 'muro' ? `Alzado «${pl.nombre}» añadido, a escala` : base.tipo === 'pov' ? `Vista «${pl.nombre}» añadida: sigue a la figura si se mueve en la planta` : `Vista 3D «${pl.nombre}» añadida con el giro guardado en la planta`);
 };
-// cámara para la base 3D: la vista guardada que el usuario elija, o la cámara actual de la sala
+// base 3D: la cámara actual, una vista guardada, o los ojos de una figura de la sala → { cam } | { figura } | null (cancelado)
 const camIso = (sala) => {
   const vs = sala.iso && Array.isArray(sala.iso.vistas) ? sala.iso.vistas : [];
-  if (!vs.length) return sala.iso || {};
-  const r = prompt(['0. Cámara actual de la planta', ...vs.map((v, i) => (i + 1) + '. ' + v.nombre)].join('\n') + '\n\nNúmero de la vista:', '0');
-  if (r == null) return sala.iso || {}; const i = parseInt(r, 10); return i > 0 && vs[i - 1] ? vs[i - 1].cam : (sala.iso || {});
+  const fs = sala.entidades.filter(V.esFigura);
+  if (!vs.length && !fs.length) return { cam: sala.iso || {} };
+  const op = ['0. Cámara actual de la planta', ...vs.map((v, i) => (i + 1) + '. Vista «' + v.nombre + '»'), ...fs.map((f, i) => (vs.length + i + 1) + '. Desde los ojos de ' + (f.nombre || 'figura') + ' ' + (i + 1))];
+  const r = prompt(op.join('\n') + '\n\nNúmero:', '0');
+  if (r == null) return null; const i = parseInt(r, 10);
+  if (i > 0 && i <= vs.length) return { cam: vs[i - 1].cam };
+  if (i > vs.length && fs[i - vs.length - 1]) return { figura: fs[i - vs.length - 1] };
+  return { cam: sala.iso || {} };
 };
 const elegir = (titulo, lista) => {
   if (!lista.length) { mensaje('El proyecto no tiene ' + (titulo === 'sala' ? 'salas' : 'muros') + ' todavía', true); return null; }

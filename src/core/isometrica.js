@@ -46,14 +46,18 @@ export const proyector = (cam) => {
 const altoLinea = (e, i, cam) => G.alturaTramo(e, i) || cam.altoDefecto;
 const banda = (e) => G.bandaMuro(e) || [-0.05, 0.05];
 
+// cam.P: proyector alternativo (perspectiva.js). Debe ofrecer P(x,y,z)→{X,Y,d}, P.vista y, si la visibilidad
+// de una cara depende de dónde está (perspectiva), P.visible(normalPlanta, puntoPlanta).
 export const escena = (proyecto, sala, cam) => {
-  const P = proyector(cam), piezas = [];
+  const P = cam.P || proyector(cam), piezas = [];
+  const visible = (nn, pt) => (P.visible ? P.visible(nn, pt) : G.dot(nn, P.vista) > 1e-9);
+  const espalda = (nn, pt) => (P.visible ? !P.visible(nn, pt) : G.dot(nn, P.vista) < -1e-9); // de canto no cuenta como espalda
   const ents = sala.entidades;
   const lineas = ents.filter((e) => e.tipo === 'linea' && e.pts.length >= 2);
   const contorno = lineas.filter((e) => G.contornoDe(e)).sort((a, b) => G.area(b.pts) - G.area(a.pts))[0] || null;
   const eje = 1.5;
   const sombra = (col, k) => col; // sin iluminación: el tono lo da cada cara
-  const cara = (pts3, st) => ({ pts: pts3.map(([x, y, z]) => { const p = P(x, y, z); return [p.X, p.Y]; }), ...st });
+  const cara = (pts3, st) => ({ pts: pts3.map(([x, y, z]) => { const p = P(x, y, z); return [p.X, p.Y]; }), pts3, ...st });
   const prof = (pts2) => Math.max(...pts2.map((p) => P(p.x, p.y).d));
   const profMin = (pts2) => Math.min(...pts2.map((p) => P(p.x, p.y).d));
 
@@ -96,7 +100,7 @@ export const escena = (proyecto, sala, cam) => {
       const L = G.dist(a, b); if (!(L > 1e-6)) continue;
       const h = altoLinea(e, i, cam); const d = G.unit(G.sub(b, a)); const n = G.perp(d);
       const nInt = G.mul(n, esContorno ? -fuera : 1);
-      const frente = esContorno && G.dot(nInt, P.vista) < -1e-9; // la cara interior da la espalda a la cámara
+      const frente = esContorno && espalda(nInt, a); // la cara interior da la espalda a la cámara
       const modo = frente ? cam.muros : 'completos';
       const alto = modo === 'cortados' ? Math.min(h, cam.zocalo) : h;
       const trans = modo === 'transparentes';
@@ -114,8 +118,8 @@ export const escena = (proyecto, sala, cam) => {
         const linea = (A, B, stt) => caras.push(cara([A, B], { ...stt, linea: true }));
         // caras largas visibles
         for (const [off, nn] of lados) {
-          if (G.dot(nn, P.vista) <= 1e-9 && !trans) continue;
           const q0 = G.add(p0, G.mul(n, off)), q1 = G.add(p1, G.mul(n, off));
+          if (!visible(nn, q0) && !trans) continue;
           const lateral = Math.abs(G.dot(nn, { x: P.vista.y, y: -P.vista.x })) > 0.5;
           const fill = trans ? 'rgba(255,255,255,0)' : colMuro ? alfa(colMuro, 0.33) : (lateral ? '#e4e2db' : '#f1f0ea');
           // las rebanadas se solapan 5 mm para que no se vean costuras
@@ -136,13 +140,13 @@ export const escena = (proyecto, sala, cam) => {
         for (const [esInicio, nn] of [[true, G.mul(d, -1)], [false, d]]) {
           if (esInicio ? k !== 0 : k !== nReb - 1) continue;
           const pp = esInicio ? p0 : p1; const c0 = G.add(pp, G.mul(n, omin)), c1 = G.add(pp, G.mul(n, omax));
-          if (G.dot(nn, P.vista) > 1e-9 || trans) caras.push(cara([[c0.x, c0.y, 0], [c1.x, c1.y, 0], [c1.x, c1.y, alto], [c0.x, c0.y, alto]], { fill: trans ? 'rgba(255,255,255,0)' : (colMuro ? alfa(colMuro, 0.33) : '#dcdad2'), stroke: null }));
+          if (visible(nn, c0) || trans) caras.push(cara([[c0.x, c0.y, 0], [c1.x, c1.y, 0], [c1.x, c1.y, alto], [c0.x, c0.y, alto]], { fill: trans ? 'rgba(255,255,255,0)' : (colMuro ? alfa(colMuro, 0.33) : '#dcdad2'), stroke: null }));
           linea([c0.x, c0.y, 0], [c0.x, c0.y, alto], st); linea([c1.x, c1.y, 0], [c1.x, c1.y, alto], st); linea([c0.x, c0.y, alto], [c1.x, c1.y, alto], st);
           if (trans) linea([c0.x, c0.y, 0], [c1.x, c1.y, 0], st);
         }
         // tapa
         const esqE = [G.sub(esq[0], G.mul(d, k ? 0.005 : 0)), G.add(esq[1], G.mul(d, k < nReb - 1 ? 0.005 : 0)), G.add(esq[2], G.mul(d, k < nReb - 1 ? 0.005 : 0)), G.sub(esq[3], G.mul(d, k ? 0.005 : 0))];
-        caras.push(cara(esqE.map((q) => [q.x, q.y, alto]), { fill: trans ? 'rgba(255,255,255,0)' : '#ffffff', stroke: null }));
+        if (!P.ojo || P.ojo[2] > alto) caras.push(cara(esqE.map((q) => [q.x, q.y, alto]), { fill: trans ? 'rgba(255,255,255,0)' : '#ffffff', stroke: null })); // la tapa no se ve desde abajo
         piezas.push({ tipo: 'muro', d: prof(esq), dmin: profMin(esq), caras, frente, tramo: e.id + ':' + i });
       }
       // cuadros sobre este tramo (solo si el muro está entero)
@@ -152,7 +156,7 @@ export const escena = (proyecto, sala, cam) => {
         const o = M.obraDe(proyecto, q.obraId); if (!o) continue;
         const nc = G.mul(G.perp(G.unit(G.sub(q.b, q.a))), q.lado === -1 ? -1 : 1); // hacia la sala
         const caraMuro = Math.sign(G.dot(nc, n)) || 1;
-        if (G.dot(nc, P.vista) <= 1e-9) continue; // cuelga de una cara que no se ve
+        if (!visible(nc, q.a)) continue; // cuelga de una cara que no se ve
         const w = o.ancho > 0 ? o.ancho : G.dist(q.a, q.b), hh = altoEstimado(o);
         let zTop = eje + hh / 2;
         const mu = muroDelTramo(proyecto, sala, e, i); const c = mu && mu.colgado.find((cc) => cc.obraId === o.id);
@@ -168,7 +172,8 @@ export const escena = (proyecto, sala, cam) => {
           const izq = G.dot(dirQ, { x: -nc.y, y: nc.x }) < 0;
           const o0 = izq ? base0 : base1, dd = izq ? dirQ : G.mul(dirQ, -1);
           const p0 = P(o0.x, o0.y, zTop), pu = P(o0.x + dd.x, o0.y + dd.y, zTop), pv = P(o0.x, o0.y, zTop - 1);
-          pieza.imagenes.push({ id: o.imagenId, m: [pu.X - p0.X, pu.Y - p0.Y, pv.X - p0.X, pv.Y - p0.Y, p0.X, p0.Y], w, h: zTop - zBot });
+          // m: afín para la axonometría; o3/ejeU/ejeV: el rectángulo en 3D (origen arriba-izquierda, metros) para la perspectiva
+          pieza.imagenes.push({ id: o.imagenId, m: [pu.X - p0.X, pu.Y - p0.Y, pv.X - p0.X, pv.Y - p0.Y, p0.X, p0.Y], w, h: zTop - zBot, o3: [o0.x, o0.y, zTop], ejeU: [dd.x, dd.y, 0], ejeV: [0, 0, -1] });
         }
         piezas.push(pieza);
       }
@@ -223,14 +228,16 @@ function recortar(a, c, poly) {
 // prisma vertical sobre un polígono de planta (z0 → z0 + h): caras laterales visibles + tapa
 function prisma(pts, h, fill, stroke, P, cara, prof, suave = false, z0 = 0) {
   const n = pts.length, caras = [];
+  const visible = (nn, pt) => (P.visible ? P.visible(nn, pt) : G.dot(nn, P.vista) > 1e-9);
   const orient = G.areaFirmada(pts) > 0 ? 1 : -1; // normal exterior de cada lado según el sentido del polígono
   for (let k = 0; k < n; k++) {
     const p = pts[k], q = pts[(k + 1) % n]; const d = G.unit(G.sub(q, p)); const nn = G.mul(G.perp(d), -orient);
-    if (G.dot(nn, P.vista) <= 1e-9) continue;
+    if (!visible(nn, p)) continue;
     const lateral = Math.abs(G.dot(nn, { x: P.vista.y, y: -P.vista.x })) > 0.5;
     caras.push(cara([[p.x, p.y, z0], [q.x, q.y, z0], [q.x, q.y, z0 + h], [p.x, p.y, z0 + h]], { fill, stroke: suave ? null : stroke, lw: 1, lateral }));
   }
-  caras.push(cara(pts.map((p) => [p.x, p.y, z0 + h]), { fill: fill.replace(/,([\d.]+)\)$/, (m, a) => ',' + Math.min(1, +a * 1.4) + ')'), stroke, lw: 1 }));
+  if (!P.ojo || P.ojo[2] > z0 + h) caras.push(cara(pts.map((p) => [p.x, p.y, z0 + h]), { fill: fill.replace(/,([\d.]+)\)$/, (m, a) => ',' + Math.min(1, +a * 1.4) + ')'), stroke, lw: 1 }));
+  else caras.push(cara(pts.map((p) => [p.x, p.y, z0]), { fill, stroke, lw: 1 })); // vista desde abajo: la base
   return { tipo: 'prisma', d: prof(pts), caras };
 }
 

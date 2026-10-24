@@ -13,6 +13,8 @@ Unifica tres herramientas que antes eran archivos sueltos (plano-sala, MuseoDraf
 
 - **Modo 3D (hecho):** la sala en axonometría con giro libre e inclinación, al estilo de Los Sims: los muros que dan la espalda a la cámara se cortan a un zócalo, se vuelven transparentes o se dejan enteros. Cuadros con su colgado, obras en planta y columnas con su alto, proyectores con su haz. Exporta PNG y SVG y entra en Lectura como base («+ 3D»).
 
+- **Puntos de vista (hecho):** vistas guardadas de la cámara 3D con nombre, y perspectiva real desde los ojos de una figura colocada en la planta (persona, silla de ruedas, niño), con cono de visión, exportación y entrada en Lectura.
+
 - **Biblioteca de objetos (hecha):** mobiliario museográfico con medidas reales (pedestales, vitrinas, paneles, bancas, señalética, técnica, figuras de referencia) que se coloca en la planta con un clic, se ajusta y se guarda en una biblioteca propia exportable; aparece en el 3D y en la lista de materiales.
 
 - **Auditoría (hecha):** revisión completa de errores y usabilidad: puente planta↔muro sin pérdida de datos al deshacer, deshacer de la planta que no toca las fichas compartidas, HTML de lectura exportable desde `app.html`, planos anotados que sobreviven al borrado de su sala o muro, atajos únicos por app, estados vacíos y foco. Detalle en `AUDITORIA.md`.
@@ -37,7 +39,8 @@ src/core/              sin DOM, probado en Node
   muro.js              geometría, cotas y pintores del alzado (de MuseoDraft)
   puente.js            planta → muro; SVG a escala de una sala o un muro; documento de la vista Muro
   anotacion.js         geometría del anotador (de anotador-planos)
-  isometrica.js        modo 3D: proyección con giro libre, escena por piezas, corte de muros, pintado
+  isometrica.js        modo 3D: proyección con giro libre, escena por piezas, corte de muros, pintado, vistas guardadas
+  perspectiva.js       perspectiva desde los ojos de una figura: proyector, recorte al plano cercano, imágenes por celdas
   biblioteca.js        catálogo de mobiliario, huella y cajas 3D de un mueble, lista de materiales
 src/vistas/
   planta.js            vista Planta (de plano-sala, sobre una sala del proyecto)
@@ -74,6 +77,8 @@ Botón «3D» (o tecla 3) en la planta. Proyección: la planta se gira θ grados
 
 **Puntos de vista.** «＋ vista» guarda la cámara y el encuadre actuales con un nombre («desde la entrada», «vista general») en `sala.iso.vistas[]`; el selector de la barra y PgUp/PgDn los recorren, PNG y SVG llevan el nombre de la vista en el archivo, y «+ 3D» en Lectura pregunta cuál usar como fondo. El encuadre se guarda relativo al encaje (factor de zoom y punto central proyectado), así que se reproduce igual en otra pantalla; las exportaciones y la base de Lectura usan la cámara completa de la escena, no el recorte.
 
+**Desde los ojos de una figura.** Las figuras de referencia de la biblioteca (persona, silla de ruedas, niño) son puntos de vista: en su ficha se fija hacia dónde miran (`mira`, grados en planta; Shift+R gira 45°), la altura de ojos (`ojos`: 1,60 / 1,20 / 1,10 m por defecto) y el campo visual (`fov`, 60°); la planta dibuja su cono. «Ver desde sus ojos», o el selector «ojos de» del 3D, pasan a perspectiva: arrastrar mira alrededor (gira la mirada y el cabeceo, que se guardan en la figura), la rueda abre o cierra el campo, PNG/SVG exportan esa vista, y «+ 3D» en Lectura la ofrece como fondo (sigue a la figura si se mueve). La escena es la misma del modo axonométrico (`isometrica.escena` con otro proyector, `perspectiva.proyectorPov`): cada cara conserva su geometría 3D, se recorta contra un plano cercano a 0,25 m y se pinta de lejos a cerca. Lo que no hace: oclusión exacta cuando dos piezas se cruzan cerca del ojo (orden de pintor), iluminación, texturas; las imágenes de las obras se proyectan por celdas afines (6 por lado), no con una homografía exacta; los vanos se pintan como huecos blancos, no se ve el piso a través de una puerta.
+
 ### Biblioteca de objetos
 
 Entidad `mueble` en la planta: `{ x, y (centro), l, a, h, rot, forma: 'caja'|'cilindro', nombre, cat, color, dz (elevación), partes? }`. `partes` son cajas relativas al centro de la base para objetos compuestos (una vitrina es base opaca + caja de cristal); al cambiar largo, ancho o alto se escalan. El catálogo base está en `src/core/biblioteca.js`; la biblioteca propia vive en `proyecto.biblioteca[]` y se intercambia como `.json` (`{ app:'museodraft-biblioteca', objetos:[…] }`). Todo son prismas y cilindros: no hay modelos 3D ni catálogos de fabricante.
@@ -97,7 +102,7 @@ proyecto { app:'museodraft', version:3, nombre, creado, modificado,
                    otros[] (vanos, personas, medidas, notas en el formato de MuseoDraft, en m),
                    guias:{v,h}, opts }
   anotaciones[]  { id, nombre, base, escala, capas[], capaActiva, items[] }
-                   base: {tipo:'imagen', imagenId, w, h} | {tipo:'sala', salaId} | {tipo:'muro', muroId} | {tipo:'iso', salaId, cam}
+                   base: {tipo:'imagen', imagenId, w, h} | {tipo:'sala', salaId} | {tipo:'muro', muroId} | {tipo:'iso', salaId, cam} | {tipo:'pov', salaId, figuraId}
                    items en el formato de anotador-planos (px de la imagen base); las imágenes incrustadas por imagenId
   imagenes{}     id → dataURL (las huérfanas se quitan al guardar, nunca en memoria: el deshacer puede necesitarlas)
   biblioteca[]   objetos propios de mobiliario }

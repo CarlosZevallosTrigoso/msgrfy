@@ -403,6 +403,8 @@ body.lectura #tituloLectura{display:inline}
 #psIso .iso-l b{color:var(--ink);min-width:30px}
 #psIso .iso-l select,#psIso .iso-l input[type=text]{width:auto;padding:2px 4px}
 #psIso .iso-sep{flex:1}
+#psIso .iso-pov{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
+#psIso .iso-l select:disabled,#psIso .iso-l input:disabled,#psIso button:disabled{opacity:.4}
 #psIso .iso-giros button{padding:2px 8px}
 #psIso #isoCv{flex:1;display:block;cursor:grab;touch-action:none}
 #psIso #isoCv:active{cursor:grabbing}
@@ -677,12 +679,13 @@ const itemValido = (it) => it && TIPOS_ITEM.has(it.tipo) && (
   (it.tipo === 'poligono' && Array.isArray(it.puntos) && it.puntos.length >= 3 && it.puntos.every(esPunto)));
 // La base puede haber desaparecido (sala o muro borrados, imagen perdida): el plano se conserva con sus
 // anotaciones y la vista lo muestra sin fondo, en vez de descartarlo en silencio al recargar.
-const validarAnotacion = (a, imagenes, salas, muros) => {
+const validarAnotacion = (a, imagenes, salas, muros, figuras = new Set()) => {
   const b = a.base || {};
   const base = b.tipo === 'imagen' && b.imagenId ? { tipo: 'imagen', imagenId: b.imagenId, w: pos(b.w, 100), h: pos(b.h, 100), perdida: !imagenes.has(b.imagenId) || undefined }
     : b.tipo === 'sala' && b.salaId ? { tipo: 'sala', salaId: b.salaId, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined }
       : b.tipo === 'muro' && b.muroId ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !muros.has(b.muroId) || undefined }
-        : b.tipo === 'iso' && b.salaId ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined } : null;
+        : b.tipo === 'iso' && b.salaId ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined }
+          : b.tipo === 'pov' && b.salaId && b.figuraId ? { tipo: 'pov', salaId: b.salaId, figuraId: str(b.figuraId), w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || !figuras.has(b.salaId + '/' + b.figuraId) || undefined } : null;
   if (!base) throw new ErrorProyecto(`El plano anotado «${str(a.nombre, '?')}» no tiene base válida`);
   if (!base.perdida) delete base.perdida;
   const capas = (Array.isArray(a.capas) ? a.capas : []).filter((c) => c && c.id).map((c) => ({ id: str(c.id), nombre: str(c.nombre, 'capa'), visible: bool(c.visible, true) }));
@@ -717,9 +720,10 @@ const validar = (d) => {
   const salaIds = new Set(salas.map((s) => s.id));
   const muros = (Array.isArray(d.muros) ? d.muros : []).filter((m) => m && typeof m === 'object').map((m) => validarMuro(m, obraIds, salaIds));
   const muroIds = new Set(muros.map((m) => m.id));
+  const figuraIds = new Set(salas.flatMap((s) => s.entidades.filter((e) => e.tipo === 'mueble').map((e) => s.id + '/' + e.id))); // puntos de vista (base 'pov')
   const anotaciones = [];
   for (const a of (Array.isArray(d.anotaciones) ? d.anotaciones : []).filter((a) => a && typeof a === 'object')) {
-    try { anotaciones.push(validarAnotacion(a, imagenes, salaIds, muroIds)); } catch (e) { if (!(e instanceof ErrorProyecto)) throw e; }
+    try { anotaciones.push(validarAnotacion(a, imagenes, salaIds, muroIds, figuraIds)); } catch (e) { if (!(e instanceof ErrorProyecto)) throw e; }
   }
   return {
     app: APP, version: VERSION, nombre: str(d.nombre, 'proyecto'), creado: str(d.creado, ahora()), modificado: str(d.modificado, ahora()),
@@ -857,7 +861,7 @@ const incorporar = (p, d) => {
     otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]), ...(o.apunta ? { apunta: re(o.apunta, 'c') } : {}) })),
   });
   for (const a of q.anotaciones) p.anotaciones.push({
-    ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : (a.base.tipo === 'sala' || a.base.tipo === 'iso') ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
+    ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : a.base.tipo === 'pov' ? { ...a.base, salaId: re(a.base.salaId, 's'), figuraId: re(a.base.figuraId, 'e') } : (a.base.tipo === 'sala' || a.base.tipo === 'iso') ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
     capas: a.capas.map((c) => ({ ...c, id: re(c.id, 'k') })), capaActiva: re(a.capaActiva, 'k'),
     items: a.items.map((it) => ({
       ...it, id: re(it.id, 'i'), capa: re(it.capa, 'k'), ...(it.imagenId ? { imagenId: re(it.imagenId, 'img') } : {}),
@@ -1726,6 +1730,12 @@ const G = (() => {
         const pts = mueblePts(e); const col2 = e.color && e.color !== '#ffffff' ? e.color : '#8a8a8a';
         cuerpo += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" fill="${col2}" fill-opacity="0.16" stroke="${col2}" stroke-width="${sw('medio')}" stroke-linejoin="miter"/>`;
         if (e.forma !== 'cilindro') { const d0 = pts[0], d2 = pts[2]; cuerpo += `<line x1="${C(d0.x)}" y1="${C(d0.y)}" x2="${C(d2.x)}" y2="${C(d2.y)}" stroke="${col2}" stroke-width="${sw('fino')}" stroke-opacity="0.5"/>`; }
+        if (e.cat === 'referencia' || Number.isFinite(e.mira)) { // figura: cono de visión (punto de vista)
+          const mira = (Number.isFinite(e.mira) ? e.mira : 0) * Math.PI / 180, fov = (e.fov >= 25 && e.fov <= 110 ? e.fov : 60) * Math.PI / 180, r = 1.2;
+          let d = `M${C(e.x)} ${C(e.y)}`; for (let k = 0; k <= 8; k++) { const a = mira - fov / 2 + fov * k / 8; d += ` L${C(e.x + Math.cos(a) * r)} ${C(e.y + Math.sin(a) * r)}`; }
+          cuerpo += `<path d="${d} Z" fill="${col2}" fill-opacity="0.1" stroke="${col2}" stroke-width="${sw('fino')}" stroke-opacity="0.6" stroke-dasharray="${C(0.06)} ${C(0.04)}"/>`;
+          cuerpo += `<line x1="${C(e.x)}" y1="${C(e.y)}" x2="${C(e.x + Math.cos(mira) * r * 0.55)}" y2="${C(e.y + Math.sin(mira) * r * 0.55)}" stroke="${col2}" stroke-width="${sw('medio')}"/>`;
+        }
         obsCajas.push(cajaDePuntos(pts));
         const tam = Math.min(h * 0.75, Math.max(e.l, e.a) * 0.22);
         if (tam >= h * 0.35) { const ang = e.forma === 'cilindro' ? 0 : (((e.rot || 0) % 180) + 180) % 180 > 90 ? ((e.rot || 0) % 180) - 180 : (e.rot || 0) % 180;
@@ -2674,6 +2684,13 @@ function canvasPainter(ctx, getImage) {
       ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh); ctx.restore();
       return true;
     },
+    // imagen con matriz afín, recortada a un polígono (celdas de una imagen en perspectiva)
+    imagePoly(id, m, w, h, poly) {
+      const img = getImage(id); if (!img) return false;
+      ctx.save(); ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.clip();
+      ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); ctx.drawImage(img, 0, 0, w, h); ctx.restore();
+      return true;
+    },
     image(id, x, y, w, h, rot) {
       const img = getImage(id); if (!img) return false;
       const r = num(rot, 0), sw = (r % 180) ? h : w, sh = (r % 180) ? w : h;
@@ -2713,6 +2730,14 @@ function svgPainter(images) {
       parts.push('<g transform="matrix(' + m.map((q) => Math.round(q * 1e4) / 1e4).join(' ') + ')">'
         + '<image href="' + src + '" xlink:href="' + src + '" x="' + n(w / 2 - sw / 2) + '" y="' + n(h / 2 - sh / 2) + '" width="' + n(sw) + '" height="' + n(sh)
         + '" preserveAspectRatio="none"' + (r ? ' transform="rotate(' + r + ' ' + n(w / 2) + ' ' + n(h / 2) + ')"' : '') + '/></g>');
+      return true;
+    },
+    imagePoly(id, m, w, h, poly) {
+      const src = images[id]; if (!src) return false;
+      const cid = 'recorte' + (parts.length + 1);
+      parts.push('<clipPath id="' + cid + '"><polygon points="' + poly.map((p) => n(p[0]) + ',' + n(p[1])).join(' ') + '"/></clipPath>'
+        + '<g clip-path="url(#' + cid + ')"><g transform="matrix(' + m.map((q) => Math.round(q * 1e4) / 1e4).join(' ') + ')">'
+        + '<image href="' + src + '" xlink:href="' + src + '" x="0" y="0" width="' + n(w) + '" height="' + n(h) + '" preserveAspectRatio="none"/></g></g>');
       return true;
     },
     image(id, x, y, w, h, rot) {
@@ -3416,14 +3441,18 @@ const proyector = (cam) => {
 const altoLinea = (e, i, cam) => G.alturaTramo(e, i) || cam.altoDefecto;
 const banda = (e) => G.bandaMuro(e) || [-0.05, 0.05];
 
+// cam.P: proyector alternativo (perspectiva.js). Debe ofrecer P(x,y,z)→{X,Y,d}, P.vista y, si la visibilidad
+// de una cara depende de dónde está (perspectiva), P.visible(normalPlanta, puntoPlanta).
 const escena = (proyecto, sala, cam) => {
-  const P = proyector(cam), piezas = [];
+  const P = cam.P || proyector(cam), piezas = [];
+  const visible = (nn, pt) => (P.visible ? P.visible(nn, pt) : G.dot(nn, P.vista) > 1e-9);
+  const espalda = (nn, pt) => (P.visible ? !P.visible(nn, pt) : G.dot(nn, P.vista) < -1e-9); // de canto no cuenta como espalda
   const ents = sala.entidades;
   const lineas = ents.filter((e) => e.tipo === 'linea' && e.pts.length >= 2);
   const contorno = lineas.filter((e) => G.contornoDe(e)).sort((a, b) => G.area(b.pts) - G.area(a.pts))[0] || null;
   const eje = 1.5;
   const sombra = (col, k) => col; // sin iluminación: el tono lo da cada cara
-  const cara = (pts3, st) => ({ pts: pts3.map(([x, y, z]) => { const p = P(x, y, z); return [p.X, p.Y]; }), ...st });
+  const cara = (pts3, st) => ({ pts: pts3.map(([x, y, z]) => { const p = P(x, y, z); return [p.X, p.Y]; }), pts3, ...st });
   const prof = (pts2) => Math.max(...pts2.map((p) => P(p.x, p.y).d));
   const profMin = (pts2) => Math.min(...pts2.map((p) => P(p.x, p.y).d));
 
@@ -3466,7 +3495,7 @@ const escena = (proyecto, sala, cam) => {
       const L = G.dist(a, b); if (!(L > 1e-6)) continue;
       const h = altoLinea(e, i, cam); const d = G.unit(G.sub(b, a)); const n = G.perp(d);
       const nInt = G.mul(n, esContorno ? -fuera : 1);
-      const frente = esContorno && G.dot(nInt, P.vista) < -1e-9; // la cara interior da la espalda a la cámara
+      const frente = esContorno && espalda(nInt, a); // la cara interior da la espalda a la cámara
       const modo = frente ? cam.muros : 'completos';
       const alto = modo === 'cortados' ? Math.min(h, cam.zocalo) : h;
       const trans = modo === 'transparentes';
@@ -3484,8 +3513,8 @@ const escena = (proyecto, sala, cam) => {
         const linea = (A, B, stt) => caras.push(cara([A, B], { ...stt, linea: true }));
         // caras largas visibles
         for (const [off, nn] of lados) {
-          if (G.dot(nn, P.vista) <= 1e-9 && !trans) continue;
           const q0 = G.add(p0, G.mul(n, off)), q1 = G.add(p1, G.mul(n, off));
+          if (!visible(nn, q0) && !trans) continue;
           const lateral = Math.abs(G.dot(nn, { x: P.vista.y, y: -P.vista.x })) > 0.5;
           const fill = trans ? 'rgba(255,255,255,0)' : colMuro ? alfa(colMuro, 0.33) : (lateral ? '#e4e2db' : '#f1f0ea');
           // las rebanadas se solapan 5 mm para que no se vean costuras
@@ -3506,13 +3535,13 @@ const escena = (proyecto, sala, cam) => {
         for (const [esInicio, nn] of [[true, G.mul(d, -1)], [false, d]]) {
           if (esInicio ? k !== 0 : k !== nReb - 1) continue;
           const pp = esInicio ? p0 : p1; const c0 = G.add(pp, G.mul(n, omin)), c1 = G.add(pp, G.mul(n, omax));
-          if (G.dot(nn, P.vista) > 1e-9 || trans) caras.push(cara([[c0.x, c0.y, 0], [c1.x, c1.y, 0], [c1.x, c1.y, alto], [c0.x, c0.y, alto]], { fill: trans ? 'rgba(255,255,255,0)' : (colMuro ? alfa(colMuro, 0.33) : '#dcdad2'), stroke: null }));
+          if (visible(nn, c0) || trans) caras.push(cara([[c0.x, c0.y, 0], [c1.x, c1.y, 0], [c1.x, c1.y, alto], [c0.x, c0.y, alto]], { fill: trans ? 'rgba(255,255,255,0)' : (colMuro ? alfa(colMuro, 0.33) : '#dcdad2'), stroke: null }));
           linea([c0.x, c0.y, 0], [c0.x, c0.y, alto], st); linea([c1.x, c1.y, 0], [c1.x, c1.y, alto], st); linea([c0.x, c0.y, alto], [c1.x, c1.y, alto], st);
           if (trans) linea([c0.x, c0.y, 0], [c1.x, c1.y, 0], st);
         }
         // tapa
         const esqE = [G.sub(esq[0], G.mul(d, k ? 0.005 : 0)), G.add(esq[1], G.mul(d, k < nReb - 1 ? 0.005 : 0)), G.add(esq[2], G.mul(d, k < nReb - 1 ? 0.005 : 0)), G.sub(esq[3], G.mul(d, k ? 0.005 : 0))];
-        caras.push(cara(esqE.map((q) => [q.x, q.y, alto]), { fill: trans ? 'rgba(255,255,255,0)' : '#ffffff', stroke: null }));
+        if (!P.ojo || P.ojo[2] > alto) caras.push(cara(esqE.map((q) => [q.x, q.y, alto]), { fill: trans ? 'rgba(255,255,255,0)' : '#ffffff', stroke: null })); // la tapa no se ve desde abajo
         piezas.push({ tipo: 'muro', d: prof(esq), dmin: profMin(esq), caras, frente, tramo: e.id + ':' + i });
       }
       // cuadros sobre este tramo (solo si el muro está entero)
@@ -3522,7 +3551,7 @@ const escena = (proyecto, sala, cam) => {
         const o = M.obraDe(proyecto, q.obraId); if (!o) continue;
         const nc = G.mul(G.perp(G.unit(G.sub(q.b, q.a))), q.lado === -1 ? -1 : 1); // hacia la sala
         const caraMuro = Math.sign(G.dot(nc, n)) || 1;
-        if (G.dot(nc, P.vista) <= 1e-9) continue; // cuelga de una cara que no se ve
+        if (!visible(nc, q.a)) continue; // cuelga de una cara que no se ve
         const w = o.ancho > 0 ? o.ancho : G.dist(q.a, q.b), hh = altoEstimado(o);
         let zTop = eje + hh / 2;
         const mu = muroDelTramo(proyecto, sala, e, i); const c = mu && mu.colgado.find((cc) => cc.obraId === o.id);
@@ -3538,7 +3567,8 @@ const escena = (proyecto, sala, cam) => {
           const izq = G.dot(dirQ, { x: -nc.y, y: nc.x }) < 0;
           const o0 = izq ? base0 : base1, dd = izq ? dirQ : G.mul(dirQ, -1);
           const p0 = P(o0.x, o0.y, zTop), pu = P(o0.x + dd.x, o0.y + dd.y, zTop), pv = P(o0.x, o0.y, zTop - 1);
-          pieza.imagenes.push({ id: o.imagenId, m: [pu.X - p0.X, pu.Y - p0.Y, pv.X - p0.X, pv.Y - p0.Y, p0.X, p0.Y], w, h: zTop - zBot });
+          // m: afín para la axonometría; o3/ejeU/ejeV: el rectángulo en 3D (origen arriba-izquierda, metros) para la perspectiva
+          pieza.imagenes.push({ id: o.imagenId, m: [pu.X - p0.X, pu.Y - p0.Y, pv.X - p0.X, pv.Y - p0.Y, p0.X, p0.Y], w, h: zTop - zBot, o3: [o0.x, o0.y, zTop], ejeU: [dd.x, dd.y, 0], ejeV: [0, 0, -1] });
         }
         piezas.push(pieza);
       }
@@ -3593,14 +3623,16 @@ function recortar(a, c, poly) {
 // prisma vertical sobre un polígono de planta (z0 → z0 + h): caras laterales visibles + tapa
 function prisma(pts, h, fill, stroke, P, cara, prof, suave = false, z0 = 0) {
   const n = pts.length, caras = [];
+  const visible = (nn, pt) => (P.visible ? P.visible(nn, pt) : G.dot(nn, P.vista) > 1e-9);
   const orient = G.areaFirmada(pts) > 0 ? 1 : -1; // normal exterior de cada lado según el sentido del polígono
   for (let k = 0; k < n; k++) {
     const p = pts[k], q = pts[(k + 1) % n]; const d = G.unit(G.sub(q, p)); const nn = G.mul(G.perp(d), -orient);
-    if (G.dot(nn, P.vista) <= 1e-9) continue;
+    if (!visible(nn, p)) continue;
     const lateral = Math.abs(G.dot(nn, { x: P.vista.y, y: -P.vista.x })) > 0.5;
     caras.push(cara([[p.x, p.y, z0], [q.x, q.y, z0], [q.x, q.y, z0 + h], [p.x, p.y, z0 + h]], { fill, stroke: suave ? null : stroke, lw: 1, lateral }));
   }
-  caras.push(cara(pts.map((p) => [p.x, p.y, z0 + h]), { fill: fill.replace(/,([\d.]+)\)$/, (m, a) => ',' + Math.min(1, +a * 1.4) + ')'), stroke, lw: 1 }));
+  if (!P.ojo || P.ojo[2] > z0 + h) caras.push(cara(pts.map((p) => [p.x, p.y, z0 + h]), { fill: fill.replace(/,([\d.]+)\)$/, (m, a) => ',' + Math.min(1, +a * 1.4) + ')'), stroke, lw: 1 }));
+  else caras.push(cara(pts.map((p) => [p.x, p.y, z0]), { fill, stroke, lw: 1 })); // vista desde abajo: la base
   return { tipo: 'prisma', d: prof(pts), caras };
 }
 
@@ -3647,6 +3679,150 @@ const svgDeIso = (proyecto, sala, cam, pxPorMetro = 120, margen = 1) => {
 return { camDefecto, soloCam, nuevaVista, vistaValida, encuadreDe, viewDeEncuadre, proyector, escena, limites, pintar, svgDeIso };
 })();
 
+// ── src/core/perspectiva.js
+const __m_src_core_perspectiva = (() => {
+// Perspectiva desde los ojos de una persona colocada en la planta («punto de vista»). Sin DOM.
+//
+// Reutiliza la escena del modo 3D (isometrica.escena) con otro proyector: ojo en (x, y, ojos), mirada
+// `mira` (grados en planta, 0 = +x, sentido horario en pantalla como el resto de la planta), cabeceo
+// vertical y campo visual `fov`. Cada cara conserva su geometría 3D (pts3): aquí se recorta contra el
+// plano cercano antes de proyectar, y se pinta de lejos a cerca por distancia al ojo.
+//
+// Límites, a propósito: orden de pintor (sin oclusión exacta cuando dos piezas se cruzan cerca del ojo),
+// sin iluminación, imágenes de las obras por celdas afines (no hay transform proyectivo en canvas/SVG).
+const { G } = __m_src_core_planta;
+const { MD } = __m_src_core_muro;
+const { escena, soloCam } = __m_src_core_isometrica;
+
+const rad = (g) => g * Math.PI / 180;
+const CERCA = 0.25; // plano cercano, m
+const OJOS = { persona: 1.6, 'silla-r': 1.2, nino: 1.1 }; // altura de ojos por figura del catálogo
+
+// Parámetros de mirada de una figura (persona, silla, niño): se guardan en la propia entidad
+const povDe = (e) => ({
+  x: e.x, y: e.y,
+  ojos: e.ojos > 0 ? e.ojos : (OJOS[e.catalogoId] || Math.max(0.9, (e.h || 1.7) - 0.1)),
+  mira: Number.isFinite(e.mira) ? e.mira : 0,
+  cabeceo: Number.isFinite(e.cabeceo) ? Math.max(-45, Math.min(45, e.cabeceo)) : 0,
+  fov: e.fov >= 25 && e.fov <= 110 ? e.fov : 60,
+});
+const esFigura = (e) => e && e.tipo === 'mueble' && (e.cat === 'referencia' || e.catalogoId in OJOS);
+
+// Proyector de perspectiva. P(x,y,z) → { X, Y (unidades focales: X = ±1 en el borde del fov), d (−profundidad) }.
+// También expone las coordenadas de cámara (cam(x,y,z) → { a (derecha), b (arriba), c (profundidad)}).
+const proyectorPov = (pov) => {
+  // la planta tiene y hacia abajo (pantalla): quien mira a +x tiene su derecha en +y
+  const t = rad(pov.mira), f = { x: Math.cos(t), y: Math.sin(t) }, r = { x: -Math.sin(t), y: Math.cos(t) };
+  const cp = Math.cos(rad(pov.cabeceo || 0)), sp = Math.sin(rad(pov.cabeceo || 0));
+  const F = 1 / Math.tan(rad(pov.fov) / 2);
+  const ojo = [pov.x, pov.y, pov.ojos];
+  const cam = (x, y, z) => {
+    const dx = x - ojo[0], dy = y - ojo[1], dz = z - ojo[2];
+    const dep = dx * f.x + dy * f.y, up = dz;
+    return { a: dx * r.x + dy * r.y, b: up * cp - dep * sp, c: dep * cp + up * sp };
+  };
+  const P = (x, y, z = 0) => { const q = cam(x, y, z); const c = Math.max(q.c, 1e-6); return { X: F * q.a / c, Y: -F * q.b / c, d: -q.c }; };
+  P.cam = cam; P.F = F; P.ojo = ojo; P.pov = pov;
+  P.vista = { x: -f.x, y: -f.y }; // en planta, hacia el ojo
+  P.visible = (nn, pt) => (ojo[0] - pt.x) * nn.x + (ojo[1] - pt.y) * nn.y > 1e-9; // el ojo está del lado exterior de la cara
+  return P;
+};
+
+// Cámara para la escena: lo que no es proyección (muros de frente, zócalo, alto por defecto, rejilla, terreno)
+const escenaPov = (proyecto, sala, pov, opciones = {}) => {
+  const base = soloCam({ ...(sala.iso || {}), ...opciones });
+  const P = proyectorPov(pov);
+  return escena(proyecto, sala, { ...base, muros: opciones.muros || 'completos', P });
+};
+
+// Recorte de un polígono en coordenadas de cámara contra c >= CERCA (Sutherland–Hodgman con un solo plano)
+const recortarCerca = (pts, cerca = CERCA) => {
+  const out = []; const n = pts.length; if (!n) return out;
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], q = pts[(i + 1) % n]; const pin = p.c >= cerca, qin = q.c >= cerca;
+    if (pin) out.push(p);
+    if (pin !== qin) { const t = (cerca - p.c) / (q.c - p.c); out.push({ a: p.a + (q.a - p.a) * t, b: p.b + (q.b - p.b) * t, c: cerca }); }
+  }
+  return out;
+};
+const proyectarCam = (q, F) => [F * q.a / q.c, -F * q.b / q.c];
+
+// Pinta la escena en perspectiva. view: { s (px por unidad focal), ox, oy } — con s = ancho/2 y ox = ancho/2 el fov llena el lienzo.
+const pintarPov = (Pt, piezas, P, view, o = {}) => {
+  const s = view.s, X = (x) => view.ox + x * s, Y = (y) => view.oy + y * s, F = P.F;
+  const orden = piezas.filter((pz) => pz.tipo !== 'sombra').slice().sort((a, b) => a.d - b.d);
+  for (const pz of orden) {
+    for (const c of pz.caras) {
+      if (!c.pts3) continue;
+      const q = c.pts3.map(([x, y, z]) => P.cam(x, y, z));
+      if (c.linea) {
+        const seg = recortarSegmento(q[0], q[1]); if (!seg) continue;
+        const a = proyectarCam(seg[0], F), b = proyectarCam(seg[1], F);
+        Pt.line(X(a[0]), Y(a[1]), X(b[0]), Y(b[1]), { stroke: c.stroke, lw: c.lw }); continue;
+      }
+      const rec = recortarCerca(q); if (rec.length < 3) continue;
+      const pts = rec.map((p) => { const [x, y] = proyectarCam(p, F); return [X(x), Y(y)]; });
+      const fill = c.fill && c.lateral ? oscurecer(c.fill) : c.fill;
+      Pt.poly(pts, { fill: fill || 'none', stroke: c.stroke || null, lw: c.lw || 1, dash: c.dash || null });
+    }
+    if (pz.imagenes && o.imagenes !== false) for (const im of pz.imagenes) if (im.o3) pintarImagen(Pt, im, P, view);
+  }
+};
+const recortarSegmento = (p, q, cerca = CERCA) => {
+  const pin = p.c >= cerca, qin = q.c >= cerca; if (!pin && !qin) return null; if (pin && qin) return [p, q];
+  const t = (cerca - p.c) / (q.c - p.c); const m = { a: p.a + (q.a - p.a) * t, b: p.b + (q.b - p.b) * t, c: cerca };
+  return pin ? [p, m] : [m, q];
+};
+// Imagen de una obra: el rectángulo 3D se parte en celdas y cada celda se dibuja con una afín recortada a su cuadrilátero
+const pintarImagen = (Pt, im, P, view, celdas = 6) => {
+  const s = view.s, X = (x) => view.ox + x * s, Y = (y) => view.oy + y * s, F = P.F;
+  const [ox, oy, oz] = im.o3, [ux, uy, uz] = im.ejeU, [vx, vy, vz] = im.ejeV;
+  const pt3 = (u, v) => [ox + ux * u + vx * v, oy + uy * u + vy * v, oz + uz * u + vz * v];
+  const proy = (u, v) => { const q = P.cam(...pt3(u, v)); if (q.c < CERCA) return null; const [x, y] = proyectarCam(q, F); return [X(x), Y(y)]; };
+  const nu = Math.max(1, Math.round(celdas * Math.max(1, im.w / im.h))), nv = Math.max(1, Math.round(celdas * Math.max(1, im.h / im.w)));
+  for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+    const u0 = im.w * i / nu, u1 = im.w * (i + 1) / nu, v0 = im.h * j / nv, v1 = im.h * (j + 1) / nv;
+    const A = proy(u0, v0), B = proy(u1, v0), C = proy(u0, v1), D = proy(u1, v1); if (!A || !B || !C || !D) continue;
+    const a = (B[0] - A[0]) / (u1 - u0), b = (B[1] - A[1]) / (u1 - u0), c = (C[0] - A[0]) / (v1 - v0), d = (C[1] - A[1]) / (v1 - v0);
+    const e = A[0] - a * u0 - c * v0, f = A[1] - b * u0 - d * v0;
+    // el recorte se ensancha medio píxel para que no se vean las costuras entre celdas
+    Pt.imagePoly(im.id, [a, b, c, d, e, f], im.w, im.h, ensanchar([A, B, D, C], 0.6));
+  }
+};
+const ensanchar = (poly, px) => {
+  const cx = poly.reduce((k, p) => k + p[0], 0) / poly.length, cy = poly.reduce((k, p) => k + p[1], 0) / poly.length;
+  return poly.map(([x, y]) => { const dx = x - cx, dy = y - cy, L = Math.hypot(dx, dy) || 1; return [x + dx / L * px, y + dy / L * px]; });
+};
+const oscurecer = (c) => {
+  const h = /^#([0-9a-f]{6})$/i.exec(c);
+  if (h) { const n = parseInt(h[1], 16); const f = (v) => Math.max(0, Math.round(v * 0.86)).toString(16).padStart(2, '0'); return '#' + f(n >> 16) + f((n >> 8) & 255) + f(n & 255); }
+  const r = /^rgba\((\d+),(\d+),(\d+),([\d.]+)\)$/.exec(c);
+  if (r) return `rgba(${Math.round(r[1] * 0.86)},${Math.round(r[2] * 0.86)},${Math.round(r[3] * 0.86)},${r[4]})`;
+  return c;
+};
+
+// Encuadre que llena el lienzo con el campo visual horizontal
+const viewPov = (w, h) => ({ s: w / 2, ox: w / 2, oy: h / 2 });
+
+// Cono de visión en planta (para dibujar sobre la persona): triángulo-abanico de radio r
+const conoVision = (pov, r = 1.5, pasos = 8) => {
+  const a0 = rad(pov.mira - pov.fov / 2), a1 = rad(pov.mira + pov.fov / 2); const pts = [{ x: pov.x, y: pov.y }];
+  for (let k = 0; k <= pasos; k++) { const a = a0 + (a1 - a0) * k / pasos; pts.push({ x: pov.x + Math.cos(a) * r, y: pov.y + Math.sin(a) * r }); }
+  return pts;
+};
+
+// SVG completo de la vista desde una persona
+const svgDePov = (proyecto, sala, persona, W = 1600, opciones = {}) => {
+  const pov = povDe(persona); const H = Math.round(W * (opciones.aspecto || 0.666));
+  const piezas = escenaPov(proyecto, sala, pov, opciones); const P = proyectorPov(pov);
+  const imgs = {}; for (const pz of piezas) for (const im of pz.imagenes || []) imgs[im.id] = proyecto.imagenes[im.id];
+  const Pt = MD.svgPainter(imgs);
+  pintarPov(Pt, piezas, P, viewPov(W, H));
+  return { svg: Pt.toString(W, H, '#ffffff'), w: W, h: H, pov, piezas };
+};
+return { CERCA, OJOS, povDe, esFigura, proyectorPov, escenaPov, recortarCerca, pintarPov, viewPov, conoVision, svgDePov };
+})();
+
 // ── src/vistas/isometrica.js
 const __m_src_vistas_isometrica = (() => {
 // Modo 3D de la vista Planta: la sala en axonometría con giro libre, al estilo de Los Sims.
@@ -3654,10 +3830,13 @@ const __m_src_vistas_isometrica = (() => {
 const I = __m_src_core_isometrica;
 const { MD } = __m_src_core_muro;
 const { fmtNum } = __m_src_core_unidades;
+const V = __m_src_core_perspectiva;
 
 const MARKUP = `
 <div class="iso-barra">
   <span class="iso-tit">3D</span>
+  <label class="iso-l" title="Perspectiva desde los ojos de una figura (persona, silla de ruedas, niño) colocada en la planta">ojos de <select id="isoOjos"><option value="">— nadie (axonometría) —</option></select></label>
+  <span class="iso-pov" id="isoPovInfo" hidden></span>
   <label class="iso-l">giro <input type="range" id="isoGiro" min="0" max="359" step="1"> <b data-v="giro"></b></label>
   <label class="iso-l">inclinación <input type="range" id="isoInc" min="15" max="90" step="1"> <b data-v="inc"></b></label>
   <div class="seg iso-giros"><button data-g="-90" title="Un cuarto de vuelta a la izquierda">⟲</button><button data-g="90" title="Un cuarto de vuelta a la derecha">⟳</button></div>
@@ -3676,7 +3855,7 @@ const MARKUP = `
   <button id="isoCerrar" title="Volver a la planta (Esc)">cerrar</button>
 </div>
 <canvas id="isoCv"></canvas>
-<div class="iso-pie">Arrastra para girar e inclinar · Shift + arrastrar desplaza · rueda acerca · «＋ vista» guarda este punto de vista con nombre; PgUp/PgDn recorre los guardados</div>
+<div class="iso-pie" id="isoPie">Arrastra para girar e inclinar · Shift + arrastrar desplaza · rueda acerca · «＋ vista» guarda este punto de vista con nombre; PgUp/PgDn recorre los guardados</div>
 `;
 
 // ctx: { root, proyecto, sala(), mensaje, onCambio, descargar(blob, nombre), nombreArchivo() }
@@ -3685,6 +3864,7 @@ function montarIso(ctx) {
   const $ = (s) => root.querySelector(s);
   const cv = $('#isoCv'), g2 = cv.getContext('2d');
   let cam = I.camDefecto(), view = { s: 60, ox: 0, oy: 0 }, piezas = [], visible = false, raf = 0, encajado = false, sFit = 60, vistaId = '';
+  let povId = ''; // figura desde cuyos ojos se mira; '' = axonometría
   const imgCache = new Map();
   const getImage = (id) => {
     let e = imgCache.get(id);
@@ -3720,13 +3900,32 @@ function montarIso(ctx) {
     if (!confirm('¿Quitar la vista «' + v.nombre + '»?')) return;
     s.iso = { ...s.iso, vistas: vistas().filter((x) => x.id !== v.id) }; vistaId = ''; renderVistas(); if (ctx.onCambio) ctx.onCambio();
   };
+  // ---- perspectiva desde una figura ----
+  const figuras = () => { const s = sala(); return s ? s.entidades.filter(V.esFigura) : []; };
+  const figura = () => figuras().find((f) => f.id === povId) || null;
+  const enPov = () => !!figura();
+  const renderOjos = () => {
+    const sel = $('#isoOjos'); const fs = figuras();
+    sel.innerHTML = '<option value="">— nadie (axonometría) —</option>' + fs.map((f, k) => `<option value="${f.id}" ${f.id === povId ? 'selected' : ''}>${esc(f.nombre || 'figura')} ${k + 1}</option>`).join('');
+    sel.disabled = !fs.length; sel.title = fs.length ? 'Perspectiva desde los ojos de una figura de la planta' : 'Coloca una persona de la biblioteca (Referencia) en la planta para mirar desde sus ojos';
+    const pov = enPov();
+    for (const id of ['isoGiro', 'isoInc', 'isoRejilla', 'isoVistas', 'isoVistaGuardar', 'isoVistaQuitar', 'isoAjustar']) $('#' + id).disabled = pov || (id === 'isoVistas' && !vistas().length) || (id === 'isoVistaQuitar' && !vistaId);
+    root.querySelectorAll('[data-g]').forEach((b) => { b.disabled = pov; });
+    $('#isoPovInfo').hidden = !pov;
+    if (pov) { const p = V.povDe(figura()); $('#isoPovInfo').textContent = `mira ${fmtNum(p.mira, 0)}° · ojos ${fmtNum(p.ojos)} m · campo ${fmtNum(p.fov, 0)}°`; }
+    $('#isoPie').textContent = pov ? 'Arrastra para mirar alrededor (y arriba/abajo) · rueda abre o cierra el campo visual · la figura y su cono se mueven en la planta · PNG/SVG exportan esta vista'
+      : 'Arrastra para girar e inclinar · Shift + arrastrar desplaza · rueda acerca · «＋ vista» guarda este punto de vista con nombre; PgUp/PgDn recorre los guardados';
+  };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const setPov = (id) => { povId = id || ''; if (!figura()) povId = ''; renderOjos(); reconstruir(); if (!enPov()) { sync(); encajar(); } pedir(); };
+  const guardarPov = () => { if (ctx.onCambio) ctx.onCambio(); };
   const sync = () => {
     $('#isoGiro').value = ((cam.giro % 360) + 360) % 360; $('#isoInc').value = cam.inclinacion;
     $('[data-v="giro"]').textContent = fmtNum(((cam.giro % 360) + 360) % 360, 0) + '°'; $('[data-v="inc"]').textContent = fmtNum(cam.inclinacion, 0) + '°';
     $('#isoMuros').value = cam.muros; $('#isoZocalo').value = fmtNum(cam.zocalo); $('#isoAlto').value = fmtNum(cam.altoDefecto); $('#isoRejilla').checked = !!cam.rejilla; $('#isoFondo').checked = cam.fondo !== false;
   };
   const tam = () => ({ w: Math.max(1, root.clientWidth), h: Math.max(1, root.clientHeight - ($('.iso-barra').offsetHeight || 36) - ($('.iso-pie').offsetHeight || 22)) });
-  const reconstruir = () => { const s = sala(); piezas = s ? I.escena(ctx.proyecto, s, cam) : []; };
+  const reconstruir = () => { const s = sala(); const f = figura(); piezas = !s ? [] : f ? V.escenaPov(ctx.proyecto, s, V.povDe(f), { muros: cam.muros, zocalo: cam.zocalo, altoDefecto: cam.altoDefecto, rejilla: cam.rejilla, fondo: cam.fondo }) : I.escena(ctx.proyecto, s, cam); };
   const encajar = () => {
     const { w, h } = tam(); const b = I.limites(piezas); const m = 30;
     const sc = Math.max(1, Math.min((w - 2 * m) / Math.max(b.w, 0.1), (h - 2 * m) / Math.max(b.h, 0.1)));
@@ -3738,10 +3937,12 @@ function montarIso(ctx) {
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
     if (!g2) return;
     g2.setTransform(dpr, 0, 0, dpr, 0, 0); g2.fillStyle = '#ffffff'; g2.fillRect(0, 0, w, h);
-    I.pintar(MD.canvasPainter(g2, getImage), piezas, view);
+    const f = figura();
+    if (f) V.pintarPov(MD.canvasPainter(g2, getImage), piezas, V.proyectorPov(V.povDe(f)), V.viewPov(w, h));
+    else I.pintar(MD.canvasPainter(g2, getImage), piezas, view);
   };
   const pedir = () => { if (!raf) raf = requestAnimationFrame(dibujar); };
-  const actualizar = (persistir = true) => { reconstruir(); sync(); pedir(); if (persistir) guardarCam(); if (vistaId) { vistaId = ''; renderVistas(); } };
+  const actualizar = (persistir = true) => { reconstruir(); sync(); pedir(); if (persistir) guardarCam(); if (vistaId && !enPov()) { vistaId = ''; renderVistas(); } };
 
   // controles
   $('#isoGiro').addEventListener('input', (e) => { cam.giro = +e.target.value; actualizar(false); });
@@ -3754,49 +3955,61 @@ function montarIso(ctx) {
   $('#isoRejilla').addEventListener('change', (e) => { cam.rejilla = e.target.checked; actualizar(); });
   $('#isoFondo').addEventListener('change', (e) => { cam.fondo = e.target.checked; actualizar(); encajar(); pedir(); });
   $('#isoAjustar').addEventListener('click', () => { encajar(); pedir(); });
+  $('#isoOjos').addEventListener('change', (e) => setPov(e.target.value));
   $('#isoVistas').addEventListener('change', (e) => { if (e.target.value) irAVista(e.target.value); else { vistaId = ''; renderVistas(); } });
   $('#isoVistaGuardar').addEventListener('click', guardarVista);
   $('#isoVistaQuitar').addEventListener('click', quitarVista);
   $('#isoCerrar').addEventListener('click', () => ctx.onCerrar && ctx.onCerrar());
+  const slug = (s) => String(s || 'figura').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'figura';
   const sufijoVista = () => { const v = vistas().find((x) => x.id === vistaId); return v ? '-' + v.nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() : ''; };
   $('#isoSvg').addEventListener('click', () => {
     const s = sala(); if (!s) return;
-    const r = I.svgDeIso(ctx.proyecto, s, cam, 120);
-    ctx.descargar(new Blob([r.svg], { type: 'image/svg+xml' }), ctx.nombreArchivo() + '-3d' + sufijoVista() + '.svg'); ctx.mensaje('SVG exportado');
+    const f = figura();
+    const r = f ? V.svgDePov(ctx.proyecto, s, f, 1600, { muros: cam.muros, zocalo: cam.zocalo, altoDefecto: cam.altoDefecto, rejilla: cam.rejilla, fondo: cam.fondo, aspecto: tam().h / tam().w }) : I.svgDeIso(ctx.proyecto, s, cam, 120);
+    ctx.descargar(new Blob([r.svg], { type: 'image/svg+xml' }), ctx.nombreArchivo() + (f ? '-desde-' + slug(f.nombre) : '-3d' + sufijoVista()) + '.svg'); ctx.mensaje('SVG exportado');
   });
   $('#isoPng').addEventListener('click', () => {
     const s = sala(); if (!s) return;
-    const b = I.limites(piezas); const pxm = Math.min(200, Math.sqrt(12e6 / Math.max(1, (b.w + 1) * (b.h + 1))));
-    const W = Math.round((b.w + 1) * pxm), H = Math.round((b.h + 1) * pxm);
+    const f = figura();
+    let W, H, pintarEn;
+    if (f) { const t = tam(); W = 2400; H = Math.round(W * t.h / t.w); pintarEn = (g) => V.pintarPov(MD.canvasPainter(g, getImage), piezas, V.proyectorPov(V.povDe(f)), V.viewPov(W, H)); }
+    else { const b = I.limites(piezas); const pxm = Math.min(200, Math.sqrt(12e6 / Math.max(1, (b.w + 1) * (b.h + 1)))); W = Math.round((b.w + 1) * pxm); H = Math.round((b.h + 1) * pxm); pintarEn = (g) => I.pintar(MD.canvasPainter(g, getImage), piezas, { s: pxm, ox: (0.5 - b.x) * pxm, oy: (0.5 - b.y) * pxm }); }
     const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
     if (!g) return ctx.mensaje('No se pudo crear el lienzo', true);
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-    I.pintar(MD.canvasPainter(g, getImage), piezas, { s: pxm, ox: (0.5 - b.x) * pxm, oy: (0.5 - b.y) * pxm });
-    c.toBlob((bl) => { if (bl) { ctx.descargar(bl, ctx.nombreArchivo() + '-3d' + sufijoVista() + '.png'); ctx.mensaje('PNG exportado: ' + W + ' × ' + H + ' px'); } else ctx.mensaje('No se pudo generar el PNG', true); }, 'image/png');
+    pintarEn(g);
+    c.toBlob((bl) => { if (bl) { ctx.descargar(bl, ctx.nombreArchivo() + (f ? '-desde-' + slug(f.nombre) : '-3d' + sufijoVista()) + '.png'); ctx.mensaje('PNG exportado: ' + W + ' × ' + H + ' px'); } else ctx.mensaje('No se pudo generar el PNG', true); }, 'image/png');
   });
 
   // puntero: arrastrar gira e inclina; Shift desplaza; rueda acerca
   let arr = null;
-  cv.addEventListener('pointerdown', (e) => { e.stopPropagation(); cv.setPointerCapture(e.pointerId); arr = { x: e.clientX, y: e.clientY, giro: cam.giro, inc: cam.inclinacion, ox: view.ox, oy: view.oy, pan: e.shiftKey || e.button === 1 }; });
+  cv.addEventListener('pointerdown', (e) => { e.stopPropagation(); cv.setPointerCapture(e.pointerId); const f = figura(); const p = f ? V.povDe(f) : null; arr = { x: e.clientX, y: e.clientY, giro: cam.giro, inc: cam.inclinacion, ox: view.ox, oy: view.oy, pan: !f && (e.shiftKey || e.button === 1), mira: p && p.mira, cabeceo: p && p.cabeceo }; });
   cv.addEventListener('pointermove', (e) => {
     e.stopPropagation(); if (!arr) return;
     const dx = e.clientX - arr.x, dy = e.clientY - arr.y;
+    const f = figura();
+    if (f) { // mirar alrededor: la mirada sigue al arrastre, como girar la cabeza
+      const { w } = tam(); const p = V.povDe(f);
+      f.mira = ((arr.mira - dx / w * p.fov) % 360 + 360) % 360; f.cabeceo = Math.max(-45, Math.min(45, arr.cabeceo + dy / w * p.fov));
+      renderOjos(); reconstruir(); pedir(); return;
+    }
     if (arr.pan) { view.ox = arr.ox + dx; view.oy = arr.oy + dy; pedir(); return; }
     cam.giro = ((arr.giro + dx * 0.5) % 360 + 360) % 360; cam.inclinacion = Math.max(15, Math.min(90, arr.inc + dy * 0.3));
     actualizar(false);
   });
-  const fin = (e) => { e.stopPropagation(); if (arr && !arr.pan) guardarCam(); arr = null; };
+  const fin = (e) => { e.stopPropagation(); if (arr && figura()) guardarPov(); else if (arr && !arr.pan) guardarCam(); arr = null; };
   cv.addEventListener('pointerup', fin); cv.addEventListener('pointercancel', fin);
-  cv.addEventListener('wheel', (e) => { e.preventDefault(); e.stopPropagation(); const r = cv.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top; const f = e.deltaY < 0 ? 1.15 : 1 / 1.15; view = { s: view.s * f, ox: px - (px - view.ox) * f, oy: py - (py - view.oy) * f }; pedir(); }, { passive: false });
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); e.stopPropagation(); const f = figura(); if (f) { f.fov = Math.max(25, Math.min(110, Math.round(V.povDe(f).fov * (e.deltaY < 0 ? 0.92 : 1 / 0.92)))); renderOjos(); reconstruir(); pedir(); guardarPov(); return; } const r = cv.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top; const k = e.deltaY < 0 ? 1.15 : 1 / 1.15; view = { s: view.s * k, ox: px - (px - view.ox) * k, oy: py - (py - view.oy) * k }; pedir(); }, { passive: false });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (visible) pedir(); }) : null; if (ro) ro.observe(root);
 
   return {
-    mostrar() { visible = true; root.hidden = false; leerCam(); imgCache.clear(); reconstruir(); sync(); if (!encajado) encajar(); vistaId = ''; renderVistas(); pedir(); },
+    mostrar(figuraId = null) { visible = true; root.hidden = false; leerCam(); imgCache.clear(); if (figuraId !== null) povId = figuraId; if (!figura()) povId = ''; renderOjos(); reconstruir(); sync(); if (!encajado) encajar(); vistaId = ''; renderVistas(); renderOjos(); pedir(); },
     vistaSiguiente,
     ocultar() { visible = false; root.hidden = true; },
-    refrescar() { if (visible) { reconstruir(); pedir(); } },
-    salaCambiada() { encajado = false; if (visible) { const s = sala(); if (!s || !s.entidades.length) { ctx.mensaje('Esta sala está vacía: dibújala antes de verla en 3D'); if (ctx.onCerrar) ctx.onCerrar(); return; } leerCam(); reconstruir(); sync(); encajar(); vistaId = ''; renderVistas(); pedir(); } },
+    refrescar() { if (visible) { if (povId && !figura()) { povId = ''; renderOjos(); } reconstruir(); pedir(); } },
+    get povId() { return povId; }, setPov,
+    salaCambiada() { encajado = false; if (visible) { const s = sala(); if (!s || !s.entidades.length) { ctx.mensaje('Esta sala está vacía: dibújala antes de verla en 3D'); if (ctx.onCerrar) ctx.onCerrar(); return; } povId = ''; renderOjos(); leerCam(); reconstruir(); sync(); encajar(); vistaId = ''; renderVistas(); pedir(); } },
     get visible() { return visible; },
     destruir() { visible = false; if (ro) ro.disconnect(); if (raf) cancelAnimationFrame(raf); },
     _cam: () => cam, _piezas: () => piezas,
@@ -3814,6 +4027,7 @@ const M = __m_src_core_modelo;
 const { MARKUP } = __m_src_vistas_planta_markup;
 const { montarIso } = __m_src_vistas_isometrica;
 const { CATALOGO, CATEGORIAS, muebleDesde, entradaDesde, csvMobiliario } = __m_src_core_biblioteca;
+const V = __m_src_core_perspectiva;
 
 // ctx: { root, proyecto, sala, onCambio(), onGuardar(), onObraCambiada(obraId) }
 function montarPlanta(ctx) {
@@ -4118,6 +4332,11 @@ const renderPanel = () => {
       const num = (k, label, v) => `<div><label>${label}</label><input type="text" inputmode="decimal" data-num="${k}" value="${G.fmtNum(v)}"></div>`;
       h += e.forma === 'cilindro' ? `<div class="fila">${num('ml', 'diámetro (m)', e.l)}${num('mh', 'alto (m)', e.h)}</div>` : `<div class="fila">${num('ml', 'largo (m)', e.l)}${num('ma', 'ancho (m)', e.a)}${num('mh', 'alto (m)', e.h)}</div>`;
       h += `<div class="fila"><div><label>giro (°)</label><input type="text" inputmode="decimal" data-num="mrot" value="${G.fmtNum(e.rot || 0, 0)}"></div><div><label>elevación (m)</label><input type="text" inputmode="decimal" data-num="mdz" value="${G.fmtNum(e.dz || 0)}" title="Altura de la base sobre el piso (0 = apoyado)"></div></div>`;
+      if (V.esFigura(e)) { // figura de referencia: punto de vista
+        const pov = V.povDe(e);
+        h += `<h3>punto de vista</h3><div class="fila"><div><label>mira hacia (°)</label><input type="text" inputmode="decimal" data-num="mira" value="${G.fmtNum(pov.mira, 0)}" title="0 = hacia la derecha del plano, 90 = hacia abajo; también girando el cono con Shift+R"></div><div><label>ojos (m)</label><input type="text" inputmode="decimal" data-num="ojos" value="${G.fmtNum(pov.ojos)}"></div><div><label>campo (°)</label><input type="text" inputmode="decimal" data-num="fov" value="${G.fmtNum(pov.fov, 0)}"></div></div>`;
+        h += `<div class="btns"><button data-acc="verDesde" class="primario" title="Abrir el 3D en perspectiva desde los ojos de esta figura">ver desde sus ojos</button></div>`;
+      }
       h += `<div class="btns"><button data-acc="rot90">⟲ 90°</button><button data-acc="rot0">sin giro</button></div>`;
       if (e.partes) h += `<div class="nota">Objeto compuesto (${e.partes.length} piezas): las medidas escalan el conjunto.</div>`;
       h += `<label>color</label>${swatches(e.color)}`;
@@ -4304,6 +4523,9 @@ const enlazarPanel = (e) => {
       if (k === 'alto') { const txt = String(i.value).trim(); if (txt && !(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); if (txt) e.alto = v; else delete e.alto; cambio(); return; }
       if (k === 'mrot') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.rot = ((v % 360) + 360) % 360; cambio(); return; }
       if (k === 'mdz') { if (!(v >= 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); e.dz = G.r6(v); cambio(); return; }
+      if (k === 'mira') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.mira = ((v % 360) + 360) % 360; cambio(); return; }
+      if (k === 'ojos') { if (!(v > 0.3 && v < 3)) { mensaje('Altura de ojos entre 0,3 y 3 m', true); renderPanel(); return; } snap(); e.ojos = G.r6(v); cambio(); return; }
+      if (k === 'fov') { if (!(v >= 25 && v <= 110)) { mensaje('Campo visual entre 25° y 110°', true); renderPanel(); return; } snap(); e.fov = Math.round(v); cambio(); return; }
       if (k === 'ml' || k === 'ma' || k === 'mh') {
         if (!(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
         snap(); const prop = k === 'ml' ? 'l' : k === 'ma' ? 'a' : 'h'; const f = v / e[prop];
@@ -4420,6 +4642,7 @@ const accion = (acc, e, btn = null) => {
   else if (acc === 'etqTodas') { snap(); S.doc.entidades.forEach((x) => { delete x.etiq; }); cambio(); mensaje('Rótulos recolocados automáticamente'); }
   else if (acc === 'etqCentro') { snap(); delete e.etq; cambio(); }
   else if (acc === 'cara') { snap(); e.lado = e.lado === -1 ? 1 : -1; cambio(); }
+  else if (acc === 'verDesde') { if (e && V.esFigura(e)) abrir3d(e.id); }
   else if (acc === 'crearObra') { if (!e || !G.esObra(e) || obraDe(e)) return; snap(); S.obraPendiente = null; asignarObra(e); cambio(); }
   else if (acc === 'csvObras') exportarCsvObras();
   else if (acc === 'csvMob') { if (!ctx.proyecto.salas.some((x) => x.entidades.some(G.esMueble))) return mensaje('Todavía no hay mobiliario', true); descargar(new Blob(['\ufeff' + csvMobiliario(ctx.proyecto)], { type: 'text/csv;charset=utf-8' }), nombreArchivo() + '-materiales.csv'); mensaje('Lista de materiales exportada'); }
@@ -4852,6 +5075,7 @@ const alTeclado = (ev) => {
     snap(); G.mover(e, d[0] * paso, d[1] * paso); cambio(); return;
   }
   if (kl === 'r' && S.tool === 'mueble') { S.muebleRot = ((S.muebleRot || 0) + 90) % 360; pedirRender(); return; }
+  if (kl === 'r' && ev.shiftKey && S.sel && V.esFigura(ent())) { const e = ent(); snap(); e.mira = ((V.povDe(e).mira + 45) % 360 + 360) % 360; cambio(); return; }
   const herr = { v: 'select', l: 'linea', r: 'rect', o: 'circulo', p: 'puerta', n: 'ventana', t: 'texto', d: 'cota', c: 'cuadro', b: 'obra', g: 'region', y: 'proyeccion' };
   if (herr[kl]) { setTool(herr[kl]); return; }
   if (k === '3' && !S.draft) { iso.visible ? cerrar3d() : abrir3d(); return; }
@@ -4962,7 +5186,7 @@ iso = montarIso({
   root: $('#psIso'), proyecto: ctx.proyecto, sala: () => S.doc, mensaje, onCambio: autosave, descargar, nombreArchivo,
   onCerrar: () => cerrar3d(),
 });
-const abrir3d = () => { if (!S.doc.entidades.length) return mensaje('Dibuja la sala antes de verla en 3D', true); S.draft = null; S.buffer = ''; S.muebleTpl = null; if (S.tool !== 'select') setTool('select'); iso.mostrar(); $('#b3d').classList.add('activo'); el.flot.style.display = 'none'; };
+const abrir3d = (figuraId = null) => { if (!S.doc.entidades.length) return mensaje('Dibuja la sala antes de verla en 3D', true); S.draft = null; S.buffer = ''; S.muebleTpl = null; if (S.tool !== 'select') setTool('select'); iso.mostrar(figuraId); $('#b3d').classList.add('activo'); el.flot.style.display = 'none'; };
 const cerrar3d = () => { iso.ocultar(); $('#b3d').classList.remove('activo'); render(); };
 $('#b3d').addEventListener('click', () => (iso.visible ? cerrar3d() : abrir3d()));
 // ── arranque y API para el cascarón
@@ -6828,6 +7052,7 @@ const { A: G } = __m_src_core_anotacion;
 const M = __m_src_core_modelo;
 const { svgDeSala, svgDeMuro } = __m_src_core_puente;
 const I = __m_src_core_isometrica;
+const V = __m_src_core_perspectiva;
 const { MARKUP } = __m_src_vistas_lectura_markup;
 
 // env: { root, proyecto, modo: 'editor'|'lectura', onCambio(), onGuardar(), onExportarHtml(), onEditar(), onArchivoJson(f), mensaje }
@@ -6848,15 +7073,16 @@ const fuente = (pl) => {
   const b = pl.base;
   if (b.tipo === 'imagen') { const href = env.proyecto.imagenes[b.imagenId] || ''; return { href, w: b.w, h: b.h, perdida: !href }; }
   const obj = b.tipo === 'muro' ? M.muroDe(env.proyecto, b.muroId) : M.salaDe(env.proyecto, b.salaId);
-  if (!obj) return { href: '', w: b.w || 100, h: b.h || 100, perdida: true };
+  const fig = obj && b.tipo === 'pov' ? obj.entidades.find((e) => e.id === b.figuraId) || null : null;
+  if (!obj || (b.tipo === 'pov' && !fig)) return { href: '', w: b.w || 100, h: b.h || 100, perdida: true };
   const firma = JSON.stringify(b.tipo === 'muro' ? [obj, env.proyecto.obras.filter((o) => obj.colgado.some((c) => c.obraId === o.id))] : [obj, env.proyecto.obras, env.proyecto.muros, b.cam]);
   const c = cacheFuente.get(pl.id);
   if (c && c.firma === firma) return c;
-  const r = b.tipo === 'sala' ? svgDeSala(env.proyecto, obj) : b.tipo === 'muro' ? svgDeMuro(env.proyecto, obj) : I.svgDeIso(env.proyecto, obj, { ...I.camDefecto(), ...(b.cam || obj.iso || {}) }, 120);
+  const r = b.tipo === 'sala' ? svgDeSala(env.proyecto, obj) : b.tipo === 'muro' ? svgDeMuro(env.proyecto, obj) : b.tipo === 'pov' ? V.svgDePov(env.proyecto, obj, fig, 2000, I.soloCam(obj.iso)) : I.svgDeIso(env.proyecto, obj, { ...I.camDefecto(), ...(b.cam || obj.iso || {}) }, 120);
   if (!r) return { href: '', w: b.w || 100, h: b.h || 100 };
   const f = { firma, href: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(r.svg), w: r.w, h: r.h };
   cacheFuente.set(pl.id, f);
-  b.w = r.w; b.h = r.h; pl.escala = b.tipo === 'iso' ? null : { pxPorMetro: r.pxPorMetro, ref: null, automatica: true };
+  b.w = r.w; b.h = r.h; pl.escala = b.tipo === 'iso' || b.tipo === 'pov' ? null : { pxPorMetro: r.pxPorMetro, ref: null, automatica: true };
   return f;
 };
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -7043,7 +7269,7 @@ const renderSvg = () => {
   el.svg.appendChild(svgEl('image', { href: f.href, x: 0, y: 0, width: f.w, height: f.h, 'data-fondo': '1' }));
   if (f.perdida) { // la sala, el muro o la imagen de base ya no existen: las anotaciones se conservan sobre un fondo vacío
     el.svg.appendChild(svgEl('rect', { x: 0, y: 0, width: f.w, height: f.h, fill: '#f6f5f0', stroke: '#c9c5b8', 'stroke-dasharray': '8 6', 'pointer-events': 'none' }));
-    el.svg.appendChild(svgEl('text', { x: f.w / 2, y: 24, 'text-anchor': 'middle', 'font-size': 14, fill: '#8a8677', 'pointer-events': 'none' }, 'El fondo de este plano (' + (pl.base.tipo === 'imagen' ? 'imagen' : pl.base.tipo === 'muro' ? 'alzado' : 'sala') + ') ya no existe en el proyecto; las anotaciones se conservan'));
+    el.svg.appendChild(svgEl('text', { x: f.w / 2, y: 24, 'text-anchor': 'middle', 'font-size': 14, fill: '#8a8677', 'pointer-events': 'none' }, 'El fondo de este plano (' + (pl.base.tipo === 'imagen' ? 'imagen' : pl.base.tipo === 'muro' ? 'alzado' : pl.base.tipo === 'pov' ? 'figura o sala' : 'sala') + ') ya no existe en el proyecto; las anotaciones se conservan'));
   }
   const z = S.view.zoom;
   for (const it of pl.items) { if (!capaVisible(pl, it.capa)) continue; el.svg.appendChild(renderItem(it, pl, z)); }
@@ -7210,17 +7436,25 @@ const agregarPlano = async (file) => {
 };
 const agregarPlanoDe = (tipo, obj) => {
   if (!obj) return;
-  const base = tipo === 'sala' ? { tipo: 'sala', salaId: obj.id, w: 0, h: 0 } : tipo === 'muro' ? { tipo: 'muro', muroId: obj.id, w: 0, h: 0 } : { tipo: 'iso', salaId: obj.id, cam: I.soloCam(camIso(obj)), w: 0, h: 0 };
-  const pl = M.nuevaAnotacion({ nombre: (obj.nombre || (tipo === 'muro' ? 'Muro' : 'Planta')) + (tipo === 'iso' ? ' · 3D' : ''), base });
+  let base, sufijo = '';
+  if (tipo === 'sala') base = { tipo: 'sala', salaId: obj.id, w: 0, h: 0 };
+  else if (tipo === 'muro') base = { tipo: 'muro', muroId: obj.id, w: 0, h: 0 };
+  else { const el = camIso(obj); if (!el) return; if (el.figura) { base = { tipo: 'pov', salaId: obj.id, figuraId: el.figura.id, w: 0, h: 0 }; sufijo = ' · desde ' + (el.figura.nombre || 'figura'); } else { base = { tipo: 'iso', salaId: obj.id, cam: I.soloCam(el.cam), w: 0, h: 0 }; sufijo = ' · 3D'; } }
+  const pl = M.nuevaAnotacion({ nombre: (obj.nombre || (tipo === 'muro' ? 'Muro' : 'Planta')) + sufijo, base });
   S.proyecto.planos.push(pl); activarPlano(pl.id);
-  mensaje(tipo === 'sala' ? `Planta «${pl.nombre}» añadida, a escala` : tipo === 'muro' ? `Alzado «${pl.nombre}» añadido, a escala` : `Vista 3D «${pl.nombre}» añadida con el giro guardado en la planta`);
+  mensaje(tipo === 'sala' ? `Planta «${pl.nombre}» añadida, a escala` : tipo === 'muro' ? `Alzado «${pl.nombre}» añadido, a escala` : base.tipo === 'pov' ? `Vista «${pl.nombre}» añadida: sigue a la figura si se mueve en la planta` : `Vista 3D «${pl.nombre}» añadida con el giro guardado en la planta`);
 };
-// cámara para la base 3D: la vista guardada que el usuario elija, o la cámara actual de la sala
+// base 3D: la cámara actual, una vista guardada, o los ojos de una figura de la sala → { cam } | { figura } | null (cancelado)
 const camIso = (sala) => {
   const vs = sala.iso && Array.isArray(sala.iso.vistas) ? sala.iso.vistas : [];
-  if (!vs.length) return sala.iso || {};
-  const r = prompt(['0. Cámara actual de la planta', ...vs.map((v, i) => (i + 1) + '. ' + v.nombre)].join('\n') + '\n\nNúmero de la vista:', '0');
-  if (r == null) return sala.iso || {}; const i = parseInt(r, 10); return i > 0 && vs[i - 1] ? vs[i - 1].cam : (sala.iso || {});
+  const fs = sala.entidades.filter(V.esFigura);
+  if (!vs.length && !fs.length) return { cam: sala.iso || {} };
+  const op = ['0. Cámara actual de la planta', ...vs.map((v, i) => (i + 1) + '. Vista «' + v.nombre + '»'), ...fs.map((f, i) => (vs.length + i + 1) + '. Desde los ojos de ' + (f.nombre || 'figura') + ' ' + (i + 1))];
+  const r = prompt(op.join('\n') + '\n\nNúmero:', '0');
+  if (r == null) return null; const i = parseInt(r, 10);
+  if (i > 0 && i <= vs.length) return { cam: vs[i - 1].cam };
+  if (i > vs.length && fs[i - vs.length - 1]) return { figura: fs[i - vs.length - 1] };
+  return { cam: sala.iso || {} };
 };
 const elegir = (titulo, lista) => {
   if (!lista.length) { mensaje('El proyecto no tiene ' + (titulo === 'sala' ? 'salas' : 'muros') + ' todavía', true); return null; }

@@ -397,6 +397,8 @@ body.lectura #tituloLectura{display:inline}
 #psIso .iso-l b{color:var(--ink);min-width:30px}
 #psIso .iso-l select,#psIso .iso-l input[type=text]{width:auto;padding:2px 4px}
 #psIso .iso-sep{flex:1}
+#psIso .iso-pov{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
+#psIso .iso-l select:disabled,#psIso .iso-l input:disabled,#psIso button:disabled{opacity:.4}
 #psIso .iso-giros button{padding:2px 8px}
 #psIso #isoCv{flex:1;display:block;cursor:grab;touch-action:none}
 #psIso #isoCv:active{cursor:grabbing}

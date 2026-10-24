@@ -712,6 +712,12 @@ export const G = (() => {
         const pts = mueblePts(e); const col2 = e.color && e.color !== '#ffffff' ? e.color : '#8a8a8a';
         cuerpo += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" fill="${col2}" fill-opacity="0.16" stroke="${col2}" stroke-width="${sw('medio')}" stroke-linejoin="miter"/>`;
         if (e.forma !== 'cilindro') { const d0 = pts[0], d2 = pts[2]; cuerpo += `<line x1="${C(d0.x)}" y1="${C(d0.y)}" x2="${C(d2.x)}" y2="${C(d2.y)}" stroke="${col2}" stroke-width="${sw('fino')}" stroke-opacity="0.5"/>`; }
+        if (e.cat === 'referencia' || Number.isFinite(e.mira)) { // figura: cono de visión (punto de vista)
+          const mira = (Number.isFinite(e.mira) ? e.mira : 0) * Math.PI / 180, fov = (e.fov >= 25 && e.fov <= 110 ? e.fov : 60) * Math.PI / 180, r = 1.2;
+          let d = `M${C(e.x)} ${C(e.y)}`; for (let k = 0; k <= 8; k++) { const a = mira - fov / 2 + fov * k / 8; d += ` L${C(e.x + Math.cos(a) * r)} ${C(e.y + Math.sin(a) * r)}`; }
+          cuerpo += `<path d="${d} Z" fill="${col2}" fill-opacity="0.1" stroke="${col2}" stroke-width="${sw('fino')}" stroke-opacity="0.6" stroke-dasharray="${C(0.06)} ${C(0.04)}"/>`;
+          cuerpo += `<line x1="${C(e.x)}" y1="${C(e.y)}" x2="${C(e.x + Math.cos(mira) * r * 0.55)}" y2="${C(e.y + Math.sin(mira) * r * 0.55)}" stroke="${col2}" stroke-width="${sw('medio')}"/>`;
+        }
         obsCajas.push(cajaDePuntos(pts));
         const tam = Math.min(h * 0.75, Math.max(e.l, e.a) * 0.22);
         if (tam >= h * 0.35) { const ang = e.forma === 'cilindro' ? 0 : (((e.rot || 0) % 180) + 180) % 180 > 90 ? ((e.rot || 0) % 180) - 180 : (e.rot || 0) % 180;

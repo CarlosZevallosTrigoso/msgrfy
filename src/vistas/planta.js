@@ -6,6 +6,7 @@ import * as M from '../core/modelo.js';
 import { MARKUP } from './planta-markup.js';
 import { montarIso } from './isometrica.js';
 import { CATALOGO, CATEGORIAS, muebleDesde, entradaDesde, csvMobiliario } from '../core/biblioteca.js';
+import * as V from '../core/perspectiva.js';
 
 // ctx: { root, proyecto, sala, onCambio(), onGuardar(), onObraCambiada(obraId) }
 export function montarPlanta(ctx) {
@@ -310,6 +311,11 @@ const renderPanel = () => {
       const num = (k, label, v) => `<div><label>${label}</label><input type="text" inputmode="decimal" data-num="${k}" value="${G.fmtNum(v)}"></div>`;
       h += e.forma === 'cilindro' ? `<div class="fila">${num('ml', 'diámetro (m)', e.l)}${num('mh', 'alto (m)', e.h)}</div>` : `<div class="fila">${num('ml', 'largo (m)', e.l)}${num('ma', 'ancho (m)', e.a)}${num('mh', 'alto (m)', e.h)}</div>`;
       h += `<div class="fila"><div><label>giro (°)</label><input type="text" inputmode="decimal" data-num="mrot" value="${G.fmtNum(e.rot || 0, 0)}"></div><div><label>elevación (m)</label><input type="text" inputmode="decimal" data-num="mdz" value="${G.fmtNum(e.dz || 0)}" title="Altura de la base sobre el piso (0 = apoyado)"></div></div>`;
+      if (V.esFigura(e)) { // figura de referencia: punto de vista
+        const pov = V.povDe(e);
+        h += `<h3>punto de vista</h3><div class="fila"><div><label>mira hacia (°)</label><input type="text" inputmode="decimal" data-num="mira" value="${G.fmtNum(pov.mira, 0)}" title="0 = hacia la derecha del plano, 90 = hacia abajo; también girando el cono con Shift+R"></div><div><label>ojos (m)</label><input type="text" inputmode="decimal" data-num="ojos" value="${G.fmtNum(pov.ojos)}"></div><div><label>campo (°)</label><input type="text" inputmode="decimal" data-num="fov" value="${G.fmtNum(pov.fov, 0)}"></div></div>`;
+        h += `<div class="btns"><button data-acc="verDesde" class="primario" title="Abrir el 3D en perspectiva desde los ojos de esta figura">ver desde sus ojos</button></div>`;
+      }
       h += `<div class="btns"><button data-acc="rot90">⟲ 90°</button><button data-acc="rot0">sin giro</button></div>`;
       if (e.partes) h += `<div class="nota">Objeto compuesto (${e.partes.length} piezas): las medidas escalan el conjunto.</div>`;
       h += `<label>color</label>${swatches(e.color)}`;
@@ -496,6 +502,9 @@ const enlazarPanel = (e) => {
       if (k === 'alto') { const txt = String(i.value).trim(); if (txt && !(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); if (txt) e.alto = v; else delete e.alto; cambio(); return; }
       if (k === 'mrot') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.rot = ((v % 360) + 360) % 360; cambio(); return; }
       if (k === 'mdz') { if (!(v >= 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); e.dz = G.r6(v); cambio(); return; }
+      if (k === 'mira') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.mira = ((v % 360) + 360) % 360; cambio(); return; }
+      if (k === 'ojos') { if (!(v > 0.3 && v < 3)) { mensaje('Altura de ojos entre 0,3 y 3 m', true); renderPanel(); return; } snap(); e.ojos = G.r6(v); cambio(); return; }
+      if (k === 'fov') { if (!(v >= 25 && v <= 110)) { mensaje('Campo visual entre 25° y 110°', true); renderPanel(); return; } snap(); e.fov = Math.round(v); cambio(); return; }
       if (k === 'ml' || k === 'ma' || k === 'mh') {
         if (!(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
         snap(); const prop = k === 'ml' ? 'l' : k === 'ma' ? 'a' : 'h'; const f = v / e[prop];
@@ -612,6 +621,7 @@ const accion = (acc, e, btn = null) => {
   else if (acc === 'etqTodas') { snap(); S.doc.entidades.forEach((x) => { delete x.etiq; }); cambio(); mensaje('Rótulos recolocados automáticamente'); }
   else if (acc === 'etqCentro') { snap(); delete e.etq; cambio(); }
   else if (acc === 'cara') { snap(); e.lado = e.lado === -1 ? 1 : -1; cambio(); }
+  else if (acc === 'verDesde') { if (e && V.esFigura(e)) abrir3d(e.id); }
   else if (acc === 'crearObra') { if (!e || !G.esObra(e) || obraDe(e)) return; snap(); S.obraPendiente = null; asignarObra(e); cambio(); }
   else if (acc === 'csvObras') exportarCsvObras();
   else if (acc === 'csvMob') { if (!ctx.proyecto.salas.some((x) => x.entidades.some(G.esMueble))) return mensaje('Todavía no hay mobiliario', true); descargar(new Blob(['\ufeff' + csvMobiliario(ctx.proyecto)], { type: 'text/csv;charset=utf-8' }), nombreArchivo() + '-materiales.csv'); mensaje('Lista de materiales exportada'); }
@@ -1044,6 +1054,7 @@ const alTeclado = (ev) => {
     snap(); G.mover(e, d[0] * paso, d[1] * paso); cambio(); return;
   }
   if (kl === 'r' && S.tool === 'mueble') { S.muebleRot = ((S.muebleRot || 0) + 90) % 360; pedirRender(); return; }
+  if (kl === 'r' && ev.shiftKey && S.sel && V.esFigura(ent())) { const e = ent(); snap(); e.mira = ((V.povDe(e).mira + 45) % 360 + 360) % 360; cambio(); return; }
   const herr = { v: 'select', l: 'linea', r: 'rect', o: 'circulo', p: 'puerta', n: 'ventana', t: 'texto', d: 'cota', c: 'cuadro', b: 'obra', g: 'region', y: 'proyeccion' };
   if (herr[kl]) { setTool(herr[kl]); return; }
   if (k === '3' && !S.draft) { iso.visible ? cerrar3d() : abrir3d(); return; }
@@ -1154,7 +1165,7 @@ iso = montarIso({
   root: $('#psIso'), proyecto: ctx.proyecto, sala: () => S.doc, mensaje, onCambio: autosave, descargar, nombreArchivo,
   onCerrar: () => cerrar3d(),
 });
-const abrir3d = () => { if (!S.doc.entidades.length) return mensaje('Dibuja la sala antes de verla en 3D', true); S.draft = null; S.buffer = ''; S.muebleTpl = null; if (S.tool !== 'select') setTool('select'); iso.mostrar(); $('#b3d').classList.add('activo'); el.flot.style.display = 'none'; };
+const abrir3d = (figuraId = null) => { if (!S.doc.entidades.length) return mensaje('Dibuja la sala antes de verla en 3D', true); S.draft = null; S.buffer = ''; S.muebleTpl = null; if (S.tool !== 'select') setTool('select'); iso.mostrar(figuraId); $('#b3d').classList.add('activo'); el.flot.style.display = 'none'; };
 const cerrar3d = () => { iso.ocultar(); $('#b3d').classList.remove('activo'); render(); };
 $('#b3d').addEventListener('click', () => (iso.visible ? cerrar3d() : abrir3d()));
 // ── arranque y API para el cascarón

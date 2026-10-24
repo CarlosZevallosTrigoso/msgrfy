@@ -189,12 +189,13 @@ const itemValido = (it) => it && TIPOS_ITEM.has(it.tipo) && (
   (it.tipo === 'poligono' && Array.isArray(it.puntos) && it.puntos.length >= 3 && it.puntos.every(esPunto)));
 // La base puede haber desaparecido (sala o muro borrados, imagen perdida): el plano se conserva con sus
 // anotaciones y la vista lo muestra sin fondo, en vez de descartarlo en silencio al recargar.
-const validarAnotacion = (a, imagenes, salas, muros) => {
+const validarAnotacion = (a, imagenes, salas, muros, figuras = new Set()) => {
   const b = a.base || {};
   const base = b.tipo === 'imagen' && b.imagenId ? { tipo: 'imagen', imagenId: b.imagenId, w: pos(b.w, 100), h: pos(b.h, 100), perdida: !imagenes.has(b.imagenId) || undefined }
     : b.tipo === 'sala' && b.salaId ? { tipo: 'sala', salaId: b.salaId, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined }
       : b.tipo === 'muro' && b.muroId ? { tipo: 'muro', muroId: b.muroId, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !muros.has(b.muroId) || undefined }
-        : b.tipo === 'iso' && b.salaId ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined } : null;
+        : b.tipo === 'iso' && b.salaId ? { tipo: 'iso', salaId: b.salaId, cam: b.cam && typeof b.cam === 'object' ? { ...b.cam } : null, w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || undefined }
+          : b.tipo === 'pov' && b.salaId && b.figuraId ? { tipo: 'pov', salaId: b.salaId, figuraId: str(b.figuraId), w: pos(b.w, 0), h: pos(b.h, 0), perdida: !salas.has(b.salaId) || !figuras.has(b.salaId + '/' + b.figuraId) || undefined } : null;
   if (!base) throw new ErrorProyecto(`El plano anotado «${str(a.nombre, '?')}» no tiene base válida`);
   if (!base.perdida) delete base.perdida;
   const capas = (Array.isArray(a.capas) ? a.capas : []).filter((c) => c && c.id).map((c) => ({ id: str(c.id), nombre: str(c.nombre, 'capa'), visible: bool(c.visible, true) }));
@@ -229,9 +230,10 @@ export const validar = (d) => {
   const salaIds = new Set(salas.map((s) => s.id));
   const muros = (Array.isArray(d.muros) ? d.muros : []).filter((m) => m && typeof m === 'object').map((m) => validarMuro(m, obraIds, salaIds));
   const muroIds = new Set(muros.map((m) => m.id));
+  const figuraIds = new Set(salas.flatMap((s) => s.entidades.filter((e) => e.tipo === 'mueble').map((e) => s.id + '/' + e.id))); // puntos de vista (base 'pov')
   const anotaciones = [];
   for (const a of (Array.isArray(d.anotaciones) ? d.anotaciones : []).filter((a) => a && typeof a === 'object')) {
-    try { anotaciones.push(validarAnotacion(a, imagenes, salaIds, muroIds)); } catch (e) { if (!(e instanceof ErrorProyecto)) throw e; }
+    try { anotaciones.push(validarAnotacion(a, imagenes, salaIds, muroIds, figuraIds)); } catch (e) { if (!(e instanceof ErrorProyecto)) throw e; }
   }
   return {
     app: APP, version: VERSION, nombre: str(d.nombre, 'proyecto'), creado: str(d.creado, ahora()), modificado: str(d.modificado, ahora()),
@@ -369,7 +371,7 @@ export const incorporar = (p, d) => {
     otros: m.otros.map((o) => ({ ...o, id: re(o.id, o.tipo[0]), ...(o.apunta ? { apunta: re(o.apunta, 'c') } : {}) })),
   });
   for (const a of q.anotaciones) p.anotaciones.push({
-    ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : (a.base.tipo === 'sala' || a.base.tipo === 'iso') ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
+    ...a, id: re(a.id, 'a'), base: a.base.tipo === 'imagen' ? { ...a.base, imagenId: re(a.base.imagenId, 'img') } : a.base.tipo === 'pov' ? { ...a.base, salaId: re(a.base.salaId, 's'), figuraId: re(a.base.figuraId, 'e') } : (a.base.tipo === 'sala' || a.base.tipo === 'iso') ? { ...a.base, salaId: re(a.base.salaId, 's') } : { ...a.base, muroId: re(a.base.muroId, 'm') },
     capas: a.capas.map((c) => ({ ...c, id: re(c.id, 'k') })), capaActiva: re(a.capaActiva, 'k'),
     items: a.items.map((it) => ({
       ...it, id: re(it.id, 'i'), capa: re(it.capa, 'k'), ...(it.imagenId ? { imagenId: re(it.imagenId, 'img') } : {}),
