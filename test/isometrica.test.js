@@ -120,3 +120,44 @@ test('vanos: la ventana usa su alféizar y su alto; sin datos, 0,90–2,10; la p
   const [c0, c1] = rango((c) => c.fill === '#ffffff' && c.pts3.every((q) => Math.abs(q[0]) < 0.25 && q[1] >= 1 - 1e-6 && q[1] <= 2 + 1e-6));
   assert.ok(Math.abs(c0) < 1e-9 && Math.abs(c1 - 2.4) < 1e-9, `puerta: ${c0}–${c1}`);
 });
+
+const dentro = (p, pts) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const a = pts[i], b = pts[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+const salaCon = (linea) => { const p = M.nuevoProyecto('m'); const s = M.nuevaSala({ nombre: 'M' }); p.salas.push(s); s.entidades.push(linea); return { p, s }; };
+
+test('esquinas: los muros se unen a inglete, sin hueco en la esquina exterior ni testas intermedias', () => {
+  const { p, s } = salaCon({ id: 'L', tipo: 'linea', pts: [{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 5 }, { x: 0, y: 5 }], cerrada: true, altura: 3, espesor: 0.15, cara: 'fuera' });
+  for (const giro of [0, 35, 125, 200, 290]) {
+    const piezas = I.escena(p, s, { ...I.camDefecto(), giro, muros: 'completos' });
+    const caras = piezas.filter((pz) => pz.tipo === 'muro').flatMap((pz) => pz.caras);
+    const tapas = caras.filter((c) => !c.linea && c.fill === '#ffffff' && c.pts3.every((q) => Math.abs(q[2] - 3) < 1e-9)).map((c) => c.pts3);
+    for (const esq of [[-0.15, -0.15], [8.15, -0.15], [8.15, 5.15], [-0.15, 5.15]].map(([x, y]) => [x * 0.999 + 0.0005 * Math.sign(4 - x), y * 0.999 + 0.0005 * Math.sign(2.5 - y)])) {
+      assert.ok(tapas.some((t) => dentro(esq, t)), `giro ${giro}: esquina exterior ${esq} cubierta`);
+    }
+    assert.equal(caras.filter((c) => c.fill === '#dcdad2').length, 0, `giro ${giro}: una sala cerrada no tiene testas`);
+  }
+});
+
+test('esquinas: una línea abierta lleva testa entera solo en sus dos extremos', () => {
+  const { p, s } = salaCon({ id: 'L', tipo: 'linea', pts: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }], cerrada: false, altura: 2.5, espesor: 0.2, cara: 'fuera' });
+  const piezas = I.escena(p, s, { ...I.camDefecto(), giro: 45, inclinacion: 35, muros: 'completos' }); // de frente al vértice intermedio
+  const testas = piezas.flatMap((pz) => pz.caras).filter((c) => c.fill === '#dcdad2');
+  const enExtremo = (c, x, y) => c.pts3.some((q) => Math.hypot(q[0] - x, q[1] - y) < 1e-9);
+  assert.ok(testas.length > 0, 'el extremo visible lleva testa');
+  assert.ok(testas.every((c) => enExtremo(c, 0, 0) || enExtremo(c, 4, 3)), 'ninguna testa en el vértice intermedio');
+});
+
+test('esquinas: un tramo corto entre tramos largos se corta o no con ellos (sin muescas)', () => {
+  // sala con un retranqueo de 10 cm y una mocheta de 15 cm junto a una puerta
+  const { p, s } = salaCon({ id: 'L', tipo: 'linea', cerrada: false, altura: 2.97, espesor: 0.26, cara: 'fuera',
+    pts: [{ x: 4.664, y: 0.154 }, { x: 4.404, y: 0.154 }, { x: 4.404, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 1.994 }, { x: 0.1027, y: 1.994 }, { x: 0.1027, y: 5.213 }, { x: 4.404, y: 5.213 }, { x: 4.404, y: 1.18 }, { x: 4.664, y: 1.18 }] });
+  // tramos: 0 jamba, 1 mocheta, 2 muro del baño, 3 y 5 muro con retranqueo (4), 6 ventana, 7 muro derecho, 8 jamba
+  const largos = { 0: [2], 1: [2], 4: [3, 5], 8: [7] }; // tramo corto → tramos largos de los que depende
+  for (let giro = 0; giro < 360; giro += 15) {
+    const frente = {};
+    for (const pz of I.escena(p, s, { ...I.camDefecto(), giro, muros: 'cortados' })) if (pz.tipo === 'muro') frente[pz.tramo.split(':')[1]] = pz.frente;
+    for (const [corto, deps] of Object.entries(largos)) {
+      const ds = deps.map((j) => frente[j]);
+      if (ds.every((v) => v === ds[0])) assert.equal(frente[corto], ds[0], `giro ${giro}: el tramo ${corto} sigue a ${deps}`);
+    }
+  }
+});

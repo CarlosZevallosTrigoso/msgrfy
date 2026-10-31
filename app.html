@@ -3498,29 +3498,69 @@ const escena = (proyecto, sala, cam) => {
   const REB = 0.5;
   for (const e of lineas) {
     const [omin, omax] = banda(e); const fuera = G.ladoFuera(e); const esContorno = !!G.contornoDe(e);
-    for (const [a, b, i] of G.segmentos(e)) {
-      const L = G.dist(a, b); if (!(L > 1e-6)) continue;
-      const h = altoLinea(e, i, cam); const d = G.unit(G.sub(b, a)); const n = G.perp(d);
+    const cerr = !!(e.cerrada && e.pts.length > 2), nP = e.pts.length;
+    // ingletes, como en la planta: las caras de cada tramo terminan donde cortan las del tramo vecino,
+    // así las esquinas quedan macizas y sin caras de testa intermedias
+    const Imin = G.desplazarPolilinea(e.pts, cerr, omin), Imax = G.desplazarPolilinea(e.pts, cerr, omax);
+    const segs = G.segmentos(e);
+    const info = segs.map(([a, b, i]) => {
+      const L = G.dist(a, b); if (!(L > 1e-6)) return null;
+      const d = G.unit(G.sub(b, a)); const n = G.perp(d);
       const nInt = G.mul(n, esContorno ? -fuera : 1);
-      const frente = esContorno && espalda(nInt, a); // la cara interior da la espalda a la cámara
-      const modo = frente ? cam.muros : 'completos';
-      const alto = modo === 'cortados' ? Math.min(h, cam.zocalo) : h;
+      return { L, d, n, i, frente: esContorno && espalda(nInt, a) }; // la cara interior da la espalda a la cámara
+    });
+    // un tramo corto (jamba, mocheta, retranqueo) no decide por sí mismo: sigue a los tramos largos que tiene al lado,
+    // y solo se corta si ellos también; si no, quedaría una muesca en medio de un muro entero
+    const CORTO = 0.6;
+    const largoHacia = (s, paso) => {
+      for (let j = s + paso, n = 0; n < segs.length; j += paso, n++) {
+        if (j < 0 || j >= segs.length) { if (!cerr) return null; j = (j + segs.length) % segs.length; }
+        if (j === s) return null;
+        if (info[j] && info[j].L >= CORTO) return info[j];
+      }
+      return null;
+    };
+    const frenteFinal = info.map((t, s) => {
+      if (!t || t.L >= CORTO) return t && t.frente;
+      const vec = [largoHacia(s, -1), largoHacia(s, 1)].filter(Boolean);
+      return vec.length ? vec.every((v) => v.frente) : t.frente;
+    });
+    info.forEach((t, s) => {
+      if (!t) return;
+      t.frente = frenteFinal[s]; t.modo = t.frente ? cam.muros : 'completos';
+      const h = altoLinea(e, t.i, cam); t.alto = t.modo === 'cortados' ? Math.min(h, cam.zocalo) : h;
+    });
+    // tramo vecino por el inicio (−1) o por el final (+1); null en los extremos de una línea abierta
+    const vecino = (s, paso) => { const j = s + paso; if (j >= 0 && j < segs.length) return info[j]; return cerr ? info[(j + segs.length) % segs.length] : null; };
+    const quiebre = (t1, t2) => Math.abs(t1.d.x * t2.d.y - t1.d.y * t2.d.x) > 0.009 || G.dot(t1.d, t2.d) < 0; // no alineados
+    for (let s = 0; s < segs.length; s++) {
+      const [a, b, i] = segs[s]; const t = info[s]; if (!t) continue;
+      const { L, d, n, frente, modo, alto } = t;
       const trans = modo === 'transparentes';
       const colMuro = e.color && e.color !== '#111111' ? e.color : null;
       const st = { stroke: trans ? '#9a9a92' : '#2a2a28', lw: trans ? 1 : 1.1, dash: trans ? [4, 3] : null };
       const huecos = vanos.filter((v) => G.proyectar(v.a, a, b).d < 0.02 && G.proyectar(v.b, a, b).d < 0.02)
         .map((v) => { const ta = G.dot(G.sub(v.a, a), d), tb = G.dot(G.sub(v.b, a), d); return { u0: Math.min(ta, tb), u1: Math.max(ta, tb), ...G.vanoAlturas(v), ventana: v.tipo === 'ventana' }; });
+      const ant = vecino(s, -1), sig = vecino(s, 1);
+      const i0 = i, i1 = (i + 1) % nP;
+      // cada cara recorre su tramo entre sus dos ingletes: u a lo largo de d desde a, a la distancia off de la línea
+      const lados = [[omin, G.mul(n, -1), G.dot(G.sub(Imin[i0], a), d), G.dot(G.sub(Imin[i1], a), d)],
+        [omax, n, G.dot(G.sub(Imax[i0], a), d), G.dot(G.sub(Imax[i1], a), d)]];
+      const punto = (off, u) => G.add(a, G.add(G.mul(d, u), G.mul(n, off)));
       const nReb = Math.max(1, Math.ceil(L / REB));
-      const lados = [[omin, G.mul(n, -1)], [omax, n]]; // cara en omin (normal −n) y cara en omax (normal +n)
       for (let k = 0; k < nReb; k++) {
-        const u0 = L * k / nReb, u1 = L * (k + 1) / nReb;
-        const p0 = G.add(a, G.mul(d, u0)), p1 = G.add(a, G.mul(d, u1));
-        const esq = [G.add(p0, G.mul(n, omin)), G.add(p1, G.mul(n, omin)), G.add(p1, G.mul(n, omax)), G.add(p0, G.mul(n, omax))];
+        const t0 = k / nReb, t1 = (k + 1) / nReb;
+        const uDe = (ld, tt) => ld[2] + (ld[3] - ld[2]) * tt;
+        const [lmin, lmax] = lados;
+        const esq = [punto(omin, uDe(lmin, t0)), punto(omin, uDe(lmin, t1)), punto(omax, uDe(lmax, t1)), punto(omax, uDe(lmax, t0))];
         const caras = [];
         const linea = (A, B, stt) => caras.push(cara([A, B], { ...stt, linea: true }));
+        const vertical = (q, z0, z1) => linea([q.x, q.y, z0], [q.x, q.y, z1], st);
         // caras largas visibles
-        for (const [off, nn] of lados) {
-          const q0 = G.add(p0, G.mul(n, off)), q1 = G.add(p1, G.mul(n, off));
+        for (const ld of lados) {
+          const [off, nn] = ld; const uA = uDe(ld, t0), uB = uDe(ld, t1);
+          if (!(uB - uA > 1e-9)) continue; // cara de largo nulo (inglete de un tramo muy corto)
+          const q0 = punto(off, uA), q1 = punto(off, uB);
           if (!visible(nn, q0) && !trans) continue;
           const lateral = Math.abs(G.dot(nn, { x: P.vista.y, y: -P.vista.x })) > 0.5;
           const fill = trans ? 'rgba(255,255,255,0)' : colMuro ? alfa(colMuro, 0.33) : (lateral ? '#e4e2db' : '#f1f0ea');
@@ -3528,26 +3568,32 @@ const escena = (proyecto, sala, cam) => {
           const e0 = k === 0 ? q0 : G.sub(q0, G.mul(d, 0.005)), e1 = k === nReb - 1 ? q1 : G.add(q1, G.mul(d, 0.005));
           caras.push(cara([[e0.x, e0.y, 0], [e1.x, e1.y, 0], [e1.x, e1.y, alto], [e0.x, e0.y, alto]], { fill, stroke: null }));
           linea([q0.x, q0.y, alto], [q1.x, q1.y, alto], st); linea([q0.x, q0.y, 0], [q1.x, q1.y, 0], st);
+          // arista vertical en la esquina con el tramo vecino (una sola, en el inglete)
+          if (k === 0 && ant && quiebre(ant, t)) vertical(q0, 0, alto);
+          if (k === nReb - 1 && sig && quiebre(t, sig)) vertical(q1, 0, alto);
           if (!trans) for (const hu of huecos) {
-            const v0 = Math.max(u0, hu.u0), v1 = Math.min(u1, hu.u1); if (v1 - v0 < 1e-6) continue;
+            const v0 = Math.max(uA, hu.u0), v1 = Math.min(uB, hu.u1); if (v1 - v0 < 1e-6) continue;
             const z0 = Math.min(alto, hu.z0), z1 = Math.min(alto, hu.z1); if (z1 <= z0) continue;
-            const r0 = G.add(a, G.add(G.mul(d, v0), G.mul(n, off))), r1 = G.add(a, G.add(G.mul(d, v1), G.mul(n, off)));
+            const r0 = punto(off, v0), r1 = punto(off, v1);
             caras.push(cara([[r0.x, r0.y, z0], [r1.x, r1.y, z0], [r1.x, r1.y, z1], [r0.x, r0.y, z1]], { fill: hu.ventana ? '#dfe8ee' : '#ffffff', stroke: null }));
             linea([r0.x, r0.y, z1], [r1.x, r1.y, z1], { stroke: '#8a8a84', lw: 1 }); if (hu.ventana) linea([r0.x, r0.y, z0], [r1.x, r1.y, z0], { stroke: '#8a8a84', lw: 1 });
             if (Math.abs(v0 - hu.u0) < 1e-9) linea([r0.x, r0.y, z0], [r0.x, r0.y, z1], { stroke: '#8a8a84', lw: 1 });
             if (Math.abs(v1 - hu.u1) < 1e-9) linea([r1.x, r1.y, z0], [r1.x, r1.y, z1], { stroke: '#8a8a84', lw: 1 });
           }
         }
-        // testeros en los extremos del tramo
-        for (const [esInicio, nn] of [[true, G.mul(d, -1)], [false, d]]) {
+        // testas: enteras en los extremos de una línea abierta (jambas, fin de un tabique); en una esquina, solo el
+        // escalón que asoma sobre un vecino más bajo (muro cortado al zócalo o con otra altura)
+        for (const [esInicio, nn, vec] of [[true, G.mul(d, -1), ant], [false, d, sig]]) {
           if (esInicio ? k !== 0 : k !== nReb - 1) continue;
-          const pp = esInicio ? p0 : p1; const c0 = G.add(pp, G.mul(n, omin)), c1 = G.add(pp, G.mul(n, omax));
-          if (visible(nn, c0) || trans) caras.push(cara([[c0.x, c0.y, 0], [c1.x, c1.y, 0], [c1.x, c1.y, alto], [c0.x, c0.y, alto]], { fill: trans ? 'rgba(255,255,255,0)' : (colMuro ? alfa(colMuro, 0.33) : '#dcdad2'), stroke: null }));
-          linea([c0.x, c0.y, 0], [c0.x, c0.y, alto], st); linea([c1.x, c1.y, 0], [c1.x, c1.y, alto], st); linea([c0.x, c0.y, alto], [c1.x, c1.y, alto], st);
-          if (trans) linea([c0.x, c0.y, 0], [c1.x, c1.y, 0], st);
+          const z0 = vec ? vec.alto : 0; if (alto - z0 < 1e-6) continue;
+          const c0 = esInicio ? esq[0] : esq[1], c1 = esInicio ? esq[3] : esq[2];
+          if (visible(nn, c0) || trans) caras.push(cara([[c0.x, c0.y, z0], [c1.x, c1.y, z0], [c1.x, c1.y, alto], [c0.x, c0.y, alto]], { fill: trans ? 'rgba(255,255,255,0)' : (colMuro ? alfa(colMuro, 0.33) : '#dcdad2'), stroke: null }));
+          vertical(c0, z0, alto); vertical(c1, z0, alto); linea([c0.x, c0.y, alto], [c1.x, c1.y, alto], st);
+          if (trans || vec) linea([c0.x, c0.y, z0], [c1.x, c1.y, z0], st);
         }
         // tapa
-        const esqE = [G.sub(esq[0], G.mul(d, k ? 0.005 : 0)), G.add(esq[1], G.mul(d, k < nReb - 1 ? 0.005 : 0)), G.add(esq[2], G.mul(d, k < nReb - 1 ? 0.005 : 0)), G.sub(esq[3], G.mul(d, k ? 0.005 : 0))];
+        const ext = (q, sgn, si) => (si ? G.add(q, G.mul(d, sgn * 0.005)) : q);
+        const esqE = [ext(esq[0], -1, k > 0), ext(esq[1], 1, k < nReb - 1), ext(esq[2], 1, k < nReb - 1), ext(esq[3], -1, k > 0)];
         if (!P.ojo || P.ojo[2] > alto) caras.push(cara(esqE.map((q) => [q.x, q.y, alto]), { fill: trans ? 'rgba(255,255,255,0)' : '#ffffff', stroke: null })); // la tapa no se ve desde abajo
         piezas.push({ tipo: 'muro', d: prof(esq), dmin: profMin(esq), caras, frente, tramo: e.id + ':' + i });
       }
