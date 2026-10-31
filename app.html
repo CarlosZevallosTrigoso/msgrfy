@@ -1293,6 +1293,13 @@ const G = (() => {
     }
     return null;
   };
+  // Alturas de un vano (m sobre el piso): ventana desde su alféizar con su alto; puerta desde el piso.
+  // Sin datos, las de siempre: ventana de 0,90 a 2,10 y puerta hasta 2,10.
+  const VENTANA_ALFEIZAR = 0.9, VENTANA_ALTO = 1.2, PUERTA_ALTO = 2.1;
+  const vanoAlturas = (e) => {
+    if (e.tipo === 'ventana') { const z0 = e.alfeizar >= 0 ? e.alfeizar : VENTANA_ALFEIZAR; return { z0, z1: z0 + (e.alto > 0 ? e.alto : VENTANA_ALTO) }; }
+    return { z0: 0, z1: e.alto > 0 ? e.alto : PUERTA_ALTO };
+  };
   // Ventana: vano a–b con marco del espesor del muro, centrado en él
   const ventanaGeom = (e) => {
     const w = dist(e.a, e.b); if (!(w > 0)) return null;
@@ -1853,7 +1860,7 @@ const G = (() => {
 
   return { U, GROSOR, TRAZO, COLORES, ESCALAS, clamp, r6, dist, sub, add, mul, dot, unit, perp, medio, rotar, parseNum, fmtNum, fmtM, fmtM2, esc,
     snapGrid, snapAngulo, proyectar, segmentos, imanar, areaFirmada, area, longitudLinea, puntoEnPoligono, anguloLegible, etiquetasTramos,
-    esRectangulo, puertaGeom, ventanaGeom, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, esMueble, mueblePts, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
+    esRectangulo, puertaGeom, ventanaGeom, vanoAlturas, VENTANA_ALFEIZAR, VENTANA_ALTO, PUERTA_ALTO, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, esMueble, mueblePts, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
     calcoCentro, localAMundo, mundoALocal, calibrarCalco, esquinasCalco, caja, unirCajas, cajaPuntos, longitudBonita, papelPara,
     C, svgDibujo, svgCalco, marcoDe, enMarco, deMarco, cajasChocan, segCruzaCaja, construirSVG, nuevoId };
 })();
@@ -3502,7 +3509,7 @@ const escena = (proyecto, sala, cam) => {
       const colMuro = e.color && e.color !== '#111111' ? e.color : null;
       const st = { stroke: trans ? '#9a9a92' : '#2a2a28', lw: trans ? 1 : 1.1, dash: trans ? [4, 3] : null };
       const huecos = vanos.filter((v) => G.proyectar(v.a, a, b).d < 0.02 && G.proyectar(v.b, a, b).d < 0.02)
-        .map((v) => { const ta = G.dot(G.sub(v.a, a), d), tb = G.dot(G.sub(v.b, a), d); return { u0: Math.min(ta, tb), u1: Math.max(ta, tb), z0: v.tipo === 'ventana' ? 0.9 : 0, z1: 2.1, ventana: v.tipo === 'ventana' }; });
+        .map((v) => { const ta = G.dot(G.sub(v.a, a), d), tb = G.dot(G.sub(v.b, a), d); return { u0: Math.min(ta, tb), u1: Math.max(ta, tb), ...G.vanoAlturas(v), ventana: v.tipo === 'ventana' }; });
       const nReb = Math.max(1, Math.ceil(L / REB));
       const lados = [[omin, G.mul(n, -1)], [omax, n]]; // cara en omin (normal −n) y cara en omax (normal +n)
       for (let k = 0; k < nReb; k++) {
@@ -4319,12 +4326,13 @@ const renderPanel = () => {
       h += `<div class="fila"><div><label>diámetro (m)</label><input type="text" inputmode="decimal" data-num="diametro" value="${G.fmtNum(e.r * 2)}"></div><div><label>alto en 3D (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto) : ''}" placeholder="muro"></div></div>`;
       h += check('medidas', 'mostrar el diámetro', e.medidas) + estiloHtml(e) + rellenoHtml(e);
     } else if (e.tipo === 'puerta') {
-      h += `<label>ancho del vano (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}">`;
+      h += `<div class="fila"><div><label>ancho del vano (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}"></div><div><label>alto (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto, 3) : ''}" placeholder="${G.fmtNum(G.PUERTA_ALTO)}"></div></div>`;
       h += `<div class="btns"><button data-acc="giro">↻ cambiar giro</button></div>`;
       h += check('medidas', 'mostrar el ancho', e.medidas) + `<label>color</label>${swatches(e.color)}`;
     } else if (e.tipo === 'ventana') {
       h += `<div class="fila"><div><label>ancho (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}"></div><div><label>espesor (m)</label><input type="text" inputmode="decimal" data-num="esp" value="${G.fmtNum(e.esp > 0 ? e.esp : 0.15)}"></div></div>`;
-      h += `<div class="nota">El espesor es el del muro donde va la ventana.</div>`;
+      h += `<div class="fila"><div><label>alféizar (m)</label><input type="text" inputmode="decimal" data-num="alfeizar" value="${e.alfeizar >= 0 ? G.fmtNum(e.alfeizar, 3) : ''}" placeholder="${G.fmtNum(G.VENTANA_ALFEIZAR)}" title="Altura del borde inferior de la ventana sobre el piso"></div><div><label>alto (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto, 3) : ''}" placeholder="${G.fmtNum(G.VENTANA_ALTO)}"></div></div>`;
+      h += `<div class="nota">El espesor es el del muro donde va la ventana. Alféizar y alto definen la ventana en el 3D; vacíos, va de ${G.fmtNum(G.VENTANA_ALFEIZAR)} a ${G.fmtNum(G.VENTANA_ALFEIZAR + G.VENTANA_ALTO)} m.</div>`;
       h += check('medidas', 'mostrar el ancho', e.medidas) + `<label>color</label>${swatches(e.color)}`;
     } else if (e.tipo === 'mueble') {
       h += `<label>nombre</label><input type="text" data-k="nombre" value="${esc(e.nombre || '')}">`;
@@ -4521,6 +4529,7 @@ const enlazarPanel = (e) => {
       const v = G.parseNum(i.value); const k = i.dataset.num;
       if (k === 'altura' && String(i.value).trim() === '') { snap(); delete e.altura; cambio(); return; }
       if (k === 'alto') { const txt = String(i.value).trim(); if (txt && !(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); if (txt) e.alto = v; else delete e.alto; cambio(); return; }
+      if (k === 'alfeizar') { const txt = String(i.value).trim(); if (txt && !(v >= 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); if (txt) e.alfeizar = G.r6(v); else delete e.alfeizar; cambio(); return; }
       if (k === 'mrot') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.rot = ((v % 360) + 360) % 360; cambio(); return; }
       if (k === 'mdz') { if (!(v >= 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); e.dz = G.r6(v); cambio(); return; }
       if (k === 'mira') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.mira = ((v % 360) + 360) % 360; cambio(); return; }

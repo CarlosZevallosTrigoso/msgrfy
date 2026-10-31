@@ -298,12 +298,13 @@ const renderPanel = () => {
       h += `<div class="fila"><div><label>diámetro (m)</label><input type="text" inputmode="decimal" data-num="diametro" value="${G.fmtNum(e.r * 2)}"></div><div><label>alto en 3D (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto) : ''}" placeholder="muro"></div></div>`;
       h += check('medidas', 'mostrar el diámetro', e.medidas) + estiloHtml(e) + rellenoHtml(e);
     } else if (e.tipo === 'puerta') {
-      h += `<label>ancho del vano (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}">`;
+      h += `<div class="fila"><div><label>ancho del vano (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}"></div><div><label>alto (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto, 3) : ''}" placeholder="${G.fmtNum(G.PUERTA_ALTO)}"></div></div>`;
       h += `<div class="btns"><button data-acc="giro">↻ cambiar giro</button></div>`;
       h += check('medidas', 'mostrar el ancho', e.medidas) + `<label>color</label>${swatches(e.color)}`;
     } else if (e.tipo === 'ventana') {
       h += `<div class="fila"><div><label>ancho (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}"></div><div><label>espesor (m)</label><input type="text" inputmode="decimal" data-num="esp" value="${G.fmtNum(e.esp > 0 ? e.esp : 0.15)}"></div></div>`;
-      h += `<div class="nota">El espesor es el del muro donde va la ventana.</div>`;
+      h += `<div class="fila"><div><label>alféizar (m)</label><input type="text" inputmode="decimal" data-num="alfeizar" value="${e.alfeizar >= 0 ? G.fmtNum(e.alfeizar, 3) : ''}" placeholder="${G.fmtNum(G.VENTANA_ALFEIZAR)}" title="Altura del borde inferior de la ventana sobre el piso"></div><div><label>alto (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto, 3) : ''}" placeholder="${G.fmtNum(G.VENTANA_ALTO)}"></div></div>`;
+      h += `<div class="nota">El espesor es el del muro donde va la ventana. Alféizar y alto definen la ventana en el 3D; vacíos, va de ${G.fmtNum(G.VENTANA_ALFEIZAR)} a ${G.fmtNum(G.VENTANA_ALFEIZAR + G.VENTANA_ALTO)} m.</div>`;
       h += check('medidas', 'mostrar el ancho', e.medidas) + `<label>color</label>${swatches(e.color)}`;
     } else if (e.tipo === 'mueble') {
       h += `<label>nombre</label><input type="text" data-k="nombre" value="${esc(e.nombre || '')}">`;
@@ -500,6 +501,7 @@ const enlazarPanel = (e) => {
       const v = G.parseNum(i.value); const k = i.dataset.num;
       if (k === 'altura' && String(i.value).trim() === '') { snap(); delete e.altura; cambio(); return; }
       if (k === 'alto') { const txt = String(i.value).trim(); if (txt && !(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); if (txt) e.alto = v; else delete e.alto; cambio(); return; }
+      if (k === 'alfeizar') { const txt = String(i.value).trim(); if (txt && !(v >= 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); if (txt) e.alfeizar = G.r6(v); else delete e.alfeizar; cambio(); return; }
       if (k === 'mrot') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.rot = ((v % 360) + 360) % 360; cambio(); return; }
       if (k === 'mdz') { if (!(v >= 0)) { mensaje('Medida no válida', true); renderPanel(); return; } snap(); e.dz = G.r6(v); cambio(); return; }
       if (k === 'mira') { if (!Number.isFinite(v)) { renderPanel(); return; } snap(); e.mira = ((v % 360) + 360) % 360; cambio(); return; }

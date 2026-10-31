@@ -275,6 +275,13 @@ export const G = (() => {
     }
     return null;
   };
+  // Alturas de un vano (m sobre el piso): ventana desde su alféizar con su alto; puerta desde el piso.
+  // Sin datos, las de siempre: ventana de 0,90 a 2,10 y puerta hasta 2,10.
+  const VENTANA_ALFEIZAR = 0.9, VENTANA_ALTO = 1.2, PUERTA_ALTO = 2.1;
+  const vanoAlturas = (e) => {
+    if (e.tipo === 'ventana') { const z0 = e.alfeizar >= 0 ? e.alfeizar : VENTANA_ALFEIZAR; return { z0, z1: z0 + (e.alto > 0 ? e.alto : VENTANA_ALTO) }; }
+    return { z0: 0, z1: e.alto > 0 ? e.alto : PUERTA_ALTO };
+  };
   // Ventana: vano a–b con marco del espesor del muro, centrado en él
   const ventanaGeom = (e) => {
     const w = dist(e.a, e.b); if (!(w > 0)) return null;
@@ -835,7 +842,7 @@ export const G = (() => {
 
   return { U, GROSOR, TRAZO, COLORES, ESCALAS, clamp, r6, dist, sub, add, mul, dot, unit, perp, medio, rotar, parseNum, fmtNum, fmtM, fmtM2, esc,
     snapGrid, snapAngulo, proyectar, segmentos, imanar, areaFirmada, area, longitudLinea, puntoEnPoligono, anguloLegible, etiquetasTramos,
-    esRectangulo, puertaGeom, ventanaGeom, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, esMueble, mueblePts, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
+    esRectangulo, puertaGeom, ventanaGeom, vanoAlturas, VENTANA_ALFEIZAR, VENTANA_ALTO, PUERTA_ALTO, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, esMueble, mueblePts, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
     calcoCentro, localAMundo, mundoALocal, calibrarCalco, esquinasCalco, caja, unirCajas, cajaPuntos, longitudBonita, papelPara,
     C, svgDibujo, svgCalco, marcoDe, enMarco, deMarco, cajasChocan, segCruzaCaja, construirSVG, nuevoId };
 })();

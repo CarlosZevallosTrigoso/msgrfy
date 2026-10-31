@@ -101,3 +101,22 @@ test('vistas guardadas: el encuadre relativo se reproduce con otra escala de enc
   assert.ok(I.vistaValida(v)); assert.ok(!I.vistaValida({ nombre: 'x', cam: {} }));
   assert.equal(I.soloCam({ giro: 1, vistas: [v] }).vistas, undefined);
 });
+
+test('vanos: la ventana usa su alféizar y su alto; sin datos, 0,90–2,10; la puerta, su alto', () => {
+  const p = M.nuevoProyecto('vanos');
+  const s = M.nuevaSala({ nombre: 'V' }); p.salas.push(s);
+  s.entidades.push({ id: 'L', tipo: 'linea', pts: [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 4 }, { x: 0, y: 4 }], cerrada: true, altura: 2.97, espesor: 0.2, cara: 'fuera' });
+  s.entidades.push({ id: 'V1', tipo: 'ventana', a: { x: 1, y: 0 }, b: { x: 2.154, y: 0 }, esp: 0.2, alfeizar: 0.868, alto: 2.11 });
+  s.entidades.push({ id: 'V2', tipo: 'ventana', a: { x: 4, y: 0 }, b: { x: 5, y: 0 }, esp: 0.2 });
+  s.entidades.push({ id: 'P', tipo: 'puerta', a: { x: 0, y: 1 }, b: { x: 0, y: 2 }, lado: 1, bisagra: 'a', alto: 2.4 });
+  const piezas = I.escena(p, s, { ...I.camDefecto(), muros: 'completos' });
+  const huecos = piezas.flatMap((pz) => pz.caras).filter((c) => c.pts3 && c.pts3.length === 4 && (c.fill === '#dfe8ee' || c.fill === '#ffffff') && !c.linea);
+  const rango = (filtro) => { const zs = huecos.filter(filtro).flatMap((c) => c.pts3.map((q) => q[2])); return [Math.min(...zs), Math.max(...zs)]; };
+  const enY0 = (x0, x1) => (c) => c.fill === '#dfe8ee' && c.pts3.every((q) => q[0] >= x0 - 1e-6 && q[0] <= x1 + 1e-6);
+  const [a0, a1] = rango(enY0(1, 2.154));
+  assert.ok(Math.abs(a0 - 0.868) < 1e-9 && Math.abs(a1 - 2.97) < 1e-9, `ventana con ficha: ${a0}–${a1} (llega al remate del muro, 2,978 > 2,97)`);
+  const [b0, b1] = rango(enY0(4, 5));
+  assert.ok(Math.abs(b0 - 0.9) < 1e-9 && Math.abs(b1 - 2.1) < 1e-9, `ventana sin datos: ${b0}–${b1}`);
+  const [c0, c1] = rango((c) => c.fill === '#ffffff' && c.pts3.every((q) => Math.abs(q[0]) < 0.25 && q[1] >= 1 - 1e-6 && q[1] <= 2 + 1e-6));
+  assert.ok(Math.abs(c0) < 1e-9 && Math.abs(c1 - 2.4) < 1e-9, `puerta: ${c0}–${c1}`);
+});

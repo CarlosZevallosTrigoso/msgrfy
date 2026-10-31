@@ -107,7 +107,7 @@ export const escena = (proyecto, sala, cam) => {
       const colMuro = e.color && e.color !== '#111111' ? e.color : null;
       const st = { stroke: trans ? '#9a9a92' : '#2a2a28', lw: trans ? 1 : 1.1, dash: trans ? [4, 3] : null };
       const huecos = vanos.filter((v) => G.proyectar(v.a, a, b).d < 0.02 && G.proyectar(v.b, a, b).d < 0.02)
-        .map((v) => { const ta = G.dot(G.sub(v.a, a), d), tb = G.dot(G.sub(v.b, a), d); return { u0: Math.min(ta, tb), u1: Math.max(ta, tb), z0: v.tipo === 'ventana' ? 0.9 : 0, z1: 2.1, ventana: v.tipo === 'ventana' }; });
+        .map((v) => { const ta = G.dot(G.sub(v.a, a), d), tb = G.dot(G.sub(v.b, a), d); return { u0: Math.min(ta, tb), u1: Math.max(ta, tb), ...G.vanoAlturas(v), ventana: v.tipo === 'ventana' }; });
       const nReb = Math.max(1, Math.ceil(L / REB));
       const lados = [[omin, G.mul(n, -1)], [omax, n]]; // cara en omin (normal −n) y cara en omax (normal +n)
       for (let k = 0; k < nReb; k++) {
