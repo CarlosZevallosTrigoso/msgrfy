@@ -13,7 +13,7 @@ export function montarPlanta(ctx) {
 'use strict';
 const root = ctx.root;
 root.innerHTML = MARKUP;
-const MAX_UNDO = 60, MAX_LADO_CALCO = 3000;
+const MAX_UNDO = 60, MAX_LADO_CALCO = 3000, CALIBRAR_MIN_PX = 12;
 const $ = (s, r = root) => r.querySelector(s);
 const $$ = (s, r = root) => Array.from(r.querySelectorAll(s));
 const esc = G.esc, C = G.C;
@@ -103,7 +103,7 @@ const tam = () => { const r = el.lienzo.getBoundingClientRect(); return { w: Mat
 const aMundo = (cx, cy) => { const { rect } = tam(); return { x: S.view.vx + (cx - rect.left) / S.view.zoom, y: S.view.vy + (cy - rect.top) / S.view.zoom }; };
 const aPantalla = (p) => ({ x: (p.x - S.view.vx) * S.view.zoom, y: (p.y - S.view.vy) * S.view.zoom });
 const zoomEn = (cx, cy, f) => {
-  const p = aMundo(cx, cy); const z = G.clamp(S.view.zoom * f, 2, 3000); const { rect } = tam();
+  const p = aMundo(cx, cy); const { rect, w, h } = tam(); const z = G.clamp(S.view.zoom * f, G.zoomMinimo(cajaTodo(), w, h), 3000);
   S.view = { zoom: z, vx: p.x - (cx - rect.left) / z, vy: p.y - (cy - rect.top) / z }; pedirRender();
 };
 const cajaTodo = () => {
@@ -114,18 +114,18 @@ const cajaTodo = () => {
 const verTodo = () => {
   const bb = cajaTodo() || { x: 0, y: 0, w: 10, h: 6 };
   const { w, h } = tam(); const m = 0.08;
-  const z = G.clamp(Math.min(w / Math.max(bb.w, 0.5), h / Math.max(bb.h, 0.5)) * (1 - m * 2), 2, 3000);
+  const z = G.clamp(Math.min(w / Math.max(bb.w, 0.5), h / Math.max(bb.h, 0.5)) * (1 - m * 2), G.zoomMinimo(bb, w, h), 3000);
   S.view = { zoom: z, vx: bb.x + bb.w / 2 - w / z / 2, vy: bb.y + bb.h / 2 - h / z / 2 }; pedirRender();
 };
 const tolM = (px = 10) => px / S.view.zoom;
 
 // ── render del lienzo
 const pedirRender = () => { if (S.raf) return; S.raf = (window.requestAnimationFrame || ((f) => setTimeout(f, 16)))(() => { S.raf = 0; renderSvg(); }); };
-const PASOS_REJ = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50];
+const PASOS_REJ = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
 const renderRejilla = (w, h) => {
   const z = S.view.zoom;
-  const menor = PASOS_REJ.find((s) => s * z >= 12) || 50;
-  const mayor = [1, 5, 10, 50, 100].find((s) => s >= menor * 4) || 100;
+  const menor = PASOS_REJ.find((s) => s * z >= 12) || 10000;
+  const mayor = [1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000].find((s) => s >= menor * 4) || 50000;
   const px = C(1 / z);
   const pat = (id, s, color) => `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${C(s)}" height="${C(s)}"><path d="M${C(s)} 0 L0 0 0 ${C(s)}" fill="none" stroke="${color}" stroke-width="${px}"/></pattern>`;
   el.defsRej.innerHTML = pat('rjMenor', menor, '#efefec') + pat('rjMayor', mayor, '#dcdcd6');
@@ -237,7 +237,7 @@ const renderSvg = () => {
   el.capaDib.innerHTML = (dib.defs ? `<defs>${dib.defs}</defs>` : '') + dib.cuerpo;
   el.capaSel.innerHTML = renderSel(z);
   el.capaDraft.innerHTML = renderDraft(z);
-  el.zoomInfo.textContent = '1 m = ' + G.fmtNum(z, 0) + ' px';
+  el.zoomInfo.textContent = '1 m = ' + G.fmtNum(z, z < 1 ? 2 : 0) + ' px';
   const L = G.longitudBonita(160 / z);
   if (L) { $('.t', el.barra).textContent = L >= 1 ? G.fmtNum(L, L % 1 ? 1 : 0) + ' m' : G.fmtNum(L * 100, 0) + ' cm'; $('.l', el.barra).style.width = L * z + 'px'; el.barra.style.display = ''; }
   else el.barra.style.display = 'none';
@@ -773,6 +773,8 @@ const clicDibujo = (p, arr) => {
   }
   // herramientas de dos (o tres) puntos
   if (!d) { if (arr && arr.creado) return render(); S.draft = { tool: t, puntos: [p] }; return render(); }
+  // Calibrar sobre unos pocos píxeles da una escala absurda: un clic que resbala no cuenta como medida, y el primer punto se mantiene
+  if (d.tool === 'calibrar' && G.dist(d.puntos[0], p) * S.view.zoom < CALIBRAR_MIN_PX) { if (!(arr && arr.creado)) mensaje('Esos dos puntos están casi encima: marca el segundo más lejos', true); return render(); }
   if (arr && arr.creado && !arr.movido) return render();
   terminarDosPuntos(p);
 };
@@ -884,6 +886,10 @@ const calibrar = (a, b, metrosDados) => {
   }
   const nuevo = G.calibrarCalco(c, a, b, m);
   if (!nuevo) { mensaje('Medida no válida', true); render(); return; }
+  if (G.calcoDudoso(nuevo)) {
+    const lado = Math.max(nuevo.w, nuevo.h) * nuevo.mpp;
+    if (!confirm(`Con ${G.fmtNum(m)} m en esa distancia, la imagen mediría ${G.fmtNum(lado, lado < 10 ? 2 : 0)} m de lado (1 m = ${G.fmtNum(1 / nuevo.mpp, 1)} px). Parece un error: la medida va en metros (3,50, no 350).\n\n¿Aplicar de todos modos?`)) { mensaje('Calibración cancelada: la escala no cambió. Marca otra vez los dos puntos.'); render(); return; }
+  }
   snap(); Object.assign(c, nuevo);
   const lado = Math.max(c.w, c.h) * c.mpp;
   if (!S.doc.entidades.length) S.doc.rotulo = G.clamp(Math.round(lado / 45 * 100) / 100, 0.06, 0.6);

@@ -426,6 +426,12 @@ export const G = (() => {
     const centro = sub(p1, rotar({ x: (l1.x - c.w / 2) * mpp, y: (l1.y - c.h / 2) * mpp }, c.rot || 0));
     return { ...c, mpp, x: centro.x - c.w * mpp / 2, y: centro.y - c.h * mpp / 2, calibrado: { metros } };
   };
+  // Una imagen de sala no mide kilómetros ni centímetros: si sale así, lo probable es un dato mal escrito (350 por 3,50) o dos puntos casi encima
+  const LADO_CALCO_MIN = 1, LADO_CALCO_MAX = 500;
+  const calcoDudoso = (c) => { const l = Math.max(c.w, c.h) * c.mpp; return l < LADO_CALCO_MIN || l > LADO_CALCO_MAX; };
+  // Zoom mínimo (px por m): 2 en lo normal, y lo que haga falta para que quepa todo lo que hay, con holgura
+  const ZOOM_MIN = 2;
+  const zoomMinimo = (bb, w, h) => (bb ? Math.min(ZOOM_MIN, Math.min(w / Math.max(bb.w, 0.5), h / Math.max(bb.h, 0.5)) / 2) : ZOOM_MIN);
   // Rotar sin que el centro se mueva
   const esquinasCalco = (c) => [[0, 0], [c.w, 0], [c.w, c.h], [0, c.h]].map(([x, y]) => localAMundo(c, { x, y }));
 
@@ -450,7 +456,7 @@ export const G = (() => {
   const unirCajas = (a, b) => { if (!a) return b; if (!b) return a; const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y); return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y }; };
   const cajaPuntos = (pts) => { if (!pts.length) return null; const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y); const x = Math.min(...xs), y = Math.min(...ys); return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }; };
 
-  const longitudBonita = (maxM) => { const b = [0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 50, 100]; let m = null; for (const n of b) if (n <= maxM) m = n; return m; };
+  const longitudBonita = (maxM) => { const b = [0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]; let m = null; for (const n of b) if (n <= maxM) m = n; return m; };
   // Hoja más pequeña que lo contiene con 10 mm de margen por lado; prueba primero la orientación del dibujo
   const papelPara = (wmm, hmm, margen = 10) => {
     const w = wmm + 2 * margen, h = hmm + 2 * margen; const apaisado = w > h;
@@ -843,7 +849,7 @@ export const G = (() => {
   return { U, GROSOR, TRAZO, COLORES, ESCALAS, clamp, r6, dist, sub, add, mul, dot, unit, perp, medio, rotar, parseNum, fmtNum, fmtM, fmtM2, esc,
     snapGrid, snapAngulo, proyectar, segmentos, imanar, areaFirmada, area, longitudLinea, puntoEnPoligono, anguloLegible, etiquetasTramos,
     esRectangulo, puertaGeom, ventanaGeom, vanoAlturas, VENTANA_ALFEIZAR, VENTANA_ALTO, PUERTA_ALTO, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, esMueble, mueblePts, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
-    calcoCentro, localAMundo, mundoALocal, calibrarCalco, esquinasCalco, caja, unirCajas, cajaPuntos, longitudBonita, papelPara,
+    calcoCentro, localAMundo, mundoALocal, calibrarCalco, calcoDudoso, zoomMinimo, esquinasCalco, caja, unirCajas, cajaPuntos, longitudBonita, papelPara,
     C, svgDibujo, svgCalco, marcoDe, enMarco, deMarco, cajasChocan, segCruzaCaja, construirSVG, nuevoId };
 })();
 export default G;
