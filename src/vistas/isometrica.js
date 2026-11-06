@@ -22,13 +22,14 @@ const MARKUP = `
   <label class="iso-l" title="Puntos de vista guardados de esta sala">vista <select id="isoVistas"><option value="">—</option></select></label>
   <button id="isoVistaGuardar" title="Guardar la cámara y el encuadre actuales como punto de vista con nombre">＋ vista</button>
   <button id="isoVistaQuitar" title="Quitar el punto de vista elegido" disabled>×</button>
+  <button id="isoCentro" title="Volver el centro de giro al medio de la sala" disabled>◎</button>
   <button id="isoAjustar" title="Encajar en la ventana">⤢</button>
   <button id="isoPng" title="Descargar PNG">PNG</button>
   <button id="isoSvg" title="Descargar SVG">SVG</button>
   <button id="isoCerrar" title="Volver a la planta (Esc)">cerrar</button>
 </div>
 <canvas id="isoCv"></canvas>
-<div class="iso-pie" id="isoPie">Arrastra para girar e inclinar · Shift + arrastrar desplaza · rueda acerca · «＋ vista» guarda este punto de vista con nombre; PgUp/PgDn recorre los guardados</div>
+<div class="iso-pie" id="isoPie">Arrastra: gira en torno a ◎ · doble clic en el piso: otro centro · Shift + arrastrar: desplaza · rueda: acerca · «＋ vista» guarda; PgUp/PgDn las recorre</div>
 `;
 
 // ctx: { root, proyecto, sala(), mensaje, onCambio, descargar(blob, nombre), nombreArchivo() }
@@ -87,15 +88,25 @@ export function montarIso(ctx) {
     $('#isoPovInfo').hidden = !pov;
     if (pov) { const p = V.povDe(figura()); $('#isoPovInfo').textContent = `mira ${fmtNum(p.mira, 0)}° · ojos ${fmtNum(p.ojos)} m · campo ${fmtNum(p.fov, 0)}°`; }
     $('#isoPie').textContent = pov ? 'Arrastra para mirar alrededor (y arriba/abajo) · rueda abre o cierra el campo visual · la figura y su cono se mueven en la planta · PNG/SVG exportan esta vista'
-      : 'Arrastra para girar e inclinar · Shift + arrastrar desplaza · rueda acerca · «＋ vista» guarda este punto de vista con nombre; PgUp/PgDn recorre los guardados';
+      : 'Arrastra: gira en torno a ◎ · doble clic en el piso: otro centro · Shift + arrastrar: desplaza · rueda: acerca · «＋ vista» guarda; PgUp/PgDn las recorre';
+    $('#isoCentro').disabled = pov || !cam.centro;
   };
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const setPov = (id) => { povId = id || ''; if (!figura()) povId = ''; renderOjos(); reconstruir(); if (!enPov()) { sync(); encajar(); } pedir(); };
   const guardarPov = () => { if (ctx.onCambio) ctx.onCambio(); };
+  const centro = () => I.centroGiro(sala(), cam);
+  // Todo cambio de giro o inclinación pasa por aquí: el centro de giro no se mueve de su sitio en la pantalla
+  const orbitar = (cambios) => { const antes = { ...cam }; Object.assign(cam, cambios); view = I.viewOrbitado(view, antes, cam, centro()); };
+  const fijarCentro = (c) => { cam.centro = c; const { w, h } = tam(); view = I.viewCentrado(view, cam, centro(), w, h); actualizar(); };
+  const pintarCentro = () => {
+    const c = centro(), p = I.proyector(cam)(c.x, c.y, 0), x = view.ox + p.X * view.s, y = view.oy + p.Y * view.s;
+    const trazo = (color, lw) => { g2.strokeStyle = color; g2.lineWidth = lw; g2.beginPath(); g2.arc(x, y, 7, 0, Math.PI * 2); g2.moveTo(x - 12, y); g2.lineTo(x + 12, y); g2.moveTo(x, y - 12); g2.lineTo(x, y + 12); g2.stroke(); };
+    trazo('#ffffff', 3.5); trazo('#b06a36', 1.5);
+  };
   const sync = () => {
     $('#isoGiro').value = ((cam.giro % 360) + 360) % 360; $('#isoInc').value = cam.inclinacion;
     $('[data-v="giro"]').textContent = fmtNum(((cam.giro % 360) + 360) % 360, 0) + '°'; $('[data-v="inc"]').textContent = fmtNum(cam.inclinacion, 0) + '°';
-    $('#isoMuros').value = cam.muros; $('#isoZocalo').value = fmtNum(cam.zocalo); $('#isoAlto').value = fmtNum(cam.altoDefecto); $('#isoRejilla').checked = !!cam.rejilla; $('#isoFondo').checked = cam.fondo !== false;
+    $('#isoMuros').value = cam.muros; $('#isoZocalo').value = fmtNum(cam.zocalo); $('#isoAlto').value = fmtNum(cam.altoDefecto); $('#isoRejilla').checked = !!cam.rejilla; $('#isoFondo').checked = cam.fondo !== false; $('#isoCentro').disabled = enPov() || !cam.centro;
   };
   const tam = () => ({ w: Math.max(1, root.clientWidth), h: Math.max(1, root.clientHeight - ($('.iso-barra').offsetHeight || 36) - ($('.iso-pie').offsetHeight || 22)) });
   const reconstruir = () => { const s = sala(); const f = figura(); piezas = !s ? [] : f ? V.escenaPov(ctx.proyecto, s, V.povDe(f), { muros: cam.muros, zocalo: cam.zocalo, altoDefecto: cam.altoDefecto, rejilla: cam.rejilla, fondo: cam.fondo }) : I.escena(ctx.proyecto, s, cam); };
@@ -112,22 +123,23 @@ export function montarIso(ctx) {
     g2.setTransform(dpr, 0, 0, dpr, 0, 0); g2.fillStyle = '#ffffff'; g2.fillRect(0, 0, w, h);
     const f = figura();
     if (f) V.pintarPov(MD.canvasPainter(g2, getImage), piezas, V.proyectorPov(V.povDe(f)), V.viewPov(w, h));
-    else I.pintar(MD.canvasPainter(g2, getImage), piezas, view);
+    else { I.pintar(MD.canvasPainter(g2, getImage), piezas, view); pintarCentro(); }
   };
   const pedir = () => { if (!raf) raf = requestAnimationFrame(dibujar); };
   const actualizar = (persistir = true) => { reconstruir(); sync(); pedir(); if (persistir) guardarCam(); if (vistaId && !enPov()) { vistaId = ''; renderVistas(); } };
 
   // controles
-  $('#isoGiro').addEventListener('input', (e) => { cam.giro = +e.target.value; actualizar(false); });
-  $('#isoInc').addEventListener('input', (e) => { cam.inclinacion = +e.target.value; actualizar(false); });
+  $('#isoGiro').addEventListener('input', (e) => { orbitar({ giro: +e.target.value }); actualizar(false); });
+  $('#isoInc').addEventListener('input', (e) => { orbitar({ inclinacion: +e.target.value }); actualizar(false); });
   for (const el of [$('#isoGiro'), $('#isoInc')]) el.addEventListener('change', () => guardarCam());
-  root.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => { cam.giro = ((cam.giro + +b.dataset.g) % 360 + 360) % 360; actualizar(); }));
+  root.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => { orbitar({ giro: ((cam.giro + +b.dataset.g) % 360 + 360) % 360 }); actualizar(); }));
   $('#isoMuros').addEventListener('change', (e) => { cam.muros = e.target.value; actualizar(); });
   $('#isoZocalo').addEventListener('change', (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (v >= 0) cam.zocalo = v; actualizar(); });
   $('#isoAlto').addEventListener('change', (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (v > 0) cam.altoDefecto = v; actualizar(); });
   $('#isoRejilla').addEventListener('change', (e) => { cam.rejilla = e.target.checked; actualizar(); });
   $('#isoFondo').addEventListener('change', (e) => { cam.fondo = e.target.checked; actualizar(); encajar(); pedir(); });
   $('#isoAjustar').addEventListener('click', () => { encajar(); pedir(); });
+  $('#isoCentro').addEventListener('click', () => { fijarCentro(null); ctx.mensaje('Centro de giro: el medio de la sala'); });
   $('#isoOjos').addEventListener('change', (e) => setPov(e.target.value));
   $('#isoVistas').addEventListener('change', (e) => { if (e.target.value) irAVista(e.target.value); else { vistaId = ''; renderVistas(); } });
   $('#isoVistaGuardar').addEventListener('click', guardarVista);
@@ -167,13 +179,20 @@ export function montarIso(ctx) {
       renderOjos(); reconstruir(); pedir(); return;
     }
     if (arr.pan) { view.ox = arr.ox + dx; view.oy = arr.oy + dy; pedir(); return; }
-    cam.giro = ((arr.giro + dx * 0.5) % 360 + 360) % 360; cam.inclinacion = Math.max(15, Math.min(90, arr.inc + dy * 0.3));
+    orbitar({ giro: ((arr.giro + dx * 0.5) % 360 + 360) % 360, inclinacion: Math.max(15, Math.min(90, arr.inc + dy * 0.3)) });
     actualizar(false);
   });
   const fin = (e) => { e.stopPropagation(); if (arr && figura()) guardarPov(); else if (arr && !arr.pan) guardarCam(); arr = null; };
   cv.addEventListener('pointerup', fin); cv.addEventListener('pointercancel', fin);
   cv.addEventListener('wheel', (e) => { e.preventDefault(); e.stopPropagation(); const f = figura(); if (f) { f.fov = Math.max(25, Math.min(110, Math.round(V.povDe(f).fov * (e.deltaY < 0 ? 0.92 : 1 / 0.92)))); renderOjos(); reconstruir(); pedir(); guardarPov(); return; } const r = cv.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top; const k = e.deltaY < 0 ? 1.15 : 1 / 1.15; view = { s: view.s * k, ox: px - (px - view.ox) * k, oy: py - (py - view.oy) * k }; pedir(); }, { passive: false });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Doble clic: ese punto del piso pasa a ser el centro de giro y se lleva al medio de la pantalla
+  cv.addEventListener('dblclick', (e) => {
+    e.stopPropagation(); if (enPov()) return;
+    const r = cv.getBoundingClientRect(); const p = I.desproyectar(cam, (e.clientX - r.left - view.ox) / view.s, (e.clientY - r.top - view.oy) / view.s, 0);
+    fijarCentro({ x: Math.round(p.x * 1e3) / 1e3, y: Math.round(p.y * 1e3) / 1e3 });
+    ctx.mensaje('Centro de giro fijado aquí · ◎ lo devuelve al medio de la sala');
+  });
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (visible) pedir(); }) : null; if (ro) ro.observe(root);
 
   return {

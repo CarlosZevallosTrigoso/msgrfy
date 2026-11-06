@@ -10,8 +10,8 @@ import { muebleCajas } from './biblioteca.js';
 const rad = (g) => g * Math.PI / 180;
 // color hex con transparencia, como rgba() (los pintores y cualquier rasterizador lo entienden)
 const alfa = (hex, a) => { const m = /^#([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return hex; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
-export const camDefecto = () => ({ giro: 35, inclinacion: 35, muros: 'cortados', zocalo: 0.9, altoDefecto: 3, rejilla: true, fondo: true });
-const CAM_CAMPOS = ['giro', 'inclinacion', 'muros', 'zocalo', 'altoDefecto', 'rejilla', 'fondo'];
+export const camDefecto = () => ({ giro: 35, inclinacion: 35, muros: 'cortados', zocalo: 0.9, altoDefecto: 3, rejilla: true, fondo: true, centro: null });
+const CAM_CAMPOS = ['giro', 'inclinacion', 'muros', 'zocalo', 'altoDefecto', 'rejilla', 'fondo', 'centro'];
 // Solo los parámetros de cámara (sin vistas guardadas ni otros restos)
 export const soloCam = (c) => { const o = {}; for (const k of CAM_CAMPOS) if (c && c[k] !== undefined) o[k] = c[k]; return { ...camDefecto(), ...o }; };
 
@@ -39,6 +39,33 @@ export const proyector = (cam) => {
   const P = (x, y, z = 0) => { const xr = x * c - y * s, yr = x * s + y * c; return { X: xr, Y: yr * sf - z * cf, d: yr }; };
   P.vista = { x: s, y: c }; // dirección en planta hacia la cámara: la profundidad d = x·sen θ + y·cos θ crece en ese sentido
   return P;
+};
+
+// Punto de la planta a la altura z que se proyecta en (X, Y): el inverso de proyector()
+export const desproyectar = (cam, X, Y, z = 0) => {
+  const t = rad(cam.giro), c = Math.cos(t), s = Math.sin(t);
+  const f = rad(cam.inclinacion), sf = Math.sin(f), cf = Math.cos(f);
+  const yr = (Y + z * cf) / sf;
+  return { x: X * c + yr * s, y: -X * s + yr * c };
+};
+
+// ---------- centro de giro ----------
+// cam.centro {x, y} es el punto del piso elegido; si no hay, el medio de lo dibujado en la sala
+export const centroGiro = (sala, cam) => {
+  const c = cam && cam.centro;
+  if (c && Number.isFinite(c.x) && Number.isFinite(c.y)) return { x: c.x, y: c.y };
+  const bb = sala && sala.entidades.length ? G.caja(sala.entidades, 0) : null;
+  return bb ? { x: bb.x + bb.w / 2, y: bb.y + bb.h / 2 } : { x: 0, y: 0 };
+};
+// Encuadre que deja `centro` en el mismo sitio de la pantalla al pasar de la cámara `antes` a `despues`
+export const viewOrbitado = (view, antes, despues, centro) => {
+  const a = proyector(antes)(centro.x, centro.y, 0), b = proyector(despues)(centro.x, centro.y, 0);
+  return { ...view, ox: view.ox + (a.X - b.X) * view.s, oy: view.oy + (a.Y - b.Y) * view.s };
+};
+// Encuadre que lleva `centro` al medio de un lienzo w × h, sin cambiar el zoom
+export const viewCentrado = (view, cam, centro, w, h) => {
+  const p = proyector(cam)(centro.x, centro.y, 0);
+  return { ...view, ox: w / 2 - p.X * view.s, oy: h / 2 - p.Y * view.s };
 };
 
 // ---------- escena ----------

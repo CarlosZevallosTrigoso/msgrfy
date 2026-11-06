@@ -161,3 +161,34 @@ test('esquinas: un tramo corto entre tramos largos se corta o no con ellos (sin 
     }
   }
 });
+
+test('centro de giro: por defecto el medio de lo dibujado; un centro elegido manda', () => {
+  const { s } = sala();
+  const c = I.centroGiro(s, I.camDefecto());
+  assert.ok(Math.abs(c.x - 4) < 0.2 && Math.abs(c.y - 2.5) < 0.2, 'medio de la sala de 8 × 5');
+  assert.deepEqual(I.centroGiro(s, { centro: { x: 1, y: 2 } }), { x: 1, y: 2 });
+  assert.deepEqual(I.centroGiro({ entidades: [] }, I.camDefecto()), { x: 0, y: 0 });
+  assert.notEqual(I.centroGiro(s, { centro: { x: NaN, y: 2 } }).x, NaN);
+  assert.equal(I.soloCam({ centro: { x: 1, y: 2 } }).centro.x, 1, 'la cámara guarda el centro');
+  assert.equal(I.camDefecto().centro, null);
+});
+
+test('al orbitar, el centro no se mueve de la pantalla aunque la sala esté lejos del origen', () => {
+  const centro = { x: -224, y: -50 }; let view = { s: 40, ox: 300, oy: 200 };
+  const pantalla = (v, cam) => { const p = I.proyector(cam)(centro.x, centro.y, 0); return { x: v.ox + p.X * v.s, y: v.oy + p.Y * v.s }; };
+  let cam = { giro: 35, inclinacion: 35 }; const inicio = pantalla(view, cam);
+  for (const giro of [0, 90, 123, 359]) for (const inclinacion of [15, 60, 90]) {
+    const nueva = { giro, inclinacion }; view = I.viewOrbitado(view, cam, nueva, centro); cam = nueva;
+    const p = pantalla(view, cam); assert.ok(Math.hypot(p.x - inicio.x, p.y - inicio.y) < 1e-6);
+  }
+  assert.equal(view.s, 40, 'no cambia el zoom');
+});
+
+test('viewCentrado lleva el punto al medio del lienzo; desproyectar invierte la proyección', () => {
+  const cam = { giro: 217, inclinacion: 28 }, q = { x: 12.5, y: -7.25 };
+  const v = I.viewCentrado({ s: 50, ox: 0, oy: 0 }, cam, q, 800, 600);
+  const p = I.proyector(cam)(q.x, q.y, 0);
+  assert.ok(Math.abs(v.ox + p.X * 50 - 400) < 1e-9 && Math.abs(v.oy + p.Y * 50 - 300) < 1e-9);
+  const r = I.desproyectar(cam, p.X, p.Y, 0); assert.ok(Math.hypot(r.x - q.x, r.y - q.y) < 1e-9);
+  const a = I.proyector(cam)(q.x, q.y, 2); const r2 = I.desproyectar(cam, a.X, a.Y, 2); assert.ok(Math.hypot(r2.x - q.x, r2.y - q.y) < 1e-9);
+});

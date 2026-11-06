@@ -11,7 +11,7 @@ Unifica tres herramientas que antes eran archivos sueltos (plano-sala, MuseoDraf
 - **Fase 3 (hecha):** vista Muro (la mesa de montaje de MuseoDraft) sobre el proyecto, conectada a la planta: desde un tramo de muro se abre su alzado con el ancho, el alto y los cuadros ya colocados; las obras se pueden colgar también desde la lista.
 - **Fase 4 (hecha):** vista Lectura (el anotador) sobre imágenes o sobre las plantas y muros del propio proyecto, redibujados a escala; `app.html` de un solo archivo; exportación de HTML de lectura autocontenido.
 
-- **Modo 3D (hecho):** la sala en axonometría con giro libre e inclinación, al estilo de Los Sims: los muros que dan la espalda a la cámara se cortan a un zócalo, se vuelven transparentes o se dejan enteros. Cuadros con su colgado, obras en planta y columnas con su alto, proyectores con su haz. Exporta PNG y SVG y entra en Lectura como base («+ 3D»).
+- **Modo 3D (hecho):** la sala en axonometría con giro libre e inclinación, al estilo de Los Sims: los muros que dan la espalda a la cámara se cortan a un zócalo, se vuelven transparentes o se dejan enteros. Cuadros con su colgado, obras en planta y columnas con su alto, proyectores con su haz. El giro es en torno a un centro que no se mueve de la pantalla: el medio de la sala, o el punto del piso donde se haga doble clic (◎ lo devuelve). Exporta PNG y SVG y entra en Lectura como base («+ 3D»).
 
 - **Puntos de vista (hecho):** vistas guardadas de la cámara 3D con nombre, y perspectiva real desde los ojos de una figura colocada en la planta (persona, silla de ruedas, niño), con cono de visión, exportación y entrada en Lectura.
 

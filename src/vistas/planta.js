@@ -899,7 +899,7 @@ const calibrar = (a, b, metrosDados) => {
 };
 
 // ── puntero
-const enUi = (t) => t && t.closest && (t.closest('#guia') || t.closest('#inicio'));
+const enUi = (t) => t && t.closest && (t.closest('#guia') || t.closest('#inicio') || t.closest('#psIso'));
 el.lienzo.addEventListener('pointerdown', (ev) => {
   if (enUi(ev.target)) return;
   if (document.activeElement && document.activeElement !== document.body && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) document.activeElement.blur();
