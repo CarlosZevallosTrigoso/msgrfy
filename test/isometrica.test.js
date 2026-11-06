@@ -192,3 +192,16 @@ test('viewCentrado lleva el punto al medio del lienzo; desproyectar invierte la 
   const r = I.desproyectar(cam, p.X, p.Y, 0); assert.ok(Math.hypot(r.x - q.x, r.y - q.y) < 1e-9);
   const a = I.proyector(cam)(q.x, q.y, 2); const r2 = I.desproyectar(cam, a.X, a.Y, 2); assert.ok(Math.hypot(r2.x - q.x, r2.y - q.y) < 1e-9);
 });
+
+test('piso: una línea abierta no se cierra con una recta entre sus extremos; un panel pequeño no se queda con el piso', () => {
+  const p = M.nuevoProyecto('a'); const s = M.nuevaSala({ nombre: 'S' }); p.salas.push(s);
+  const L = { id: 'L', tipo: 'linea', pts: [{ x: 6, y: 1 }, { x: 6, y: 4 }, { x: 0, y: 8 }, { x: 0, y: 3 }, { x: 2.5, y: 0 }], espesor: 0.15, cara: 'fuera', altura: 3 };
+  s.entidades.push(L, { id: 'P', tipo: 'linea', cerrada: true, pts: [{ x: 8, y: 2 }, { x: 9, y: 2 }, { x: 9, y: 2.1 }, { x: 8, y: 2.1 }], espesor: 0.1, cara: 'fuera' });
+  const cam = { ...I.camDefecto(), giro: 0, inclinacion: 90 };
+  const caja = (z) => { const q = z.caras[0].pts; return { x0: Math.min(...q.map((v) => v[0])), x1: Math.max(...q.map((v) => v[0])), n: q.length }; };
+  const abierto = caja(I.escena(p, s, cam).find((z) => z.tipo === 'piso'));
+  assert.equal(abierto.n, 4, 'la caja de todo'); assert.ok(abierto.x0 <= 0 && abierto.x1 >= 9);
+  L.cerrada = true;
+  const cerrado = caja(I.escena(p, s, cam).find((z) => z.tipo === 'piso'));
+  assert.equal(cerrado.n, 5, 'el contorno de la línea cerrada'); assert.ok(cerrado.x1 <= 6);
+});
