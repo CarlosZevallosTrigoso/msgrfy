@@ -1080,6 +1080,7 @@ el.lienzo.addEventListener('dblclick', (ev) => {
 });
 el.lienzo.addEventListener('wheel', (ev) => { ev.preventDefault(); zoomEn(ev.clientX, ev.clientY, ev.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
 el.lienzo.addEventListener('contextmenu', (ev) => ev.preventDefault());
+el.lienzo.addEventListener('dragstart', (ev) => ev.preventDefault());
 el.lienzo.addEventListener('dragover', (ev) => ev.preventDefault());
 el.lienzo.addEventListener('drop', (ev) => {
   ev.preventDefault(); if (iso && iso.visible) return; const f = (ev.dataTransfer && ev.dataTransfer.files || [])[0]; if (!f) return;

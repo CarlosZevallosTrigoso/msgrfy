@@ -398,6 +398,8 @@ body.lectura #tituloLectura{display:inline}
 #psIso[hidden]{display:none}
 /* el lienzo se redibuja al apretar el puntero: si el clic cayera en una pieza, esta desaparecería y el navegador no emitiría click ni dblclick. La selección la calcula G.tocar */
 #svg *{pointer-events:none}
+/* arrastrar en el lienzo no selecciona texto: apretar sobre una selección iniciaría un arrastre del navegador y cancelaría el del puntero */
+#lienzo{-webkit-user-select:none;user-select:none}
 #psIso .iso-barra{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:4px 10px;min-height:36px;border-bottom:1px solid var(--linea);background:var(--panel)}
 #psIso .iso-tit{font-weight:700}
 #psIso .iso-l{display:inline-flex;align-items:center;gap:4px;margin:0;color:var(--ink2);font-size:11px;text-transform:none;letter-spacing:0}
@@ -5385,6 +5387,7 @@ el.lienzo.addEventListener('dblclick', (ev) => {
 });
 el.lienzo.addEventListener('wheel', (ev) => { ev.preventDefault(); zoomEn(ev.clientX, ev.clientY, ev.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
 el.lienzo.addEventListener('contextmenu', (ev) => ev.preventDefault());
+el.lienzo.addEventListener('dragstart', (ev) => ev.preventDefault());
 el.lienzo.addEventListener('dragover', (ev) => ev.preventDefault());
 el.lienzo.addEventListener('drop', (ev) => {
   ev.preventDefault(); if (iso && iso.visible) return; const f = (ev.dataTransfer && ev.dataTransfer.files || [])[0]; if (!f) return;
