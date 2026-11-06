@@ -71,6 +71,95 @@ export const G = (() => {
     if (e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro') return [[e.a, e.b, 0]];
     return [];
   };
+  // ── muros curvos. Cada tramo de una línea puede ser un arco de círculo: e.curvas[i] es su flecha en metros, con signo,
+  // sobre la normal izquierda de a→b. Los vértices no cambian: el arco se convierte en puntos solo para dibujar y calcular,
+  // y los tramos conservan su número (alturas, alzados).
+  const FLECHA_MIN = 1e-3, TOL_ARCO = 0.002, PASO_ARCO_MAX = 6 * Math.PI / 180;
+  const curvaDe = (e, i) => { const f = e.tipo === 'linea' && e.curvas ? e.curvas[i] : 0; return Number.isFinite(f) && Math.abs(f) >= FLECHA_MIN ? f : 0; };
+  // c: centro; R: radio; phi: medio ángulo del arco; L: longitud; s: lado hacia el que se curva
+  const arco = (a, b, f) => {
+    const cuerda = dist(a, b); if (!f || !(cuerda > 1e-9)) return null;
+    const n = perp(unit(sub(b, a))), s = Math.sign(f), h = Math.abs(f);
+    const R = (cuerda * cuerda / 4 + h * h) / (2 * h), phi = 2 * Math.atan2(2 * h, cuerda);
+    return { a, b, f, s, R, phi, n, cuerda, c: add(medio(a, b), mul(n, f - s * R)), L: 2 * R * phi };
+  };
+  const arcoDe = (e, seg) => arco(seg[0], seg[1], curvaDe(e, seg[2]));
+  const enArco = (g, t) => add(g.c, rotar(sub(g.a, g.c), -g.s * 2 * g.phi * t * 180 / Math.PI));
+  const puntosArco = (g) => {
+    const paso = Math.min(PASO_ARCO_MAX, 2 * Math.acos(Math.max(0, 1 - TOL_ARCO / g.R)));
+    const n = clamp(Math.ceil(2 * g.phi / paso), 4, 180); const pts = [];
+    for (let k = 0; k <= n; k++) pts.push(k === 0 ? g.a : k === n ? g.b : enArco(g, k / n));
+    return pts;
+  };
+  const tieneCurvas = (e) => !!e.curvas && segmentos(e).some((s) => curvaDe(e, s[2]));
+  const puntosTramo = (e, seg) => { const g = arcoDe(e, seg); return g ? puntosArco(g) : [seg[0], seg[1]]; };
+  // La línea como polilínea recta: pts densos y, por cada tramo fino, su tramo original y su tramo de arco en metros
+  const lineaFina = (e) => {
+    const cerrada = !!(e.cerrada && e.pts.length > 2); const segs = segmentos(e);
+    if (!tieneCurvas(e)) return { pts: e.pts, cerrada, orig: segs.map((s) => s[2]), curva: segs.map(() => false), u0: segs.map(() => 0), u1: segs.map((s) => dist(s[0], s[1])) };
+    const pts = [], orig = [], curva = [], u0 = [], u1 = [];
+    for (const seg of segs) {
+      const q = puntosTramo(e, seg); const es = q.length > 2 || !!curvaDe(e, seg[2]); const g = arcoDe(e, seg); let u = 0;
+      for (let k = 0; k < q.length - 1; k++) {
+        const l = g ? g.L / (q.length - 1) : dist(q[k], q[k + 1]);
+        pts.push(q[k]); orig.push(seg[2]); curva.push(es); u0.push(u); u1.push(u + l); u += l;
+      }
+    }
+    if (!cerrada) pts.push(segs[segs.length - 1][1]);
+    return { pts, cerrada, orig, curva, u0, u1 };
+  };
+  const polilinea = (e) => (e.tipo === 'linea' ? lineaFina(e).pts : e.pts);
+  // Como segmentos(), pero con los arcos ya troceados: [p, q, tramo]
+  const finos = (e) => {
+    if (e.tipo !== 'linea' || !tieneCurvas(e)) return segmentos(e);
+    const f = lineaFina(e), n = f.pts.length;
+    return f.orig.map((i, s) => [f.pts[s], f.pts[(s + 1) % n], i]);
+  };
+  const largoTramo = (e, seg) => { const g = arcoDe(e, seg); return g ? g.L : dist(seg[0], seg[1]); };
+  const medioTramo = (e, seg) => { const g = arcoDe(e, seg); return g ? add(medio(seg[0], seg[1]), mul(g.n, g.f)) : medio(seg[0], seg[1]); };
+  // Punto del tramo más cercano a p: q, distancia d, fracción t y metros u desde su inicio (sobre el arco si es curvo)
+  const cercaTramo = (e, seg, p) => {
+    const g = arcoDe(e, seg);
+    if (!g) { const r = proyectar(p, seg[0], seg[1]); return { ...r, u: r.t * dist(seg[0], seg[1]) }; }
+    const v = sub(p, g.c), r0 = sub(g.a, g.c), l = Math.hypot(v.x, v.y);
+    let ang = Math.atan2(r0.x * v.y - r0.y * v.x, dot(r0, v)) * -g.s; if (ang < 0) ang += 2 * Math.PI;
+    const tot = 2 * g.phi;
+    if (ang <= tot && l > 0) { const t = ang / tot; return { q: add(g.c, mul(v, g.R / l)), t, d: Math.abs(l - g.R), u: t * g.L }; }
+    const da = dist(p, g.a), db = dist(p, g.b);
+    return da <= db ? { q: g.a, t: 0, d: da, u: 0 } : { q: g.b, t: 1, d: db, u: g.L };
+  };
+  // Normal izquierda del tramo en el punto del arco que corresponde a p
+  const normalEn = (e, seg, p) => { const g = arcoDe(e, seg); if (!g) return perp(unit(sub(seg[1], seg[0]))); const v = sub(p, g.c); return Math.hypot(v.x, v.y) > 0 ? mul(unit(v), g.s) : g.n; };
+  // Flecha que hace pasar el tramo a–b por p, a la altura de su punto medio
+  const flechaHacia = (a, b, p) => dot(sub(p, medio(a, b)), perp(unit(sub(b, a))));
+  const fijarCurva = (e, i, f) => {
+    const seg = segmentos(e).find((s) => s[2] === i); if (!seg) return false;
+    const lim = 2 * dist(seg[0], seg[1]); const v = r6(clamp(f, -lim, lim));
+    if (Math.abs(v) >= FLECHA_MIN) e.curvas = { ...(e.curvas || {}), [i]: v };
+    else if (e.curvas) { delete e.curvas[i]; if (!Object.keys(e.curvas).length) delete e.curvas; }
+    return true;
+  };
+  // Flecha de un arco de radio R sobre una cuerda dada; null si el radio no alcanza a cubrirla. mayor: el arco largo
+  const flechaDeRadio = (cuerda, R, mayor = false) => { if (!(R >= cuerda / 2) || !(cuerda > 0)) return null; const m = Math.sqrt(Math.max(0, R * R - cuerda * cuerda / 4)); return mayor ? R + m : R - m; };
+  // Puntos con que se agarra la curvatura de cada tramo, en su punto medio
+  const asasCurva = (e) => (e.tipo === 'linea' ? segmentos(e).map((s) => ({ ...medioTramo(e, s), i: s[2], cuerda: dist(s[0], s[1]), a: s[0], b: s[1], f: curvaDe(e, s[2]) })) : []);
+  // Al cambiar los vértices, cada tramo curvo conserva su forma: la flecha crece o se encoge con su cuerda
+  const reescalarCurvas = (e, viejos) => {
+    if (!e.curvas) return e;
+    const n = e.pts.length; const dist2 = (P, i) => dist(P[i], P[(i + 1) % n]);
+    for (const k of Object.keys(e.curvas)) {
+      const i = +k; if (i >= n) continue; const c0 = dist2(viejos, i), c1 = dist2(e.pts, i);
+      if (c0 > 1e-9 && Math.abs(c1 - c0) > 1e-9) fijarCurva(e, i, e.curvas[k] * c1 / c0);
+    }
+    return e;
+  };
+  // Convierte un círculo en muro: cuatro arcos que hacen uno
+  const circuloAMuro = (e) => {
+    const { c, r } = e; const f = r6(r * (1 - Math.SQRT1_2));
+    const pts = [[r, 0], [0, r], [-r, 0], [0, -r]].map(([x, y]) => ({ x: r6(c.x + x), y: r6(c.y + y) }));
+    const lado = areaFirmada(pts) > 0 ? -1 : 1; // con área positiva, la normal izquierda apunta adentro: el arco va al otro lado
+    return { tipo: 'linea', pts, cerrada: true, curvas: { 0: f * lado, 1: f * lado, 2: f * lado, 3: f * lado } };
+  };
   const verticesIman = (e) => (e.tipo === 'linea' ? e.pts : e.tipo === 'circulo' ? [e.c] : e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro' || e.tipo === 'proyeccion' ? [e.a, e.b] : esPoligono(e) ? e.pts : esMueble(e) ? (e.forma === 'cilindro' ? [{ x: e.x, y: e.y }] : mueblePts(e)) : []);
   // Imán: vértice > punto medio > sobre un tramo > rejilla > libre
   const imanar = (p, o) => {
@@ -83,9 +172,9 @@ export const G = (() => {
       });
       if (best) return best;
       const segs = [];
-      for (const e of ents) { if (ex && ex.id === e.id) continue; for (const s of segmentos(e)) segs.push(s); }
+      for (const e of ents) { if (ex && ex.id === e.id) continue; for (const s of finos(e)) segs.push(s); }
       let bm = tol * 0.55;
-      for (const [a, b] of segs) { const m = medio(a, b); const d = dist(p, m); if (d <= bm) { bm = d; best = { p: { x: r6(m.x), y: r6(m.y) }, tipo: 'medio' }; } }
+      for (const e of ents) { if (ex && ex.id === e.id) continue; for (const s of segmentos(e)) { const m = medioTramo(e, s); const d = dist(p, m); if (d <= bm) { bm = d; best = { p: { x: r6(m.x), y: r6(m.y) }, tipo: 'medio' }; } } }
       if (best) return best;
       let bl = null, bdl = tol * 0.8;
       for (const [a, b] of segs) { const pr = proyectar(p, a, b); if (pr.d <= bdl) { bdl = pr.d; bl = { p: { x: r6(pr.q.x), y: r6(pr.q.y) }, tipo: 'linea' }; } }
@@ -98,7 +187,14 @@ export const G = (() => {
   // ── medidas
   const areaFirmada = (pts) => { let s = 0; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; s += a.x * b.y - b.x * a.y; } return s / 2; };
   const area = (pts) => (pts && pts.length > 2 ? Math.abs(areaFirmada(pts)) : 0);
-  const longitudLinea = (e) => segmentos(e).reduce((s, [a, b]) => s + dist(a, b), 0);
+  const longitudLinea = (e) => segmentos(e).reduce((s, seg) => s + largoTramo(e, seg), 0);
+  // Área de una línea, exacta aunque tenga arcos: la del polígono de sus vértices más o menos el segmento circular de cada arco
+  const areaLinea = (e) => {
+    if (!tieneCurvas(e)) return area(e.pts);
+    let s = areaFirmada(e.pts);
+    for (const seg of segmentos(e)) { const g = arcoDe(e, seg); if (g) s -= g.s * g.R * g.R / 2 * (2 * g.phi - Math.sin(2 * g.phi)); }
+    return Math.abs(s);
+  };
   const puntoEnPoligono = (p, pts) => {
     let dentro = false;
     for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -112,7 +208,7 @@ export const G = (() => {
   const ladoArriba = (n) => (n.y < -1e-9 || (Math.abs(n.y) < 1e-9 && n.x < 0)) ? 1 : -1;
   // Rótulos de longitud por tramo: fuera de la figura si es cerrada; arriba/izquierda si es abierta
   // Una línea cerrada, o abierta que rodea un espacio (calco a medio trazar), define un contorno con dentro y fuera
-  const contornoDe = (e) => (e.tipo === 'linea' && e.pts.length > 2 && (e.cerrada || area(e.pts) > 0.05 * Math.pow(longitudLinea(e), 2) / 16) ? e.pts : null);
+  const contornoDe = (e) => (e.tipo === 'linea' && e.pts.length > 2 && (e.cerrada || areaLinea(e) > 0.05 * Math.pow(longitudLinea(e), 2) / 16) ? polilinea(e) : null);
   const esRectangulo = (pts) => {
     if (pts.length !== 4) return false;
     for (let i = 0; i < 4; i++) { const a = pts[i], b = pts[(i + 1) % 4], c = pts[(i + 2) % 4]; const u = sub(b, a), v = sub(c, b); if (Math.abs(dot(u, v)) > 1e-6 * (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y) + 1e-12)) return false; }
@@ -123,16 +219,17 @@ export const G = (() => {
     const res = []; const cerr = e.tipo === 'linea' && e.cerrada && e.pts.length > 2;
     // una línea abierta que rodea un espacio se rotula hacia fuera de la figura que insinúa
     const contorno = contornoDe(e);
-    const rect = cerr && esRectangulo(e.pts);
-    for (const [a, b, i] of segmentos(e)) {
+    const rect = cerr && esRectangulo(e.pts) && !tieneCurvas(e);
+    for (const seg of segmentos(e)) {
+      const [a, b, i] = seg;
       if (rect && i > 1) continue;
-      const L = dist(a, b); if (L < h * 2) continue; // un tramo más corto que su rótulo se acota a mano
-      const m = medio(a, b); const n = unit(perp(sub(b, a)));
+      const L = largoTramo(e, seg); if (L < h * 2) continue; // un tramo más corto que su rótulo se acota a mano
+      const m = medioTramo(e, seg); const n = unit(perp(sub(b, a)));
       let s;
       if (contorno) { const prueba = add(m, mul(n, Math.min(h * 0.85, L * 0.2, h * 0.3))); s = puntoEnPoligono(prueba, contorno) ? -1 : 1; }
       else s = ladoArriba(n);
       // extra puede devolver un número (separación) o {off, t}: separación y posición a lo largo del tramo (0–1)
-      const ex = extra ? extra(a, b, s) : 0;
+      const ex = extra ? extra(a, b, s, i) : 0;
       const off = h * 0.85 + (typeof ex === 'number' ? ex : ex.off);
       const base = typeof ex === 'number' ? m : add(a, mul(sub(b, a), ex.t));
       const pos = add(base, mul(n, s * off));
@@ -237,7 +334,7 @@ export const G = (() => {
   // Signo de la normal izquierda (perp) que apunta fuera del contorno; +1 si no hay contorno
   const ladoFuera = (e) => {
     const c = contornoDe(e); if (!c) return 1;
-    let mejor = null, bl = 0; for (const [a, b] of segmentos(e)) { const L = dist(a, b); if (L > bl) { bl = L; mejor = [a, b]; } }
+    let mejor = null, bl = 0; for (const [a, b] of finos(e)) { const L = dist(a, b); if (L > bl) { bl = L; mejor = [a, b]; } }
     if (!mejor) return 1;
     const [a, b] = mejor; const prueba = add(medio(a, b), mul(unit(perp(sub(b, a))), Math.min(bl * 0.01, 0.01)));
     return puntoEnPoligono(prueba, c) ? -1 : 1;
@@ -265,7 +362,8 @@ export const G = (() => {
   const contornoBanda = (e) => {
     const b = bandaMuro(e); if (!b) return null;
     const cerr = e.cerrada && e.pts.length > 2;
-    return { banda: b, cerrada: cerr, A: desplazarPolilinea(e.pts, cerr, b[1]), B: desplazarPolilinea(e.pts, cerr, b[0]) };
+    const pts = polilinea(e);
+    return { banda: b, cerrada: cerr, A: desplazarPolilinea(pts, cerr, b[1]), B: desplazarPolilinea(pts, cerr, b[0]) };
   };
   // Muro con espesor bajo un vano a–b (puerta o ventana): normal del tramo y extensión de la banda
   const anfitrion = (ents, a, b) => {
@@ -321,9 +419,10 @@ export const G = (() => {
     switch (e.tipo) {
       case 'linea': {
         const bm = bandaMuro(e); const ext = bm ? Math.max(-bm[0], bm[1]) : 0;
-        if (ext) { let d = Infinity; for (const [a, b] of segmentos(e)) d = Math.min(d, proyectar(p, a, b).d); if (d <= ext) return 0; }
-        if (e.cerrada && e.relleno && e.relleno !== 'ninguno' && e.pts.length > 2 && puntoEnPoligono(p, e.pts)) return 0;
-        let d = Infinity; for (const [a, b] of segmentos(e)) d = Math.min(d, proyectar(p, a, b).d);
+        const fs = finos(e);
+        if (ext) { let d = Infinity; for (const [a, b] of fs) d = Math.min(d, proyectar(p, a, b).d); if (d <= ext) return 0; }
+        if (e.cerrada && e.relleno && e.relleno !== 'ninguno' && e.pts.length > 2 && puntoEnPoligono(p, polilinea(e))) return 0;
+        let d = Infinity; for (const [a, b] of fs) d = Math.min(d, proyectar(p, a, b).d);
         if (e.pts.length === 1) d = dist(p, e.pts[0]);
         return d;
       }
@@ -376,7 +475,8 @@ export const G = (() => {
   };
   const fijarAsa = (e, i, p) => {
     const q = { x: r6(p.x), y: r6(p.y) };
-    if (e.tipo === 'linea' || esPoligono(e)) e.pts[i] = q;
+    if (e.tipo === 'linea') { const viejos = e.pts.slice(); e.pts[i] = q; reescalarCurvas(e, viejos); }
+    else if (esPoligono(e)) e.pts[i] = q;
     else if (e.tipo === 'cuadro') e[i === 0 ? 'a' : 'b'] = q;
     else if (e.tipo === 'proyeccion') e[['a', 'b', 'p'][i]] = q;
     else if (e.tipo === 'circulo') { if (i === 0) e.c = q; else e.r = Math.max(0.01, r6(dist(e.c, q))); }
@@ -388,15 +488,25 @@ export const G = (() => {
   const insertarVertice = (e, p, tol) => {
     if (e.tipo !== 'linea' && !esPoligono(e)) return -1;
     let best = null, bd = tol;
-    for (const [a, b, i] of segmentos(e)) { const pr = proyectar(p, a, b); if (pr.d <= bd && pr.t > 0.001 && pr.t < 0.999) { bd = pr.d; best = { i, q: pr.q }; } }
+    for (const seg of segmentos(e)) { const pr = cercaTramo(e, seg, p); if (pr.d <= bd && pr.t > 0.001 && pr.t < 0.999) { bd = pr.d; best = { i: seg[2], q: pr.q, t: pr.t, g: arcoDe(e, seg) }; } }
     if (!best) return -1;
     e.pts.splice(best.i + 1, 0, { x: r6(best.q.x), y: r6(best.q.y) }); delete e.etiq;
+    if (e.curvas) { // los tramos siguientes avanzan un número; un arco partido queda en dos arcos del mismo círculo
+      const c = {}; for (const k of Object.keys(e.curvas)) { const j = +k; if (j !== best.i) c[j > best.i ? j + 1 : j] = e.curvas[k]; }
+      if (best.g) { const { R, s, phi } = best.g; c[best.i] = r6(s * R * (1 - Math.cos(phi * best.t))); c[best.i + 1] = r6(s * R * (1 - Math.cos(phi * (1 - best.t)))); }
+      e.curvas = c;
+    }
     return best.i + 1;
   };
   const borrarVertice = (e, i) => {
     if (esPoligono(e)) { if (e.pts.length <= 3) return false; e.pts.splice(i, 1); return true; }
     if (e.tipo !== 'linea' || e.pts.length <= 2) return false;
     delete e.etiq;
+    if (e.curvas) { // los dos tramos que tocaban el punto se funden en uno recto; los demás conservan su curva con su nuevo número
+      const n = e.pts.length, c = {};
+      for (const k of Object.keys(e.curvas)) { const j = +k; if (j === i || (j + 1) % n === i) continue; c[j < i ? j : j - 1] = e.curvas[k]; }
+      if (Object.keys(c).length) e.curvas = c; else delete e.curvas;
+    }
     e.pts.splice(i, 1); if (e.cerrada && e.pts.length < 3) e.cerrada = false; return true;
   };
   // Estira el tramo i hasta nuevaL: todo lo que queda más allá de su extremo, en su dirección, se desplaza.
@@ -411,6 +521,14 @@ export const G = (() => {
       if (k === i) return { x: p.x, y: p.y };
       return dot(sub(p, a), d) >= L - tolp ? { x: r6(p.x + d.x * delta), y: r6(p.y + d.y * delta) } : { x: p.x, y: p.y };
     });
+  };
+  // Lleva el tramo i a medir `largo` (sobre el arco si es curvo): estira la figura como estirarTramo y el arco conserva su forma
+  const estirarLinea = (e, i, largo) => {
+    const seg = segmentos(e).find((s) => s[2] === i); if (!seg || !(largo > 0)) return false;
+    const L = largoTramo(e, seg); if (!(L > 0)) return false;
+    const nuevos = estirarTramo(e.pts, i, e.cerrada, dist(seg[0], seg[1]) * largo / L); if (!nuevos) return false;
+    const viejos = e.pts; e.pts = nuevos; reescalarCurvas(e, viejos);
+    return true;
   };
   const rectPts = (a, b) => [{ x: a.x, y: a.y }, { x: b.x, y: a.y }, { x: b.x, y: b.y }, { x: a.x, y: b.y }];
 
@@ -440,7 +558,7 @@ export const G = (() => {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     const inc = (p, r = 0) => { x0 = Math.min(x0, p.x - r); y0 = Math.min(y0, p.y - r); x1 = Math.max(x1, p.x + r); y1 = Math.max(y1, p.y + r); };
     for (const e of ents) {
-      if (e.tipo === 'linea') { const r = (e.medidas || tieneAlturas(e) ? h * 1.6 : 0) + (e.espesor > 0 ? e.espesor : 0); e.pts.forEach((p) => inc(p, r)); }
+      if (e.tipo === 'linea') { const r = (e.medidas || tieneAlturas(e) ? h * 1.6 : 0) + (e.espesor > 0 ? e.espesor : 0); polilinea(e).forEach((p) => inc(p, r)); }
       else if (e.tipo === 'circulo') { inc(e.c, e.r); if (e.medidas) inc({ x: e.c.x + e.r + h * 6, y: e.c.y }); }
       else if (esMueble(e)) mueblePts(e).forEach((p) => inc(p));
       else if (e.tipo === 'puerta') { inc(e.a); inc(e.b); const g = puertaGeom(e); if (g) inc(g.hoja); }
@@ -567,9 +685,10 @@ export const G = (() => {
       if (e.tipo === 'linea') {
         if (e.pts.length < 2) continue;
         const cerr = e.cerrada && e.pts.length > 2;
-        const d = 'M' + e.pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L') + (cerr ? ' Z' : '');
+        const fina = polilinea(e);
+        const d = 'M' + fina.map((p) => C(p.x) + ' ' + C(p.y)).join(' L') + (cerr ? ' Z' : '');
         const cb = contornoBanda(e);
-        const segs = segmentos(e); segs.forEach(([a, b]) => obsSegs.push([a, b]));
+        const segs = segmentos(e); finos(e).forEach(([a, b]) => obsSegs.push([a, b]));
         if (cb) {
           for (const P of [cb.A, cb.B]) for (let i = 0; i < P.length - (cb.cerrada ? 0 : 1); i++) obsSegs.push([P[i], P[(i + 1) % P.length]]);
           const anillo = (P) => 'M' + P.map((p) => C(p.x) + ' ' + C(p.y)).join(' L');
@@ -580,13 +699,14 @@ export const G = (() => {
           cuerpo += `<path d="${dB}" ${fill} fill-rule="evenodd" stroke="${col}" stroke-width="${sw('fino')}" stroke-linejoin="miter" stroke-miterlimit="6"/>`;
         } else cuerpo += `<path d="${d}" ${cerr ? relleno(e) : 'fill="none"'} stroke="${col}" stroke-width="${sw(e.grosor)}" stroke-linejoin="miter" stroke-miterlimit="6"${trazo(e.estilo, e.grosor)}/>`;
         if (e.flecha && !cerr) {
-          const b = e.pts[e.pts.length - 1], a = e.pts[e.pts.length - 2]; const dd = unit(sub(b, a)); const s = h * 0.9;
+          const b = fina[fina.length - 1], a = fina[fina.length - 2]; const dd = unit(sub(b, a)); const s = h * 0.9;
           const base = sub(b, mul(dd, s)); const w = mul(perp(dd), s * 0.42);
           cuerpo += `<polygon points="${[b, add(base, w), sub(base, w)].map((p) => C(p.x) + ',' + C(p.y)).join(' ')}" fill="${col}"/>`;
         }
         const bnd = cb ? cb.banda : null;
         const banda = (s) => (bnd ? Math.max(0, s > 0 ? bnd[1] : -bnd[0]) : 0);
-        const apartar = (a, b, s) => {
+        const apartar = (a, b, s, i) => {
+          if (curvaDe(e, i)) return banda(s); // en un arco, los choques con vanos los resuelve la colocación de rótulos
           let off = Math.max(margenVentanas(a, b), banda(s));
           // vanos en este tramo: el rótulo va al centro del mayor trozo libre; si no cabe en ninguno, se aparta de la hoja de la puerta
           const L = dist(a, b); const iv = []; let hoja = 0;
@@ -607,12 +727,12 @@ export const G = (() => {
         const et = e.medidas || tieneAlturas(e) ? etiquetasTramos(e, h, apartar) : [];
         const alts = etiquetasAltura(e, et);
         // figura estrecha (panel, vitrina): no cabe la altura por dentro; va junto al largo
-        const estrecha = cerr && 2 * area(e.pts) / Math.max(longitudLinea(e), 1e-9) < h * 2.2;
+        const estrecha = cerr && 2 * areaLinea(e) / Math.max(longitudLinea(e), 1e-9) < h * 2.2;
         const junto = new Map(); if (estrecha) alts.forEach(({ t, v }) => junto.set(t.i, v));
         const tramo = (i) => segs.find((x) => x[2] === i);
         const otroLado = (v, tam) => { const s = -(Math.sign(v) || 1); return s * (h * 0.85 + banda(s)); };
         if (e.medidas) for (const t of et) {
-          const [a, b] = tramo(t.i); const f = marcoDe(a, b); const L = dist(a, b);
+          const [a, b] = tramo(t.i); const f = marcoDe(a, b); const L = dist(a, b); // L: la cuerda, por la que se deslizan los candidatos
           const txt = t.texto + (junto.has(t.i) ? ' · h ' + fmtM(junto.get(t.i)) : '');
           const c0 = enMarco(f, t);
           pedir(e, 'L' + t.i, [{ texto: txt, tam: h, color: '#333333' }], t.ang, f, variantes(L, anchoTxt(txt, h), c0.u, [...alejar(c0.v), otroLado(c0.v)]));
@@ -847,6 +967,7 @@ export const G = (() => {
   const nuevoId = () => 'e' + Date.now().toString(36) + (_n++).toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 
   return { U, GROSOR, TRAZO, COLORES, ESCALAS, clamp, r6, dist, sub, add, mul, dot, unit, perp, medio, rotar, parseNum, fmtNum, fmtM, fmtM2, esc,
+    curvaDe, arco, arcoDe, enArco, puntosArco, tieneCurvas, puntosTramo, lineaFina, polilinea, finos, largoTramo, medioTramo, cercaTramo, normalEn, flechaHacia, fijarCurva, flechaDeRadio, asasCurva, reescalarCurvas, circuloAMuro, estirarLinea, areaLinea,
     snapGrid, snapAngulo, proyectar, segmentos, imanar, areaFirmada, area, longitudLinea, puntoEnPoligono, anguloLegible, etiquetasTramos,
     esRectangulo, puertaGeom, ventanaGeom, vanoAlturas, VENTANA_ALFEIZAR, VENTANA_ALTO, PUERTA_ALTO, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, esMueble, mueblePts, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
     calcoCentro, localAMundo, mundoALocal, calibrarCalco, calcoDudoso, zoomMinimo, esquinasCalco, caja, unirCajas, cajaPuntos, longitudBonita, papelPara,

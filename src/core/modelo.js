@@ -136,6 +136,10 @@ const entidadValida = (e) => e && TIPOS_ENTIDAD.has(e.tipo) && (
 const validarSala = (s, obras, imagenes) => {
   const ents = (Array.isArray(s.entidades) ? s.entidades : []).filter(entidadValida).map((e) => {
     const n = { ...e }; n.id = str(n.id) || nuevoId('e');
+    if (n.tipo === 'linea' && n.curvas !== undefined) { // flecha de cada tramo curvo: solo números válidos, sobre tramos que existen
+      const c = {}; if (n.curvas && typeof n.curvas === 'object') for (const [k, f] of Object.entries(n.curvas)) if (Number.isInteger(+k) && +k >= 0 && +k < n.pts.length && Number.isFinite(f) && f !== 0) c[k] = f;
+      if (Object.keys(c).length) n.curvas = c; else delete n.curvas;
+    }
     if (n.tipo === 'cota' && !Array.isArray(n.pts)) { n.pts = [n.a, n.b]; delete n.a; delete n.b; }
     if (n.tipo === 'cuadro' || n.tipo === 'obra') n.obraId = n.obraId && obras.has(n.obraId) ? n.obraId : null;
     return n;

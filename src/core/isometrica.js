@@ -9,6 +9,7 @@ import { muebleCajas } from './biblioteca.js';
 
 const rad = (g) => g * Math.PI / 180;
 // color hex con transparencia, como rgba() (los pintores y cualquier rasterizador lo entienden)
+const mezcla = (h1, h2, t) => { const n1 = parseInt(h1.slice(1), 16), n2 = parseInt(h2.slice(1), 16); const c = (k) => Math.round(((n1 >> k) & 255) * (1 - t) + ((n2 >> k) & 255) * t).toString(16).padStart(2, '0'); return '#' + c(16) + c(8) + c(0); };
 const alfa = (hex, a) => { const m = /^#([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return hex; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
 export const camDefecto = () => ({ giro: 35, inclinacion: 35, muros: 'cortados', zocalo: 0.9, altoDefecto: 3, rejilla: true, fondo: true, centro: null });
 const CAM_CAMPOS = ['giro', 'inclinacion', 'muros', 'zocalo', 'altoDefecto', 'rejilla', 'fondo', 'centro'];
@@ -81,7 +82,7 @@ export const escena = (proyecto, sala, cam) => {
   const espalda = (nn, pt) => (P.visible ? !P.visible(nn, pt) : G.dot(nn, P.vista) < -1e-9); // de canto no cuenta como espalda
   const ents = sala.entidades;
   const lineas = ents.filter((e) => e.tipo === 'linea' && e.pts.length >= 2);
-  const contorno = lineas.filter((e) => G.contornoDe(e)).sort((a, b) => G.area(b.pts) - G.area(a.pts))[0] || null;
+  const contorno = lineas.filter((e) => G.contornoDe(e)).sort((a, b) => G.areaLinea(b) - G.areaLinea(a))[0] || null;
   const eje = 1.5;
   const sombra = (col, k) => col; // sin iluminación: el tono lo da cada cara
   const cara = (pts3, st) => ({ pts: pts3.map(([x, y, z]) => { const p = P(x, y, z); return [p.X, p.Y]; }), pts3, ...st });
@@ -89,7 +90,7 @@ export const escena = (proyecto, sala, cam) => {
   const profMin = (pts2) => Math.min(...pts2.map((p) => P(p.x, p.y).d));
 
   // piso: el contorno mayor; si no hay, la caja de todo
-  const pisoPts = contorno ? contorno.pts : (G.caja(ents, 0.2) ? (({ x, y, w, h }) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }])(G.caja(ents, 0.2)) : []);
+  const pisoPts = contorno ? G.polilinea(contorno) : (G.caja(ents, 0.2) ? (({ x, y, w, h }) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }])(G.caja(ents, 0.2)) : []);
   if (pisoPts.length) {
     // losa bajo el piso, que asoma algo más que los muros, y una sombra en el suelo para que no flote
     const t = contorno ? (() => { const [o0, o1] = banda(contorno); const f = G.ladoFuera(contorno); return f > 0 ? Math.max(0, o1) + 0.12 : Math.min(0, o0) - 0.12; })() : 0.12;
@@ -105,7 +106,7 @@ export const escena = (proyecto, sala, cam) => {
     }
     const sombra = losaPts.map((q) => { const pr = P(q.x, q.y, -0.15); return [pr.X + 0.35, pr.Y + 0.25]; });
     piezas.push({ tipo: 'sombra', d: -3e6, caras: [{ pts: sombra, fill: 'rgba(17,17,17,0.07)', stroke: null }] });
-    const losa = prisma(losaPts, 0.15, '#d9d7cf', '#8f8d85', P, cara, prof, false, -0.15); losa.d = -2e6; losa.tipo = 'losa';
+    const losa = prisma(losaPts, 0.15, '#d9d7cf', '#8f8d85', P, cara, prof, !!(contorno && G.tieneCurvas(contorno)), -0.15); losa.d = -2e6; losa.tipo = 'losa';
     piezas.push(losa);
     const caras = [cara(pisoPts.map((p) => [p.x, p.y, 0]), { fill: '#eeede8', stroke: '#b9b7ae', lw: 1 })];
     if (cam.rejilla) {
@@ -123,16 +124,19 @@ export const escena = (proyecto, sala, cam) => {
   const REB = 0.5;
   for (const e of lineas) {
     const [omin, omax] = banda(e); const fuera = G.ladoFuera(e); const esContorno = !!G.contornoDe(e);
-    const cerr = !!(e.cerrada && e.pts.length > 2), nP = e.pts.length;
+    // un tramo curvo se levanta como muchas caras planas cortas: cada tramo fino hace de tramo, sin cambiar su número original
+    const fina = G.lineaFina(e); const cerr = fina.cerrada, nP = fina.pts.length;
+    const lineaF = { tipo: 'linea', pts: fina.pts, cerrada: cerr };
     // ingletes, como en la planta: las caras de cada tramo terminan donde cortan las del tramo vecino,
     // así las esquinas quedan macizas y sin caras de testa intermedias
-    const Imin = G.desplazarPolilinea(e.pts, cerr, omin), Imax = G.desplazarPolilinea(e.pts, cerr, omax);
-    const segs = G.segmentos(e);
-    const info = segs.map(([a, b, i]) => {
+    const Imin = G.desplazarPolilinea(fina.pts, cerr, omin), Imax = G.desplazarPolilinea(fina.pts, cerr, omax);
+    const segs = G.segmentos(lineaF);
+    const info = segs.map(([a, b, s]) => {
+      const i = fina.orig[s];
       const L = G.dist(a, b); if (!(L > 1e-6)) return null;
       const d = G.unit(G.sub(b, a)); const n = G.perp(d);
       const nInt = G.mul(n, esContorno ? -fuera : 1);
-      return { L, d, n, i, frente: esContorno && espalda(nInt, a) }; // la cara interior da la espalda a la cámara
+      return { L, d, n, i, arco: fina.curva[s] ? i : null, frente: esContorno && espalda(nInt, a) }; // la cara interior da la espalda a la cámara
     });
     // un tramo corto (jamba, mocheta, retranqueo) no decide por sí mismo: sigue a los tramos largos que tiene al lado,
     // y solo se corta si ellos también; si no, quedaría una muesca en medio de un muro entero
@@ -141,12 +145,12 @@ export const escena = (proyecto, sala, cam) => {
       for (let j = s + paso, n = 0; n < segs.length; j += paso, n++) {
         if (j < 0 || j >= segs.length) { if (!cerr) return null; j = (j + segs.length) % segs.length; }
         if (j === s) return null;
-        if (info[j] && info[j].L >= CORTO) return info[j];
+        if (info[j] && (info[j].L >= CORTO || info[j].arco != null)) return info[j];
       }
       return null;
     };
     const frenteFinal = info.map((t, s) => {
-      if (!t || t.L >= CORTO) return t && t.frente;
+      if (!t || t.L >= CORTO || t.arco != null) return t && t.frente;
       const vec = [largoHacia(s, -1), largoHacia(s, 1)].filter(Boolean);
       return vec.length ? vec.every((v) => v.frente) : t.frente;
     });
@@ -157,9 +161,12 @@ export const escena = (proyecto, sala, cam) => {
     });
     // tramo vecino por el inicio (−1) o por el final (+1); null en los extremos de una línea abierta
     const vecino = (s, paso) => { const j = s + paso; if (j >= 0 && j < segs.length) return info[j]; return cerr ? info[(j + segs.length) % segs.length] : null; };
-    const quiebre = (t1, t2) => Math.abs(t1.d.x * t2.d.y - t1.d.y * t2.d.x) > 0.009 || G.dot(t1.d, t2.d) < 0; // no alineados
+    const mismoArco = (t1, t2) => !!t1 && !!t2 && t1.arco != null && t1.arco === t2.arco;
+    // no alineados; donde hay un arco, las caras ya giran un poco entre sí: solo cuenta un quiebre mayor que ese paso
+    const quiebre = (t1, t2) => !mismoArco(t1, t2) && (Math.abs(t1.d.x * t2.d.y - t1.d.y * t2.d.x) > (t1.arco != null || t2.arco != null ? 0.12 : 0.009) || G.dot(t1.d, t2.d) < 0);
     for (let s = 0; s < segs.length; s++) {
-      const [a, b, i] = segs[s]; const t = info[s]; if (!t) continue;
+      const [a, b] = segs[s]; const t = info[s]; if (!t) continue;
+      const i = t.i, iF = segs[s][2];
       const { L, d, n, frente, modo, alto } = t;
       const trans = modo === 'transparentes';
       const colMuro = e.color && e.color !== '#111111' ? e.color : null;
@@ -167,7 +174,7 @@ export const escena = (proyecto, sala, cam) => {
       const huecos = vanos.filter((v) => G.proyectar(v.a, a, b).d < 0.02 && G.proyectar(v.b, a, b).d < 0.02)
         .map((v) => { const ta = G.dot(G.sub(v.a, a), d), tb = G.dot(G.sub(v.b, a), d); return { u0: Math.min(ta, tb), u1: Math.max(ta, tb), ...G.vanoAlturas(v), ventana: v.tipo === 'ventana' }; });
       const ant = vecino(s, -1), sig = vecino(s, 1);
-      const i0 = i, i1 = (i + 1) % nP;
+      const i0 = iF, i1 = (iF + 1) % nP;
       // cada cara recorre su tramo entre sus dos ingletes: u a lo largo de d desde a, a la distancia off de la línea
       const lados = [[omin, G.mul(n, -1), G.dot(G.sub(Imin[i0], a), d), G.dot(G.sub(Imin[i1], a), d)],
         [omax, n, G.dot(G.sub(Imax[i0], a), d), G.dot(G.sub(Imax[i1], a), d)]];
@@ -188,9 +195,11 @@ export const escena = (proyecto, sala, cam) => {
           const q0 = punto(off, uA), q1 = punto(off, uB);
           if (!visible(nn, q0) && !trans) continue;
           const lateral = Math.abs(G.dot(nn, { x: P.vista.y, y: -P.vista.x })) > 0.5;
-          const fill = trans ? 'rgba(255,255,255,0)' : colMuro ? alfa(colMuro, 0.33) : (lateral ? '#e4e2db' : '#f1f0ea');
+          // en un arco el tono cambia poco a poco con la orientación, para que se lea como curva
+          const tono = t.arco != null ? mezcla('#f1f0ea', '#e4e2db', Math.abs(G.dot(nn, { x: P.vista.y, y: -P.vista.x }))) : (lateral ? '#e4e2db' : '#f1f0ea');
+          const fill = trans ? 'rgba(255,255,255,0)' : colMuro ? alfa(colMuro, 0.33) : tono;
           // las rebanadas se solapan 5 mm para que no se vean costuras
-          const e0 = k === 0 ? q0 : G.sub(q0, G.mul(d, 0.005)), e1 = k === nReb - 1 ? q1 : G.add(q1, G.mul(d, 0.005));
+          const e0 = k === 0 && !mismoArco(ant, t) ? q0 : G.sub(q0, G.mul(d, 0.005)), e1 = k === nReb - 1 && !mismoArco(t, sig) ? q1 : G.add(q1, G.mul(d, 0.005));
           caras.push(cara([[e0.x, e0.y, 0], [e1.x, e1.y, 0], [e1.x, e1.y, alto], [e0.x, e0.y, alto]], { fill, stroke: null }));
           linea([q0.x, q0.y, alto], [q1.x, q1.y, alto], st); linea([q0.x, q0.y, 0], [q1.x, q1.y, 0], st);
           // arista vertical en la esquina con el tramo vecino (una sola, en el inglete)
@@ -218,7 +227,8 @@ export const escena = (proyecto, sala, cam) => {
         }
         // tapa
         const ext = (q, sgn, si) => (si ? G.add(q, G.mul(d, sgn * 0.005)) : q);
-        const esqE = [ext(esq[0], -1, k > 0), ext(esq[1], 1, k < nReb - 1), ext(esq[2], 1, k < nReb - 1), ext(esq[3], -1, k > 0)];
+        const sAnt = k > 0 || mismoArco(ant, t), sSig = k < nReb - 1 || mismoArco(t, sig);
+        const esqE = [ext(esq[0], -1, sAnt), ext(esq[1], 1, sSig), ext(esq[2], 1, sSig), ext(esq[3], -1, sAnt)];
         if (!P.ojo || P.ojo[2] > alto) caras.push(cara(esqE.map((q) => [q.x, q.y, alto]), { fill: trans ? 'rgba(255,255,255,0)' : '#ffffff', stroke: null })); // la tapa no se ve desde abajo
         piezas.push({ tipo: 'muro', d: prof(esq), dmin: profMin(esq), caras, frente, tramo: e.id + ':' + i });
       }

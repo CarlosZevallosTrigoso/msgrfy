@@ -17,7 +17,7 @@ const MAX_UNDO = 60, MAX_LADO_CALCO = 3000, CALIBRAR_MIN_PX = 12;
 const $ = (s, r = root) => r.querySelector(s);
 const $$ = (s, r = root) => Array.from(r.querySelectorAll(s));
 const esc = G.esc, C = G.C;
-const DIBUJO = ['linea', 'rect', 'circulo', 'puerta', 'ventana', 'texto', 'cota', 'calibrar', 'cuadro', 'obra', 'region', 'proyeccion', 'mueble'];
+const DIBUJO = ['linea', 'arco', 'rect', 'circulo', 'puerta', 'ventana', 'texto', 'cota', 'calibrar', 'cuadro', 'obra', 'region', 'proyeccion', 'mueble'];
 const POLI = ['linea', 'obra', 'region'];
 const esPoli = (t) => POLI.includes(t);
 const COLORES_REGION = ['#4f6b82', '#586a45', '#b06a36', '#b03a2e', '#8a8a8a'];
@@ -140,19 +140,32 @@ const renderSel = (z) => {
   const marcoRotulo = ra ? `<rect x="${C(ra.caja.x0 - 3 / z)}" y="${C(ra.caja.y0 - 3 / z)}" width="${C(ra.caja.x1 - ra.caja.x0 + 6 / z)}" height="${C(ra.caja.y1 - ra.caja.y0 + 6 / z)}" fill="none" stroke="#b06a36" stroke-width="${C(1.5 / z)}" stroke-dasharray="${C(4 / z)} ${C(2 / z)}"/>` : '';
   return marcoRotulo + renderSelPieza(e, z);
 };
+// El punto para curvar un tramo: solo en tramos con sitio en pantalla para agarrarlo sin confundirlo con sus vértices
+const asasCurvaVisibles = (e, z) => G.asasCurva(e).filter((p) => p.cuerda * z >= 36);
 const renderSelPieza = (e, z) => {
   const st = `fill="none" stroke="#b06a36" stroke-width="${C(1.5 / z)}" stroke-dasharray="${C(5 / z)} ${C(3 / z)}"`;
   let s = '';
   if ((e.tipo === 'linea' || G.esPoligono(e)) && e.pts.length > 1) {
-    s += `<path d="M${e.pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')}${(e.cerrada || G.esPoligono(e)) && e.pts.length > 2 ? ' Z' : ''}" ${st}/>`;
-    if (S.tramo != null) { const sg = G.segmentos(e).find((x) => x[2] === S.tramo); if (sg) s += `<line x1="${C(sg[0].x)}" y1="${C(sg[0].y)}" x2="${C(sg[1].x)}" y2="${C(sg[1].y)}" stroke="#b06a36" stroke-width="${C(5 / z)}" stroke-opacity=".45"/>`; }
+    s += `<path d="M${G.polilinea(e).map((p) => C(p.x) + ' ' + C(p.y)).join(' L')}${(e.cerrada || G.esPoligono(e)) && e.pts.length > 2 ? ' Z' : ''}" ${st}/>`;
+    if (S.tramo != null) { const sg = G.segmentos(e).find((x) => x[2] === S.tramo); if (sg) s += `<path d="M${G.puntosTramo(e, sg).map((p) => C(p.x) + ' ' + C(p.y)).join(' L')}" fill="none" stroke="#b06a36" stroke-width="${C(5 / z)}" stroke-opacity=".45"/>`; }
   } else if (e.tipo === 'circulo') s += `<circle cx="${C(e.c.x)}" cy="${C(e.c.y)}" r="${C(e.r)}" ${st}/>`;
   else if (e.tipo === 'texto') { const c = G.textoCaja(e); const p = 3 / z; s += `<rect x="${C(e.x - c.w / 2 - p)}" y="${C(e.y - c.h / 2 - p)}" width="${C(c.w + 2 * p)}" height="${C(c.h + 2 * p)}" ${st}${e.rot ? ` transform="rotate(${e.rot} ${C(e.x)} ${C(e.y)})"` : ''}/>`; }
   else if (e.tipo === 'cota') { const g = G.cotaGeom(e); s += `<line x1="${C(g.qmin.x)}" y1="${C(g.qmin.y)}" x2="${C(g.qmax.x)}" y2="${C(g.qmax.y)}" ${st}/>`; }
   else if (e.tipo === 'puerta' || e.tipo === 'ventana' || e.tipo === 'cuadro') s += `<line x1="${C(e.a.x)}" y1="${C(e.a.y)}" x2="${C(e.b.x)}" y2="${C(e.b.y)}" ${st}/>`;
   else if (G.esMueble(e)) { const pts = G.mueblePts(e); s += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" ${st}/>`; }
   G.asas(e).forEach((p, i) => { s += asaSvg(p, i === S.vsel, z); });
+  asasCurvaVisibles(e, z).forEach((p) => { s += `<circle cx="${C(p.x)}" cy="${C(p.y)}" r="${C(5 / z)}" fill="${S.arr && S.arr.tipo === 'curva' && S.arr.i === p.i ? '#b06a36' : '#ffffff'}" stroke="#b06a36" stroke-width="${C(1.5 / z)}"/>`; });
   return s;
+};
+const textoArco = (a, b, f) => { const g = G.arco(a, b, f); return g ? `flecha ${G.fmtM(Math.abs(f))} · radio ${G.fmtM(g.R)} · largo ${G.fmtM(g.L)}` : 'recto · ' + G.fmtM(G.dist(a, b)); };
+// Flecha del arco a–b que pasa por el cursor, con el mismo ajuste al arrastrar que al dibujar: a recto, a medio círculo y a la rejilla
+const flechaArco = (a, b, p, libre = false) => {
+  let f = G.flechaHacia(a, b, p); if (libre) return f;
+  const tol = tolM(8), media = G.dist(a, b) / 2;
+  if (Math.abs(f) <= tol) return 0;
+  if (Math.abs(Math.abs(f) - media) <= tol) return Math.sign(f) * media;
+  if (S.doc.imanes && S.doc.rejilla > 0) f = Math.round(f / S.doc.rejilla) * S.doc.rejilla;
+  return f;
 };
 const renderDraft = (z) => {
   let s = '';
@@ -168,6 +181,11 @@ const renderDraft = (z) => {
       s += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')}${d.tool !== 'linea' ? ' Z' : ''}" ${st(colD)}/>`;
       d.puntos.forEach((p, i) => { s += `<circle cx="${C(p.x)}" cy="${C(p.y)}" r="${C((i === 0 && d.puntos.length >= 3 ? 6 : 3) / z)}" fill="${i === 0 ? '#ffffff' : '#111111'}" stroke="#111111" stroke-width="${C(1.5 / z)}"/>`; });
       etiqueta = G.fmtM(G.dist(d.puntos[d.puntos.length - 1], cur));
+    } else if (d.tool === 'arco') {
+      const b = d.puntos[1] || cur; const f = d.puntos[1] ? flechaArco(p0, b, cur) : 0; const g = G.arco(p0, b, f);
+      s += `<path d="M${(g ? G.puntosArco(g) : [p0, b]).map((p) => C(p.x) + ' ' + C(p.y)).join(' L')}" ${st('#111111')}/>`;
+      for (const p of d.puntos) s += `<circle cx="${C(p.x)}" cy="${C(p.y)}" r="${C(3.5 / z)}" fill="#111111"/>`;
+      etiqueta = d.puntos[1] ? textoArco(p0, b, f) : G.fmtM(G.dist(p0, cur));
     } else if (d.tool === 'rect') {
       const pts = G.rectPts(p0, cur); s += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" ${st('#111111')}/>`;
       etiqueta = G.fmtNum(Math.abs(cur.x - p0.x)) + ' × ' + G.fmtNum(Math.abs(cur.y - p0.y)) + ' m';
@@ -209,6 +227,7 @@ const renderDraft = (z) => {
     s += `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')} Z" fill="#b06a36" fill-opacity="0.15" ${st('#b06a36')}/>`;
     etiqueta = S.muebleTpl.nombre;
   }
+  if (S.arr && S.arr.tipo === 'curva' && cur) { const e = ent(); if (e) { const sg = G.segmentos(e).find((x) => x[2] === S.arr.i); if (sg) etiqueta = textoArco(sg[0], sg[1], G.curvaDe(e, S.arr.i)); } }
   // indicador de imán
   if (cur && (DIBUJO.includes(S.tool) || (S.arr && S.arr.tipo === 'asa')) && S.iman) {
     const a = 6 / z, p = cur, col = '#b06a36', w = C(1.5 / z);
@@ -281,11 +300,14 @@ const renderPanel = () => {
       h += `<label>altura del muro (m)</label><input type="text" inputmode="decimal" data-num="altura" value="${e.altura > 0 ? G.fmtNum(e.altura) : ''}" placeholder="sin indicar">`;
       const ph = e.altura > 0 ? G.fmtNum(e.altura) : '—';
       const tieneMuro = (i) => ctx.proyecto.muros.some((m) => m.salaId === S.doc.id && m.tramo && m.tramo.entidadId === e.id && m.tramo.i === i);
-      h += `<label>tramos: largo · alto (m) · alzado</label><table class="tramos">${segs.map(([a, b, i]) => `<tr><td>tramo ${i + 1}</td><td><input type="text" inputmode="decimal" data-tramo="${i}" value="${G.fmtNum(G.dist(a, b))}" aria-label="largo del tramo ${i + 1}"></td><td class="alto"><input type="text" inputmode="decimal" data-alto="${i}" value="${e.alturas && e.alturas[i] > 0 ? G.fmtNum(e.alturas[i]) : ''}" placeholder="${ph}" aria-label="alto del tramo ${i + 1}"></td><td class="u"><button data-alzado="${i}" class="${tieneMuro(i) ? 'activo' : ''}" title="${tieneMuro(i) ? 'Abrir el alzado de este tramo' : 'Crear el alzado de este tramo con sus cuadros'}">▭</button></td></tr>`).join('')}</table>`;
+      h += `<label>tramos: largo · alto (m) · alzado</label><table class="tramos">${segs.map((sg) => { const i = sg[2]; return `<tr><td>tramo ${i + 1}</td><td><input type="text" inputmode="decimal" data-tramo="${i}" value="${G.fmtNum(G.largoTramo(e, sg))}" aria-label="largo del tramo ${i + 1}"></td><td class="alto"><input type="text" inputmode="decimal" data-alto="${i}" value="${e.alturas && e.alturas[i] > 0 ? G.fmtNum(e.alturas[i]) : ''}" placeholder="${ph}" aria-label="alto del tramo ${i + 1}"></td><td class="u"><button data-alzado="${i}" class="${tieneMuro(i) ? 'activo' : ''}" title="${tieneMuro(i) ? 'Abrir el alzado de este tramo' : 'Crear el alzado de este tramo con sus cuadros'}">▭</button></td></tr>`; }).join('')}</table>`;
+      const curvos = segs.filter((sg) => G.curvaDe(e, sg[2]));
+      if (curvos.length) h += `<label>tramos curvos: flecha · radio (m)</label><table class="tramos">${curvos.map((sg) => { const i = sg[2]; const f = G.curvaDe(e, i); return `<tr><td>tramo ${i + 1}</td><td><input type="text" inputmode="decimal" data-flecha="${i}" value="${G.fmtNum(f)}" aria-label="flecha del tramo ${i + 1}" title="Cuánto se separa el arco de la recta; el signo elige el lado"></td><td class="alto"><input type="text" inputmode="decimal" data-radio="${i}" value="${G.fmtNum(G.arcoDe(e, sg).R)}" aria-label="radio del tramo ${i + 1}"></td><td class="u"><button data-recto="${i}" title="Volver recto este tramo">╱</button></td></tr>`; }).join('')}</table>`;
+      h += `<div class="nota">Arrastra el círculo del medio de un tramo para curvarlo.</div>`;
       h += `<div class="nota">▭ abre el alzado del tramo en la vista Muro, con sus cuadros ya colocados.</div>`;
       h += `<div class="nota">El alto de un tramo solo hace falta si difiere de la altura del muro.</div>`;
       h += `<div class="nota">Cambiar una medida estira la figura desde el final de ese tramo.</div>`;
-      h += `<div class="dato">largo total: <b>${G.fmtM(G.longitudLinea(e))}</b>${e.cerrada && e.pts.length > 2 ? ` · área: <b>${G.fmtM2(G.area(e.pts))}</b>` : ''}</div>`;
+      h += `<div class="dato">largo total: <b>${G.fmtM(G.longitudLinea(e))}</b>${e.cerrada && e.pts.length > 2 ? ` · área: <b>${G.fmtM2(G.areaLinea(e))}</b>` : ''}</div>`;
       h += `<label>espesor del muro (m)</label><input type="text" inputmode="decimal" data-num="espesor" value="${G.fmtNum(e.espesor > 0 ? e.espesor : 0)}">`;
       if (e.espesor > 0) {
         const cont = !!G.contornoDe(e);
@@ -297,6 +319,7 @@ const renderPanel = () => {
     } else if (e.tipo === 'circulo') {
       h += `<div class="fila"><div><label>diámetro (m)</label><input type="text" inputmode="decimal" data-num="diametro" value="${G.fmtNum(e.r * 2)}"></div><div><label>alto en 3D (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto) : ''}" placeholder="muro"></div></div>`;
       h += check('medidas', 'mostrar el diámetro', e.medidas) + estiloHtml(e) + rellenoHtml(e);
+      h += `<div class="btns"><button data-acc="circuloMuro" title="Convierte el círculo en un muro de cuatro arcos, con espesor, altura y alzados">◯ convertir en muro</button></div>`;
     } else if (e.tipo === 'puerta') {
       h += `<div class="fila"><div><label>ancho del vano (m)</label><input type="text" inputmode="decimal" data-num="ancho" value="${G.fmtNum(G.dist(e.a, e.b))}"></div><div><label>alto (m)</label><input type="text" inputmode="decimal" data-num="alto" value="${e.alto > 0 ? G.fmtNum(e.alto, 3) : ''}" placeholder="${G.fmtNum(G.PUERTA_ALTO)}"></div></div>`;
       h += `<div class="btns"><button data-acc="giro">↻ cambiar giro</button></div>`;
@@ -386,7 +409,7 @@ const renderPanel = () => {
     h += `<div class="nota">Las medidas se colocan solas evitando choques. Para mover una, arrástrala con «Elegir»; doble clic la devuelve.</div>`;
     if (d.entidades.some((x) => x.etiq && Object.keys(x.etiq).length)) h += `<div class="btns"><button data-acc="etqTodas">recolocar todos los rótulos</button></div>`;
     const cerradas = d.entidades.filter((x) => x.tipo === 'linea' && x.cerrada && x.pts.length > 2);
-    if (cerradas.length) { const mayor = cerradas.reduce((a, b) => (G.area(b.pts) > G.area(a.pts) ? b : a)); h += `<div class="dato">figura mayor: <b>${G.fmtM2(G.area(mayor.pts))}</b> · perímetro <b>${G.fmtM(G.longitudLinea(mayor))}</b></div>`; }
+    if (cerradas.length) { const mayor = cerradas.reduce((a, b) => (G.areaLinea(b) > G.areaLinea(a) ? b : a)); h += `<div class="dato">figura mayor: <b>${G.fmtM2(G.areaLinea(mayor))}</b> · perímetro <b>${G.fmtM(G.longitudLinea(mayor))}</b></div>`; }
     h += `<div class="dato">${d.entidades.length} elemento${d.entidades.length === 1 ? '' : 's'}</div>`;
     // biblioteca de objetos
     h += `<h3>biblioteca</h3><select data-bibcat>${CATEGORIAS.map(([v, t]) => `<option value="${v}" ${v === S.bibCat ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
@@ -495,6 +518,25 @@ const enlazarPanel = (e) => {
     i.addEventListener('blur', () => { S.tramo = null; aplicarTramo(i, e, t); });
     i.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); aplicarTramo(i, e, t); i.select(); } });
   });
+  const conFocoTramo = (i, t) => { i.addEventListener('focus', () => { S.tramo = t; pedirRender(); }); i.addEventListener('blur', () => { S.tramo = null; pedirRender(); }); i.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); i.blur(); } }); };
+  $$('[data-flecha]', P).forEach((i) => {
+    const t = +i.dataset.flecha; conFocoTramo(i, t);
+    i.addEventListener('change', () => {
+      const v = G.parseNum(i.value); if (!Number.isFinite(v)) { mensaje('Flecha no válida', true); renderPanel(); return; }
+      snap(); G.fijarCurva(e, t, v); cambio();
+    });
+  });
+  $$('[data-radio]', P).forEach((i) => {
+    const t = +i.dataset.radio; conFocoTramo(i, t);
+    i.addEventListener('change', () => {
+      const sg = G.segmentos(e).find((x) => x[2] === t); const v = G.parseNum(i.value); if (!sg) return;
+      const cuerda = G.dist(sg[0], sg[1]); const f0 = G.curvaDe(e, t);
+      const f = G.flechaDeRadio(cuerda, v, Math.abs(f0) > cuerda / 2);
+      if (f == null) { mensaje(`El radio debe ser de al menos ${G.fmtM(cuerda / 2)}: la mitad de la distancia entre los extremos`, true); renderPanel(); return; }
+      snap(); G.fijarCurva(e, t, (Math.sign(f0) || 1) * f); cambio();
+    });
+  });
+  $$('[data-recto]', P).forEach((b) => b.addEventListener('click', () => { snap(); G.fijarCurva(e, +b.dataset.recto, 0); S.tramo = null; cambio(); }));
   // números de pieza
   $$('[data-num]', P).forEach((i) => {
     const aplicar = () => {
@@ -602,14 +644,16 @@ const enlazarPanel = (e) => {
 const aplicarTramo = (i, e, t) => {
   if (!e || !ent(e.id)) return;
   const v = G.parseNum(i.value); const sg = G.segmentos(e).find((x) => x[2] === t); if (!sg) return;
-  const actual = G.dist(sg[0], sg[1]);
+  const actual = G.largoTramo(e, sg);
   if (!(v > 0)) { i.value = G.fmtNum(actual); mensaje('Medida no válida', true); return; }
   if (Math.abs(v - actual) < 1e-9) return;
-  const nuevos = G.estirarTramo(e.pts, t, e.cerrada, v); if (!nuevos) return;
-  snap(); e.pts = nuevos; autosave(); renderSvg();
-  $$('[data-tramo]', el.panel).forEach((inp) => { const s = G.segmentos(e).find((x) => x[2] === +inp.dataset.tramo); if (s && inp !== document.activeElement) inp.value = G.fmtNum(G.dist(s[0], s[1])); });
+  snap(); if (!G.estirarLinea(e, t, v)) { S.undo.pop(); return; }
+  autosave(); renderSvg();
+  $$('[data-tramo]', el.panel).forEach((inp) => { const s = G.segmentos(e).find((x) => x[2] === +inp.dataset.tramo); if (s && inp !== document.activeElement) inp.value = G.fmtNum(G.largoTramo(e, s)); });
+  $$('[data-flecha]', el.panel).forEach((inp) => { inp.value = G.fmtNum(G.curvaDe(e, +inp.dataset.flecha)); });
+  $$('[data-radio]', el.panel).forEach((inp) => { const s = G.segmentos(e).find((x) => x[2] === +inp.dataset.radio); const g = s && G.arcoDe(e, s); if (g) inp.value = G.fmtNum(g.R); });
   i.value = G.fmtNum(v);
-  const d = $('.dato', el.panel); if (d) d.innerHTML = `largo total: <b>${G.fmtM(G.longitudLinea(e))}</b>${e.cerrada && e.pts.length > 2 ? ` · área: <b>${G.fmtM2(G.area(e.pts))}</b>` : ''}`;
+  const d = $('.dato', el.panel); if (d) d.innerHTML = `largo total: <b>${G.fmtM(G.longitudLinea(e))}</b>${e.cerrada && e.pts.length > 2 ? ` · área: <b>${G.fmtM2(G.areaLinea(e))}</b>` : ''}`;
 };
 const accion = (acc, e, btn = null) => {
   if (acc === 'borrar') borrarSel();
@@ -622,6 +666,7 @@ const accion = (acc, e, btn = null) => {
   else if (acc === 'etqAuto') { snap(); delete e.etiq; cambio(); }
   else if (acc === 'etqTodas') { snap(); S.doc.entidades.forEach((x) => { delete x.etiq; }); cambio(); mensaje('Rótulos recolocados automáticamente'); }
   else if (acc === 'etqCentro') { snap(); delete e.etq; cambio(); }
+  else if (acc === 'circuloMuro') { snap(); const m = G.circuloAMuro(e); const { c: _c, r: _r, tipo: _t, ...resto } = e; const alto = e.alto; Object.keys(e).forEach((k) => delete e[k]); Object.assign(e, resto, m, { medidas: resto.medidas !== false, espesor: 0 }); delete e.alto; if (alto > 0) e.altura = alto; cambio(); mensaje('Ahora es un muro de cuatro arcos: dale espesor y altura en el panel'); }
   else if (acc === 'cara') { snap(); e.lado = e.lado === -1 ? 1 : -1; cambio(); }
   else if (acc === 'verDesde') { if (e && V.esFigura(e)) abrir3d(e.id); }
   else if (acc === 'crearObra') { if (!e || !G.esObra(e) || obraDe(e)) return; snap(); S.obraPendiente = null; asignarObra(e); cambio(); }
@@ -644,10 +689,11 @@ const pistaTexto = () => {
     if (!e) return 'Clic en un elemento para elegirlo · arrastra un número para moverlo (doble clic lo devuelve) · arrastra el fondo para desplazarte';
     if (e.tipo === 'region') return 'Arrastra el nombre para moverlo solo · arrastra el borde para mover la región · puntos naranjas: contorno · Supr borra';
     if (e.tipo === 'obra' || e.tipo === 'region') return 'Arrastra para mover · los puntos naranjas ajustan el contorno · doble clic en un borde añade un punto · Supr borra';
-    if (e.tipo === 'linea') return 'Arrastra los puntos naranjas · doble clic sobre un tramo añade un punto · Supr borra el punto marcado · flechas mueven';
+    if (e.tipo === 'linea') return 'Cuadrados: mueven los puntos · círculos: curvan el tramo · doble clic sobre un tramo añade un punto · Supr borra el punto marcado';
     return 'Arrastra para mover · los puntos naranjas ajustan la forma · Supr borra';
   }
   if (t === 'linea') return d ? 'Clic: siguiente punto · escribe una medida y ⏎ · Shift: 15° · clic en el primer punto cierra · doble clic o ⏎ termina' : 'Clic donde empieza el muro';
+  if (t === 'arco') return !d ? 'Clic donde empieza el muro curvo' : d.puntos.length === 1 ? 'Clic donde termina · o escribe la distancia y ⏎ · Shift: 15°' : 'Mueve y haz clic para fijar cuánto se curva · o escribe la flecha y ⏎ · Alt: sin ajustes';
   if (t === 'rect') return d ? 'Clic en la esquina opuesta · o escribe «3x2» y ⏎' : 'Clic en una esquina (o arrastra)';
   if (t === 'circulo') return d ? 'Clic en el borde · o escribe el diámetro y ⏎' : 'Clic en el centro';
   if (t === 'proyeccion') return !d ? 'Clic en un extremo de la imagen, sobre el muro o la pantalla' : d.puntos.length === 1 ? 'Clic en el otro extremo de la imagen · o escribe su ancho y ⏎' : 'Clic donde va el proyector (la lente) · o escribe la distancia y ⏎';
@@ -739,9 +785,10 @@ const enfocarObra = () => { const i = $('#panel [data-ok="nombre"]'); if (i && !
 const ultimo = () => (S.draft ? S.draft.puntos[S.draft.puntos.length - 1] : null);
 // Cursor con imán, ángulo o libre según el estado
 const calcularCursor = (raw, ev) => {
-  const base = S.draft && !S.draft.cadena && ['linea', 'obra', 'region', 'puerta', 'ventana', 'cuadro', 'proyeccion', 'cota', 'calibrar'].includes(S.draft.tool) && !((S.draft.tool === 'cota' || S.draft.tool === 'proyeccion') && S.draft.puntos.length === 2) ? ultimo() : null;
+  const base = S.draft && !S.draft.cadena && ['linea', 'arco', 'obra', 'region', 'puerta', 'ventana', 'cuadro', 'proyeccion', 'cota', 'calibrar'].includes(S.draft.tool) && !((S.draft.tool === 'cota' || S.draft.tool === 'proyeccion') && S.draft.puntos.length === 2) ? ultimo() : null;
   if (S.draft && S.draft.tool === 'cota' && S.draft.puntos.length === 2) { S.iman = 'libre'; return raw; }
   if (S.tool === 'calibrar') { S.iman = 'libre'; return raw; }
+  if (S.draft && S.draft.tool === 'arco' && S.draft.puntos.length === 2) { S.iman = 'libre'; S.altArco = !!(ev && ev.altKey); return raw; }
   if (ev && ev.shiftKey && base) { S.iman = 'angulo'; return G.snapAngulo(base, raw, 15, S.doc.imanes ? S.doc.rejilla : 0); }
   if ((ev && ev.altKey) || !S.doc.imanes) { S.iman = 'libre'; return raw; }
   const ents = S.doc.entidades.slice();
@@ -780,6 +827,18 @@ const clicDibujo = (p, arr) => {
 };
 const terminarDosPuntos = (p) => {
   const d = S.draft; const t = d.tool;
+  if (t === 'arco') {
+    const a = d.puntos[0];
+    if (d.puntos.length === 1) {
+      if (G.dist(a, p) * S.view.zoom < 6) { mensaje('Marca el final del muro más lejos del inicio', true); return render(); }
+      d.puntos.push(p); S.buffer = ''; return render();
+    }
+    const b = d.puntos[1]; const f = d.flechaExacta ?? flechaArco(a, b, p, S.altArco);
+    S.draft = null; S.buffer = '';
+    const e = agregar({ tipo: 'linea', pts: [a, b], cerrada: false, ...DEF.linea });
+    if (f) G.fijarCurva(e, 0, f);
+    render(); autosave(); return;
+  }
   if (t === 'cota' && d.cadena) {
     const e = ent(d.cadena); S.buffer = '';
     if (!e) { S.draft = null; return render(); }
@@ -830,6 +889,10 @@ const aplicarBuffer = () => {
   const L = G.parseNum(txt);
   if (!(L > 0)) { mensaje('Medida no válida', true); return render(); }
   if (d.tool === 'circulo') return terminarDosPuntos({ x: G.r6(base.x + L / 2), y: base.y });
+  if (d.tool === 'arco' && d.puntos.length === 2) { // la flecha escrita, hacia el lado donde está el cursor
+    const [a, b] = d.puntos; d.flechaExacta = (Math.sign(G.flechaHacia(a, b, S.cursor || G.medio(a, b))) || 1) * L;
+    return terminarDosPuntos(S.cursor || b);
+  }
   if (d.tool === 'cota' && d.puntos.length === 2) { d.desp = L * (Math.sign(d.desp || 1)); return terminarDosPuntos(null); }
   if (d.tool === 'proyeccion' && d.puntos.length === 2) {
     const [pa, pb] = d.puntos; const m = G.medio(pa, pb); const n = G.unit(G.perp(G.sub(pb, pa)));
@@ -910,7 +973,9 @@ el.lienzo.addEventListener('pointerdown', (ev) => {
   if (ev.button !== 0) return;
   if (S.tool === 'select') {
     const e = ent();
-    if (e) { const i = G.asas(e).findIndex((p) => G.dist(p, raw) <= tolM(8)); if (i >= 0) { S.vsel = i; S.arr = { ...base, tipo: 'asa', idx: i, hecho: false }; renderSvg(); renderPista(); return; } }
+    if (e) { const i = G.asas(e).findIndex((p) => G.dist(p, raw) <= tolM(8)); if (i >= 0) { S.vsel = i; S.arr = { ...base, tipo: 'asa', idx: i, hecho: false }; renderSvg(); renderPista(); return; }
+      const c = asasCurvaVisibles(e, S.view.zoom).find((p) => G.dist(p, raw) <= tolM(8));
+      if (c) { S.vsel = null; S.arr = { ...base, tipo: 'curva', i: c.i, a: c.a, b: c.b, hecho: false }; renderSvg(); renderPista(); return; } }
     const id = G.tocar(S.doc.entidades, raw, tolM(7), S.doc.rotulo);
     const rt = rotuloEn(raw);
     if (rt && ent(rt.id)) {
@@ -927,7 +992,7 @@ el.lienzo.addEventListener('pointerdown', (ev) => {
   if (S.tool === 'calco') { const c = S.doc.calco; if (c) S.arr = { ...base, tipo: 'calco', cx: c.x, cy: c.y, hecho: false }; return; }
   if (DIBUJO.includes(S.tool)) {
     const p = calcularCursor(raw, ev); S.cursor = p;
-    const creado = !S.draft && ['rect', 'circulo', 'puerta', 'ventana', 'cuadro', 'proyeccion', 'cota', 'calibrar'].includes(S.tool);
+    const creado = !S.draft && ['arco', 'rect', 'circulo', 'puerta', 'ventana', 'cuadro', 'proyeccion', 'cota', 'calibrar'].includes(S.tool);
     if (creado) { S.draft = { tool: S.tool, puntos: [p] }; }
     S.arr = { ...base, tipo: 'dibujo', creado }; renderSvg(); renderPista();
   }
@@ -952,6 +1017,11 @@ el.lienzo.addEventListener('pointermove', (ev) => {
       const e = ent(a.id); if (!e) return;
       if (!a.hecho) { snap(); a.hecho = true; }
       const c = G.enMarco(a.f, raw); e.etiq = { ...(e.etiq || {}), [a.key]: { u: G.r6(c.u + a.du), v: G.r6(c.v + a.dv) } }; return pedirRender();
+    }
+    if (a.tipo === 'curva') {
+      const e = ent(); if (!e) return;
+      if (!a.hecho) { snap(); a.hecho = true; }
+      S.cursor = raw; G.fijarCurva(e, a.i, flechaArco(a.a, a.b, raw, ev.altKey)); return pedirRender();
     }
     if (a.tipo === 'etq') {
       const e = ent(a.id); if (!e) return;
@@ -981,6 +1051,7 @@ const finPuntero = (ev) => {
   try { el.lienzo.releasePointerCapture(ev.pointerId); } catch (e) {}
   if (a.tipo === 'pan') return;
   if (a.tipo === 'fondo') { if (S.sel) { S.sel = null; S.vsel = null; S.rsel = null; render(); } return; }
+  if (a.tipo === 'curva') { if (a.hecho) { autosave(); render(); } else renderSvg(); return; }
   if (a.tipo === 'mover' || a.tipo === 'asa' || a.tipo === 'calco' || a.tipo === 'etq' || a.tipo === 'rotulo') { if (a.hecho) { autosave(); render(); } return; }
   if (a.tipo === 'dibujo') {
     const raw = aMundo(ev.clientX, ev.clientY);
@@ -1063,7 +1134,7 @@ const alTeclado = (ev) => {
   }
   if (kl === 'r' && S.tool === 'mueble') { S.muebleRot = ((S.muebleRot || 0) + 90) % 360; pedirRender(); return; }
   if (kl === 'r' && ev.shiftKey && S.sel && V.esFigura(ent())) { const e = ent(); snap(); e.mira = ((V.povDe(e).mira + 45) % 360 + 360) % 360; cambio(); return; }
-  const herr = { v: 'select', l: 'linea', r: 'rect', o: 'circulo', p: 'puerta', n: 'ventana', t: 'texto', d: 'cota', c: 'cuadro', b: 'obra', g: 'region', y: 'proyeccion' };
+  const herr = { v: 'select', l: 'linea', a: 'arco', r: 'rect', o: 'circulo', p: 'puerta', n: 'ventana', t: 'texto', d: 'cota', c: 'cuadro', b: 'obra', g: 'region', y: 'proyeccion' };
   if (herr[kl]) { setTool(herr[kl]); return; }
   if (k === '3' && !S.draft) { iso.visible ? cerrar3d() : abrir3d(); return; }
   if (k === '0') verTodo(); else if (k === '+' || k === '=') { const { rect } = tam(); zoomEn(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.25); }
