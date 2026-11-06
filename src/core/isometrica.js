@@ -171,7 +171,13 @@ export const escena = (proyecto, sala, cam) => {
       const trans = modo === 'transparentes';
       const colMuro = e.color && e.color !== '#111111' ? e.color : null;
       const st = { stroke: trans ? '#9a9a92' : '#2a2a28', lw: trans ? 1 : 1.1, dash: trans ? [4, 3] : null };
-      const huecos = vanos.filter((v) => G.proyectar(v.a, a, b).d < 0.02 && G.proyectar(v.b, a, b).d < 0.02)
+      // en un arco, cada cara corta el trozo de vano que le toca, medido sobre el arco; si lo cruza entero, sin jambas
+      const segO = t.arco != null ? G.segmentos(e).find((x) => x[2] === t.arco) : null; const U0 = fina.u0[s], U1 = fina.u1[s];
+      const sobreArco = (q) => G.cercaTramo(e, segO, q);
+      const huecos = segO ? vanos.filter((v) => sobreArco(v.a).d < 0.02 && sobreArco(v.b).d < 0.02).map((v) => {
+        const ua = sobreArco(v.a).u, ub = sobreArco(v.b).u, mn = Math.min(ua, ub), mx = Math.max(ua, ub), esc = L / (U1 - U0);
+        return mx > U0 && mn < U1 ? { u0: mn <= U0 ? -Infinity : (mn - U0) * esc, u1: mx >= U1 ? Infinity : (mx - U0) * esc, ...G.vanoAlturas(v), ventana: v.tipo === 'ventana' } : null;
+      }).filter(Boolean) : vanos.filter((v) => G.proyectar(v.a, a, b).d < 0.02 && G.proyectar(v.b, a, b).d < 0.02)
         .map((v) => { const ta = G.dot(G.sub(v.a, a), d), tb = G.dot(G.sub(v.b, a), d); return { u0: Math.min(ta, tb), u1: Math.max(ta, tb), ...G.vanoAlturas(v), ventana: v.tipo === 'ventana' }; });
       const ant = vecino(s, -1), sig = vecino(s, 1);
       const i0 = iF, i1 = (iF + 1) % nP;
@@ -235,7 +241,10 @@ export const escena = (proyecto, sala, cam) => {
       // cuadros sobre este tramo (solo si el muro está entero)
       if (!frente || modo !== 'cortados') for (const q of ents) {
         if (q.tipo !== 'cuadro' || !q.obraId) continue;
-        if (G.proyectar(q.a, a, b).d > 0.02 || G.proyectar(q.b, a, b).d > 0.02) continue;
+        if (segO) { // en un arco, el cuadro se cuelga una sola vez: en la cara donde cae su centro
+          if (sobreArco(q.a).d > 0.02 || sobreArco(q.b).d > 0.02) continue;
+          const um = (sobreArco(q.a).u + sobreArco(q.b).u) / 2; if (um < U0 || um >= U1) continue;
+        } else if (G.proyectar(q.a, a, b).d > 0.02 || G.proyectar(q.b, a, b).d > 0.02) continue;
         const o = M.obraDe(proyecto, q.obraId); if (!o) continue;
         const nc = G.mul(G.perp(G.unit(G.sub(q.b, q.a))), q.lado === -1 ? -1 : 1); // hacia la sala
         const caraMuro = Math.sign(G.dot(nc, n)) || 1;
@@ -246,7 +255,10 @@ export const escena = (proyecto, sala, cam) => {
         if (c) zTop = mu.alto - c.y - c.marco - c.pp;
         const zBot = Math.max(0, zTop - hh);
         const off = caraMuro > 0 ? omax : omin; const salto = 0.03;
-        const base0 = G.add(q.a, G.mul(n, off + caraMuro * salto)), base1 = G.add(q.b, G.mul(n, off + caraMuro * salto));
+        // en un arco la pieza sigue siendo plana: arranca de la cara del muro en cada extremo y, en la cara convexa, se apoya en su centro
+        const gO = segO && G.arcoDe(e, segO); const apoyo = gO && caraMuro === gO.s ? G.sagitaCuerda(gO.R, G.dist(q.a, q.b)) : 0;
+        const nA = segO ? G.normalEn(e, segO, q.a) : n, nB = segO ? G.normalEn(e, segO, q.b) : n;
+        const base0 = G.add(G.add(q.a, G.mul(nA, off + caraMuro * salto)), G.mul(nc, apoyo)), base1 = G.add(G.add(q.b, G.mul(nB, off + caraMuro * salto)), G.mul(nc, apoyo));
         const dirQ = G.unit(G.sub(q.b, q.a));
         const esqC = [[base0.x, base0.y, zBot], [base1.x, base1.y, zBot], [base1.x, base1.y, zTop], [base0.x, base0.y, zTop]];
         const col = q.color || '#b06a36';

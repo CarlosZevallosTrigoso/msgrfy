@@ -22,11 +22,11 @@ export const extremoIzquierdo = (a, b, cara) => {
 // Cuadros de la sala que cuelgan de ese tramo, con la cara en la que están
 export const cuadrosDelTramo = (sala, linea, i) => {
   const seg = G.segmentos(linea).find((s) => s[2] === i); if (!seg) return [];
-  const [a, b] = seg; const d = G.unit(G.sub(b, a)); const nz = G.perp(d);
   const out = [];
   for (const e of sala.entidades) {
     if (e.tipo !== 'cuadro' || !e.obraId) continue;
-    if (G.proyectar(e.a, a, b).d > TOL || G.proyectar(e.b, a, b).d > TOL) continue;
+    if (G.cercaTramo(linea, seg, e.a).d > TOL || G.cercaTramo(linea, seg, e.b).d > TOL) continue;
+    const nz = G.normalEn(linea, seg, G.medio(e.a, e.b)); // en un arco, la normal cambia a lo largo del tramo
     const nc = G.mul(G.perp(G.unit(G.sub(e.b, e.a))), e.lado === -1 ? -1 : 1);
     out.push({ e, cara: Math.sign(G.dot(nc, nz)) || 1 });
   }
@@ -40,13 +40,14 @@ export const altoEstimado = (o) => (o.alto > 0 ? o.alto : o.ancho > 0 ? (o.imgRa
 // Las obras cuyo alto se desconoce reciben un alto estimado en su ficha.
 export const muroDesdeTramo = (proyecto, sala, linea, i, cara) => {
   const seg = G.segmentos(linea).find((s) => s[2] === i); if (!seg) return null;
-  const [a, b] = seg; const largo = G.dist(a, b); if (!(largo > 0)) return null;
+  // un tramo curvo se abre desenrollado: el alzado mide lo que el arco
+  const [a, b] = seg; const largo = G.largoTramo(linea, seg); if (!(largo > 0)) return null;
   cara = cara === -1 || cara === 1 ? cara : caraPorDefecto(linea);
   const izq = extremoIzquierdo(a, b, cara);
-  const origen = izq === 'a' ? a : b, d = G.unit(G.sub(izq === 'a' ? b : a, origen));
+  const posicion = (p) => { const u = G.cercaTramo(linea, seg, p).u; return izq === 'a' ? u : largo - u; }; // metros desde el extremo izquierdo
   const alto = G.alturaTramo(linea, i) || 3;
   const muro = M.nuevoMuro({
-    nombre: (sala.nombre || 'Sala') + ' · tramo ' + (i + 1), salaId: sala.id, tramo: { entidadId: linea.id, i, cara },
+    nombre: (sala.nombre || 'Sala') + ' · tramo ' + (i + 1) + (G.curvaDe(linea, i) ? ' (curvo)' : ''), salaId: sala.id, tramo: { entidadId: linea.id, i, cara },
     ancho: r6(largo), alto: r6(alto), eje: r6(Math.min(1.5, alto / 2)), grosor: r6(linea.espesor > 0 ? linea.espesor : 0.15),
   });
   const cuadros = cuadrosDelTramo(sala, linea, i).filter((c) => c.cara === cara);
@@ -55,12 +56,15 @@ export const muroDesdeTramo = (proyecto, sala, linea, i, cara) => {
     const ancho = o.ancho > 0 ? o.ancho : G.dist(e.a, e.b);
     if (!(o.ancho > 0)) { o.ancho = r6(ancho); o.estimado.ancho = false; }
     if (!(o.alto > 0)) { o.alto = r6(altoEstimado(o)); o.estimado.alto = true; }
-    const x0 = Math.min(G.dot(G.sub(e.a, origen), d), G.dot(G.sub(e.b, origen), d));
+    const x0 = Math.min(posicion(e.a), posicion(e.b));
     muro.colgado.push(M.nuevoColgado({ obraId: o.id, x: r6(x0), y: r6(alto - muro.eje - o.alto / 2) }));
   }
   muro.colgado.sort((p, q) => p.x - q.x);
   return muro;
 };
+
+// Largo actual de un tramo de la planta (sobre el arco si es curvo), para compararlo con su alzado
+export const largoDelTramo = (linea, i) => { const seg = G.segmentos(linea).find((s) => s[2] === i); return seg ? G.largoTramo(linea, seg) : 0; };
 
 // Muro ya existente para ese tramo y cara, si lo hay
 export const muroDelTramo = (proyecto, sala, linea, i, cara) =>

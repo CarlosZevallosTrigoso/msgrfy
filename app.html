@@ -1152,6 +1152,8 @@ const G = (() => {
   };
   // Normal izquierda del tramo en el punto del arco que corresponde a p
   const normalEn = (e, seg, p) => { const g = arcoDe(e, seg); if (!g) return perp(unit(sub(seg[1], seg[0]))); const v = sub(p, g.c); return Math.hypot(v.x, v.y) > 0 ? mul(unit(v), g.s) : g.n; };
+  // Cuánto se separa del arco, en su centro, una pieza recta y rígida de ancho w apoyada en él por sus extremos
+  const sagitaCuerda = (R, w) => R - Math.sqrt(Math.max(0, R * R - w * w / 4));
   // Flecha que hace pasar el tramo a–b por p, a la altura de su punto medio
   const flechaHacia = (a, b, p) => dot(sub(p, medio(a, b)), perp(unit(sub(b, a))));
   const fijarCurva = (e, i, f) => {
@@ -1280,7 +1282,7 @@ const G = (() => {
   };
   // Muro (línea) sobre el que está un tramo a–b
   const lineaBajo = (ents, a, b) => {
-    for (let k = ents.length - 1; k >= 0; k--) { const e = ents[k]; if (e.tipo !== 'linea') continue; for (const [p, q] of segmentos(e)) if (proyectar(a, p, q).d < 0.02 && proyectar(b, p, q).d < 0.02) return { e, hn: unit(perp(sub(q, p))) }; }
+    for (let k = ents.length - 1; k >= 0; k--) { const e = ents[k]; if (e.tipo !== 'linea') continue; for (const seg of segmentos(e)) if (cercaTramo(e, seg, a).d < 0.02 && cercaTramo(e, seg, b).d < 0.02) return { e, seg, hn: normalEn(e, seg, medio(a, b)) }; }
     return null;
   };
   // Cuadro adosado: franja de fondo `fondo` desde la cara del muro, hacia el lado `lado` (±1 sobre la normal izquierda de a→b)
@@ -1290,6 +1292,8 @@ const G = (() => {
     if (host) {
       const bm = bandaMuro(host.e); const sh = Math.sign(dot(n, host.hn)) || 1;
       s0 = bm ? Math.max(0, sh > 0 ? bm[1] : -bm[0]) : (GROSOR[host.e.grosor] || 2) * k / 2;
+      // sobre la cara convexa de un arco, la pieza recta toca en su centro, no en sus extremos
+      const g = arcoDe(host.e, host.seg); if (g && sh === g.s) s0 += sagitaCuerda(g.R, w);
     }
     const f = Math.max(e.fondo > 0 ? e.fondo : 0.05, k * 4);
     const esquinas = [add(e.a, mul(n, s0)), add(e.b, mul(n, s0)), add(e.b, mul(n, s0 + f)), add(e.a, mul(n, s0 + f))];
@@ -1302,6 +1306,15 @@ const G = (() => {
     const dentro = -ladoFuera(host.e); const anchoMedio = 2 * area(c) / Math.max(longitudLinea({ ...host.e, cerrada: true }), 1e-9);
     const lado = anchoMedio < 0.35 ? -dentro : dentro;
     return (Math.sign(dot(perp(unit(sub(b, a))), host.hn)) || 1) * lado;
+  };
+  // Punto final de una pieza a–b de ancho w: sobre su misma recta o, si está sobre un muro curvo, sobre el arco
+  const finConAncho = (e, ents, w) => {
+    const d = unit(sub(e.b, e.a)); const recto = { x: r6(e.a.x + d.x * w), y: r6(e.a.y + d.y * w) };
+    const host = lineaBajo(ents, e.a, e.b); const g = host && arcoDe(host.e, host.seg);
+    if (!g || !(w < 2 * g.R)) return recto;
+    const ta = cercaTramo(host.e, host.seg, e.a).t, tb = cercaTramo(host.e, host.seg, e.b).t;
+    const q = enArco(g, ta + (tb >= ta ? 1 : -1) * Math.asin(w / (2 * g.R)) / g.phi);
+    return { x: r6(q.x), y: r6(q.y) };
   };
   const esObra = (e) => e.tipo === 'obra' || e.tipo === 'cuadro';
   // ── proyección: imagen a–b sobre un muro o pantalla, proyector con la lente en p
@@ -1391,7 +1404,10 @@ const G = (() => {
   const anfitrion = (ents, a, b) => {
     for (const e of ents) {
       const banda = bandaMuro(e); if (!banda) continue;
-      for (const [p, q] of segmentos(e)) if (proyectar(a, p, q).d < 0.02 && proyectar(b, p, q).d < 0.02) return { n: unit(perp(sub(q, p))), omin: banda[0], omax: banda[1] };
+      for (const seg of segmentos(e)) if (cercaTramo(e, seg, a).d < 0.02 && cercaTramo(e, seg, b).d < 0.02) {
+        const g = arcoDe(e, seg); // ext: lo que el arco se aparta del vano recto, que el corte del muro también debe cubrir
+        return { n: normalEn(e, seg, medio(a, b)), omin: banda[0], omax: banda[1], ext: g ? sagitaCuerda(g.R, dist(a, b)) : 0 };
+      }
     }
     return null;
   };
@@ -1700,6 +1716,13 @@ const G = (() => {
       if (e.relleno === 'rayado') { usados.add(e.color); return `fill="url(#ry${e.color.slice(1)})"`; }
       return 'fill="none"';
     };
+    // borra la línea de un muro sin espesor bajo un vano; si el muro es curvo, a lo largo de su arco
+    const tapaVano = (e) => {
+      const host = lineaBajo(doc.entidades, e.a, e.b); const gh = host && arcoDe(host.e, host.seg);
+      if (!gh) return `<line x1="${C(e.a.x)}" y1="${C(e.a.y)}" x2="${C(e.b.x)}" y2="${C(e.b.y)}" stroke="#ffffff" stroke-width="${C(k * 7)}"/>`;
+      const ta = cercaTramo(host.e, host.seg, e.a).t, tb = cercaTramo(host.e, host.seg, e.b).t; const pts = []; for (let i = 0; i <= 12; i++) pts.push(enArco(gh, ta + (tb - ta) * i / 12));
+      return `<path d="M${pts.map((p) => C(p.x) + ' ' + C(p.y)).join(' L')}" fill="none" stroke="#ffffff" stroke-width="${C(k * 7)}"/>`;
+    };
     const capa = (e) => (e.tipo === 'region' ? -1 : e.tipo === 'puerta' || e.tipo === 'ventana' || esObra(e) || e.tipo === 'proyeccion' || esMueble(e) ? 1 : e.tipo === 'cota' || e.tipo === 'texto' ? 2 : 0);
     const orden = [-1, 0, 1, 2].flatMap((n) => doc.entidades.filter((e) => capa(e) === n));
     for (const e of orden) {
@@ -1778,10 +1801,10 @@ const G = (() => {
         const g = puertaGeom(e); if (!g) continue;
         const an = anfitrion(doc.entidades, e.a, e.b);
         if (an) {
-          const x = k * 1.5, c4 = [add(e.a, mul(an.n, an.omin - x)), add(e.b, mul(an.n, an.omin - x)), add(e.b, mul(an.n, an.omax + x)), add(e.a, mul(an.n, an.omax + x))];
+          const x = k * 1.5 + an.ext, c4 = [add(e.a, mul(an.n, an.omin - x)), add(e.b, mul(an.n, an.omin - x)), add(e.b, mul(an.n, an.omax + x)), add(e.a, mul(an.n, an.omax + x))];
           cuerpo += `<polygon points="${c4.map((p) => C(p.x) + ',' + C(p.y)).join(' ')}" fill="#ffffff"/>`;
           for (const p of [e.a, e.b]) { const p1 = add(p, mul(an.n, an.omin)), p2 = add(p, mul(an.n, an.omax)); cuerpo += `<line x1="${C(p1.x)}" y1="${C(p1.y)}" x2="${C(p2.x)}" y2="${C(p2.y)}" stroke="${col}" stroke-width="${sw('fino')}"/>`; }
-        } else cuerpo += `<line x1="${C(e.a.x)}" y1="${C(e.a.y)}" x2="${C(e.b.x)}" y2="${C(e.b.y)}" stroke="#ffffff" stroke-width="${C(k * 7)}"/>`;
+        } else cuerpo += tapaVano(e);
         cuerpo += `<line x1="${C(g.hinge.x)}" y1="${C(g.hinge.y)}" x2="${C(g.hoja.x)}" y2="${C(g.hoja.y)}" stroke="${col}" stroke-width="${sw('medio')}" stroke-linecap="square"/>`;
         cuerpo += `<path d="M${C(g.hoja.x)} ${C(g.hoja.y)} A${C(g.w)} ${C(g.w)} 0 0 ${g.sweep} ${C(g.otro.x)} ${C(g.otro.y)}" fill="none" stroke="${col}" stroke-width="${sw('fino')}"/>`;
         obsCajas.push(cajaDePuntos([g.hinge, g.hoja, g.otro, add(g.hinge, sub(g.hoja, g.hinge)), add(g.otro, sub(g.hoja, g.hinge))]));
@@ -1795,7 +1818,8 @@ const G = (() => {
         const nn = an ? an.n : g.n, o0 = an ? an.omin : -g.mitad, o1 = an ? an.omax : g.mitad, om = (o0 + o1) / 2;
         const esq = [add(e.a, mul(nn, o0)), add(e.b, mul(nn, o0)), add(e.b, mul(nn, o1)), add(e.a, mul(nn, o1))];
         const va = add(e.a, mul(nn, om)), vb = add(e.b, mul(nn, om));
-        if (!an) cuerpo += `<line x1="${C(e.a.x)}" y1="${C(e.a.y)}" x2="${C(e.b.x)}" y2="${C(e.b.y)}" stroke="#ffffff" stroke-width="${C(k * 7)}"/>`;
+        if (!an) cuerpo += tapaVano(e);
+        else if (an.ext) { const x = an.ext + k * 1.5; cuerpo += `<polygon points="${[add(e.a, mul(nn, o0 - x)), add(e.b, mul(nn, o0 - x)), add(e.b, mul(nn, o1 + x)), add(e.a, mul(nn, o1 + x))].map((p) => C(p.x) + ',' + C(p.y)).join(' ')}" fill="#ffffff"/>`; }
         cuerpo += `<polygon points="${esq.map((p) => C(p.x) + ',' + C(p.y)).join(' ')}" fill="#ffffff" stroke="${col}" stroke-width="${sw('fino')}"/>`;
         cuerpo += `<line x1="${C(va.x)}" y1="${C(va.y)}" x2="${C(vb.x)}" y2="${C(vb.y)}" stroke="${col}" stroke-width="${sw('fino')}"/>`;
         obsCajas.push(cajaDePuntos(esq));
@@ -1989,7 +2013,7 @@ const G = (() => {
   const nuevoId = () => 'e' + Date.now().toString(36) + (_n++).toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 
   return { U, GROSOR, TRAZO, COLORES, ESCALAS, clamp, r6, dist, sub, add, mul, dot, unit, perp, medio, rotar, parseNum, fmtNum, fmtM, fmtM2, esc,
-    curvaDe, arco, arcoDe, enArco, puntosArco, tieneCurvas, puntosTramo, lineaFina, polilinea, finos, largoTramo, medioTramo, cercaTramo, normalEn, flechaHacia, fijarCurva, flechaDeRadio, asasCurva, reescalarCurvas, circuloAMuro, estirarLinea, areaLinea,
+    sagitaCuerda, finConAncho, curvaDe, arco, arcoDe, enArco, puntosArco, tieneCurvas, puntosTramo, lineaFina, polilinea, finos, largoTramo, medioTramo, cercaTramo, normalEn, flechaHacia, fijarCurva, flechaDeRadio, asasCurva, reescalarCurvas, circuloAMuro, estirarLinea, areaLinea,
     snapGrid, snapAngulo, proyectar, segmentos, imanar, areaFirmada, area, longitudLinea, puntoEnPoligono, anguloLegible, etiquetasTramos,
     esRectangulo, puertaGeom, ventanaGeom, vanoAlturas, VENTANA_ALFEIZAR, VENTANA_ALTO, PUERTA_ALTO, siguienteGiro, FORMATOS, proyGeom, proyConDistancia, proyConAncho, esPoligono, esMueble, mueblePts, centroide, etqRegion, enEtqRegion, lineaBajo, cuadroGeom, ladoCuadro, esObra, puntoObra, obrasEn, regionDe, numSiguiente, ordenNatural, csvObras, alturaTramo, tieneAlturas, etiquetasAltura, cotaGeom, cotaPts, estirarCota, contornoDe, ladoFuera, bandaMuro, desplazarPolilinea, contornoBanda, anfitrion, textoCaja, distanciaA, tocar, mover, asas, fijarAsa, insertarVertice, borrarVertice, estirarTramo, rectPts,
     calcoCentro, localAMundo, mundoALocal, calibrarCalco, calcoDudoso, zoomMinimo, esquinasCalco, caja, unirCajas, cajaPuntos, longitudBonita, papelPara,
@@ -2131,7 +2155,7 @@ const MARKUP = `
       <tr><td><kbd>Y</kbd> Proyección</td><td>Dos clics marcan el ancho de la imagen sobre el muro o la pantalla; el tercero, la lente del proyector (o escribe la distancia y <kbd>⏎</kbd>). En el panel: formato, ancho y alto de imagen, distancia, relación de tiro y tamaño del cuerpo. Escribe el tiro de tu proyector y se coloca a la distancia justa.</td></tr>
       <tr><td><kbd>G</kbd> Región</td><td>Lazo poligonal para un núcleo o zona curatorial. Muestra su nombre y cuántas obras caen dentro.</td></tr>
       <tr><td>Lista</td><td>Sin nada elegido, el panel lista las obras; clic en una para ir a ella. «Lista de obras (CSV)» descarga la checklist de montaje.</td></tr>
-      <tr><td><kbd>A</kbd> Arco</td><td>Tres clics: inicio, fin y cuánto se curva (o escribe la flecha en metros y <kbd>⏎</kbd>). Para curvar un muro ya dibujado, elígelo y arrastra el círculo del medio de un tramo; se ajusta solo a recto y a medio círculo. Con <kbd>Alt</kbd>, sin ajustes. En el panel escribes la flecha o el radio exactos.</td></tr>
+      <tr><td><kbd>A</kbd> Arco</td><td>Tres clics: inicio, fin y cuánto se curva (o escribe la flecha en metros y <kbd>⏎</kbd>). Para curvar un muro ya dibujado, elígelo y arrastra el círculo del medio de un tramo; se ajusta solo a recto y a medio círculo. Con <kbd>Alt</kbd>, sin ajustes. En el panel escribes la flecha o el radio exactos. Cuadros, puertas y ventanas se apoyan en la curva, y ▭ abre su alzado desenrollado, con el largo del arco.</td></tr>
       <tr><td><kbd>T</kbd> Texto</td><td>Clic y escribe en el panel derecho.</td></tr>
       <tr><td>Biblioteca</td><td>En el panel derecho (sin nada elegido): pedestales, vitrinas, paneles, bancas, señalética, técnica y figuras de referencia con medidas reales. Clic en uno y clic en la planta para colocarlo; <kbd>R</kbd> lo gira 90° antes de soltarlo; <kbd>Esc</kbd> termina. En su ficha cambias medidas, giro, elevación y color, y «guardar en mi biblioteca» lo conserva para reutilizarlo; la biblioteca propia se exporta e importa como .json. «Materiales (CSV)» cuenta el mobiliario por sala. Aparece en el 3D.</td></tr>
       <tr><td><kbd>3</kbd> 3D</td><td>La sala en axonometría con giro libre. Arrastra para girar e inclinar en torno al centro de giro (◎): por defecto es el medio de la sala; doble clic en el piso fija otro. Los muros que darían la espalda se cortan a un zócalo o se vuelven transparentes. Las obras en planta y columnas toman su alto de la ficha; los cuadros, su colgado del alzado si existe. Exporta PNG y SVG.</td></tr>
@@ -3434,11 +3458,11 @@ const extremoIzquierdo = (a, b, cara) => {
 // Cuadros de la sala que cuelgan de ese tramo, con la cara en la que están
 const cuadrosDelTramo = (sala, linea, i) => {
   const seg = G.segmentos(linea).find((s) => s[2] === i); if (!seg) return [];
-  const [a, b] = seg; const d = G.unit(G.sub(b, a)); const nz = G.perp(d);
   const out = [];
   for (const e of sala.entidades) {
     if (e.tipo !== 'cuadro' || !e.obraId) continue;
-    if (G.proyectar(e.a, a, b).d > TOL || G.proyectar(e.b, a, b).d > TOL) continue;
+    if (G.cercaTramo(linea, seg, e.a).d > TOL || G.cercaTramo(linea, seg, e.b).d > TOL) continue;
+    const nz = G.normalEn(linea, seg, G.medio(e.a, e.b)); // en un arco, la normal cambia a lo largo del tramo
     const nc = G.mul(G.perp(G.unit(G.sub(e.b, e.a))), e.lado === -1 ? -1 : 1);
     out.push({ e, cara: Math.sign(G.dot(nc, nz)) || 1 });
   }
@@ -3452,13 +3476,14 @@ const altoEstimado = (o) => (o.alto > 0 ? o.alto : o.ancho > 0 ? (o.imgRatio > 0
 // Las obras cuyo alto se desconoce reciben un alto estimado en su ficha.
 const muroDesdeTramo = (proyecto, sala, linea, i, cara) => {
   const seg = G.segmentos(linea).find((s) => s[2] === i); if (!seg) return null;
-  const [a, b] = seg; const largo = G.dist(a, b); if (!(largo > 0)) return null;
+  // un tramo curvo se abre desenrollado: el alzado mide lo que el arco
+  const [a, b] = seg; const largo = G.largoTramo(linea, seg); if (!(largo > 0)) return null;
   cara = cara === -1 || cara === 1 ? cara : caraPorDefecto(linea);
   const izq = extremoIzquierdo(a, b, cara);
-  const origen = izq === 'a' ? a : b, d = G.unit(G.sub(izq === 'a' ? b : a, origen));
+  const posicion = (p) => { const u = G.cercaTramo(linea, seg, p).u; return izq === 'a' ? u : largo - u; }; // metros desde el extremo izquierdo
   const alto = G.alturaTramo(linea, i) || 3;
   const muro = M.nuevoMuro({
-    nombre: (sala.nombre || 'Sala') + ' · tramo ' + (i + 1), salaId: sala.id, tramo: { entidadId: linea.id, i, cara },
+    nombre: (sala.nombre || 'Sala') + ' · tramo ' + (i + 1) + (G.curvaDe(linea, i) ? ' (curvo)' : ''), salaId: sala.id, tramo: { entidadId: linea.id, i, cara },
     ancho: r6(largo), alto: r6(alto), eje: r6(Math.min(1.5, alto / 2)), grosor: r6(linea.espesor > 0 ? linea.espesor : 0.15),
   });
   const cuadros = cuadrosDelTramo(sala, linea, i).filter((c) => c.cara === cara);
@@ -3467,12 +3492,15 @@ const muroDesdeTramo = (proyecto, sala, linea, i, cara) => {
     const ancho = o.ancho > 0 ? o.ancho : G.dist(e.a, e.b);
     if (!(o.ancho > 0)) { o.ancho = r6(ancho); o.estimado.ancho = false; }
     if (!(o.alto > 0)) { o.alto = r6(altoEstimado(o)); o.estimado.alto = true; }
-    const x0 = Math.min(G.dot(G.sub(e.a, origen), d), G.dot(G.sub(e.b, origen), d));
+    const x0 = Math.min(posicion(e.a), posicion(e.b));
     muro.colgado.push(M.nuevoColgado({ obraId: o.id, x: r6(x0), y: r6(alto - muro.eje - o.alto / 2) }));
   }
   muro.colgado.sort((p, q) => p.x - q.x);
   return muro;
 };
+
+// Largo actual de un tramo de la planta (sobre el arco si es curvo), para compararlo con su alzado
+const largoDelTramo = (linea, i) => { const seg = G.segmentos(linea).find((s) => s[2] === i); return seg ? G.largoTramo(linea, seg) : 0; };
 
 // Muro ya existente para ese tramo y cara, si lo hay
 const muroDelTramo = (proyecto, sala, linea, i, cara) =>
@@ -3528,7 +3556,7 @@ const svgDeMuro = (proyecto, mu, pxcm = 8) => {
   MD.drawScene(P, doc, fr.view, { ui: fr.u, sel: new Set(), cotas: 'all', show, eje: true, human: true, ojos: false, grid: false, guides: null, vw: fr.W, vh: fr.H, escala: true, rotulo: true, bounds: fr.bounds, floorRange: [fr.bounds.x - 1e4, fr.bounds.x + fr.bounds.w + 1e4] });
   return { svg: P.toString(fr.W, fr.H, '#ffffff'), w: fr.W, h: fr.H, pxPorMetro: fr.s * 100 };
 };
-return { caraPorDefecto, extremoIzquierdo, cuadrosDelTramo, altoEstimado, muroDesdeTramo, muroDelTramo, dimsTexto, salaDecorada, svgDeSala, docDeMuro, svgDeMuro };
+return { caraPorDefecto, extremoIzquierdo, cuadrosDelTramo, altoEstimado, muroDesdeTramo, largoDelTramo, muroDelTramo, dimsTexto, salaDecorada, svgDeSala, docDeMuro, svgDeMuro };
 })();
 
 // ── src/core/isometrica.js
@@ -3706,7 +3734,13 @@ const escena = (proyecto, sala, cam) => {
       const trans = modo === 'transparentes';
       const colMuro = e.color && e.color !== '#111111' ? e.color : null;
       const st = { stroke: trans ? '#9a9a92' : '#2a2a28', lw: trans ? 1 : 1.1, dash: trans ? [4, 3] : null };
-      const huecos = vanos.filter((v) => G.proyectar(v.a, a, b).d < 0.02 && G.proyectar(v.b, a, b).d < 0.02)
+      // en un arco, cada cara corta el trozo de vano que le toca, medido sobre el arco; si lo cruza entero, sin jambas
+      const segO = t.arco != null ? G.segmentos(e).find((x) => x[2] === t.arco) : null; const U0 = fina.u0[s], U1 = fina.u1[s];
+      const sobreArco = (q) => G.cercaTramo(e, segO, q);
+      const huecos = segO ? vanos.filter((v) => sobreArco(v.a).d < 0.02 && sobreArco(v.b).d < 0.02).map((v) => {
+        const ua = sobreArco(v.a).u, ub = sobreArco(v.b).u, mn = Math.min(ua, ub), mx = Math.max(ua, ub), esc = L / (U1 - U0);
+        return mx > U0 && mn < U1 ? { u0: mn <= U0 ? -Infinity : (mn - U0) * esc, u1: mx >= U1 ? Infinity : (mx - U0) * esc, ...G.vanoAlturas(v), ventana: v.tipo === 'ventana' } : null;
+      }).filter(Boolean) : vanos.filter((v) => G.proyectar(v.a, a, b).d < 0.02 && G.proyectar(v.b, a, b).d < 0.02)
         .map((v) => { const ta = G.dot(G.sub(v.a, a), d), tb = G.dot(G.sub(v.b, a), d); return { u0: Math.min(ta, tb), u1: Math.max(ta, tb), ...G.vanoAlturas(v), ventana: v.tipo === 'ventana' }; });
       const ant = vecino(s, -1), sig = vecino(s, 1);
       const i0 = iF, i1 = (iF + 1) % nP;
@@ -3770,7 +3804,10 @@ const escena = (proyecto, sala, cam) => {
       // cuadros sobre este tramo (solo si el muro está entero)
       if (!frente || modo !== 'cortados') for (const q of ents) {
         if (q.tipo !== 'cuadro' || !q.obraId) continue;
-        if (G.proyectar(q.a, a, b).d > 0.02 || G.proyectar(q.b, a, b).d > 0.02) continue;
+        if (segO) { // en un arco, el cuadro se cuelga una sola vez: en la cara donde cae su centro
+          if (sobreArco(q.a).d > 0.02 || sobreArco(q.b).d > 0.02) continue;
+          const um = (sobreArco(q.a).u + sobreArco(q.b).u) / 2; if (um < U0 || um >= U1) continue;
+        } else if (G.proyectar(q.a, a, b).d > 0.02 || G.proyectar(q.b, a, b).d > 0.02) continue;
         const o = M.obraDe(proyecto, q.obraId); if (!o) continue;
         const nc = G.mul(G.perp(G.unit(G.sub(q.b, q.a))), q.lado === -1 ? -1 : 1); // hacia la sala
         const caraMuro = Math.sign(G.dot(nc, n)) || 1;
@@ -3781,7 +3818,10 @@ const escena = (proyecto, sala, cam) => {
         if (c) zTop = mu.alto - c.y - c.marco - c.pp;
         const zBot = Math.max(0, zTop - hh);
         const off = caraMuro > 0 ? omax : omin; const salto = 0.03;
-        const base0 = G.add(q.a, G.mul(n, off + caraMuro * salto)), base1 = G.add(q.b, G.mul(n, off + caraMuro * salto));
+        // en un arco la pieza sigue siendo plana: arranca de la cara del muro en cada extremo y, en la cara convexa, se apoya en su centro
+        const gO = segO && G.arcoDe(e, segO); const apoyo = gO && caraMuro === gO.s ? G.sagitaCuerda(gO.R, G.dist(q.a, q.b)) : 0;
+        const nA = segO ? G.normalEn(e, segO, q.a) : n, nB = segO ? G.normalEn(e, segO, q.b) : n;
+        const base0 = G.add(G.add(q.a, G.mul(nA, off + caraMuro * salto)), G.mul(nc, apoyo)), base1 = G.add(G.add(q.b, G.mul(nB, off + caraMuro * salto)), G.mul(nc, apoyo));
         const dirQ = G.unit(G.sub(q.b, q.a));
         const esqC = [[base0.x, base0.y, zBot], [base1.x, base1.y, zBot], [base1.x, base1.y, zTop], [base0.x, base0.y, zTop]];
         const col = q.color || '#b06a36';
@@ -4325,7 +4365,7 @@ const asignarObra = (e) => {
     const ancho = e.tipo === 'cuadro' ? G.r6(G.dist(e.a, e.b)) : null;
     o = M.nuevaObra({ nombre: '', ancho, alto: null, estimado: { ancho: !ancho, alto: true } });
     ctx.proyecto.obras.push(o);
-  } else if (e.tipo === 'cuadro' && o.ancho > 0) { const d = G.unit(G.sub(e.b, e.a)); e.b = { x: G.r6(e.a.x + d.x * o.ancho), y: G.r6(e.a.y + d.y * o.ancho) }; }
+  } else if (e.tipo === 'cuadro' && o.ancho > 0) { e.b = G.finConAncho(e, S.doc.entidades, o.ancho); }
   else if (e.tipo === 'cuadro') { o.ancho = G.r6(G.dist(e.a, e.b)); o.estimado.ancho = false; }
   e.obraId = o.id;
   if (ctx.onObraCambiada) ctx.onObraCambiada(o.id);
@@ -4732,7 +4772,7 @@ const enlazarPanel = (e) => {
       const o = obraDe(e); if (!o) return; const k = i.dataset.odim; const txt = String(i.value).trim(); const v = G.parseNum(txt);
       if (txt && !(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
       snap(); o[k] = txt ? G.r6(v) : null; o.estimado[k] = !txt;
-      if (k === 'ancho' && e.tipo === 'cuadro' && v > 0) { const d = G.unit(G.sub(e.b, e.a)); e.b = { x: G.r6(e.a.x + d.x * v), y: G.r6(e.a.y + d.y * v) }; }
+      if (k === 'ancho' && e.tipo === 'cuadro' && v > 0) { e.b = G.finConAncho(e, S.doc.entidades, v); }
       cambio(); if (ctx.onObraCambiada) ctx.onObraCambiada(o.id);
     };
     i.addEventListener('change', aplicar);
@@ -4741,7 +4781,7 @@ const enlazarPanel = (e) => {
   $$('[data-cambiar-obra]', P).forEach((s) => s.addEventListener('change', () => {
     const o = M.obraDe(ctx.proyecto, s.value); if (!o) return;
     snap(); e.obraId = o.id;
-    if (e.tipo === 'cuadro' && o.ancho > 0) { const d = G.unit(G.sub(e.b, e.a)); e.b = { x: G.r6(e.a.x + d.x * o.ancho), y: G.r6(e.a.y + d.y * o.ancho) }; }
+    if (e.tipo === 'cuadro' && o.ancho > 0) { e.b = G.finConAncho(e, S.doc.entidades, o.ancho); }
     cambio(); if (ctx.onObraCambiada) ctx.onObraCambiada(o.id);
   }));
   // tramos
@@ -4821,7 +4861,7 @@ const enlazarPanel = (e) => {
       if (!Number.isFinite(v) || (k === 'altura' && v < 0) || ((k === 'diametro' || k === 'ancho' || k === 'tam' || k === 'largo' || k === 'esp' || /^p[A-Z]/.test(k)) && !(v > 0)) || (k === 'espesor' && v < 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
       snap();
       if (k === 'diametro') e.r = v / 2;
-      else if (k === 'ancho' || k === 'largo') { const d = G.unit(G.sub(e.b, e.a)); e.b = { x: G.r6(e.a.x + d.x * v), y: G.r6(e.a.y + d.y * v) }; const o = e.tipo === 'cuadro' ? obraDe(e) : null; if (o) { o.ancho = G.r6(v); o.estimado.ancho = false; if (ctx.onObraCambiada) ctx.onObraCambiada(o.id); } }
+      else if (k === 'ancho' || k === 'largo') { e.b = G.finConAncho(e, S.doc.entidades, v); const o = e.tipo === 'cuadro' ? obraDe(e) : null; if (o) { o.ancho = G.r6(v); o.estimado.ancho = false; if (ctx.onObraCambiada) ctx.onObraCambiada(o.id); } }
       else if (k === 'tam') e.tam = v;
       else if (k === 'rot') e.rot = v;
       else if (k === 'desp') e.desp = v;
@@ -8242,6 +8282,7 @@ const abrirAlzado = (sala, linea, i) => {
     proyecto.muros.push(m); cambio();
     mensaje(`Alzado creado: ${fmtNum(m.ancho)} × ${fmtNum(m.alto)} m, ${m.colgado.length} obra${m.colgado.length === 1 ? '' : 's'} colocada${m.colgado.length === 1 ? '' : 's'}`);
   }
+  else { const L = puente.largoDelTramo(linea, i); if (Math.abs(L - m.ancho) > 0.01) mensaje(`Este alzado mide ${fmtNum(m.ancho)} m, pero el tramo mide ahora ${fmtNum(L)} m`); }
   irAVista('muro'); muro.abrir(m); obras.refrescar();
 };
 

@@ -100,6 +100,7 @@ const abrirAlzado = (sala, linea, i) => {
     proyecto.muros.push(m); cambio();
     mensaje(`Alzado creado: ${fmtNum(m.ancho)} × ${fmtNum(m.alto)} m, ${m.colgado.length} obra${m.colgado.length === 1 ? '' : 's'} colocada${m.colgado.length === 1 ? '' : 's'}`);
   }
+  else { const L = puente.largoDelTramo(linea, i); if (Math.abs(L - m.ancho) > 0.01) mensaje(`Este alzado mide ${fmtNum(m.ancho)} m, pero el tramo mide ahora ${fmtNum(L)} m`); }
   irAVista('muro'); muro.abrir(m); obras.refrescar();
 };
 

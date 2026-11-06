@@ -62,7 +62,7 @@ const asignarObra = (e) => {
     const ancho = e.tipo === 'cuadro' ? G.r6(G.dist(e.a, e.b)) : null;
     o = M.nuevaObra({ nombre: '', ancho, alto: null, estimado: { ancho: !ancho, alto: true } });
     ctx.proyecto.obras.push(o);
-  } else if (e.tipo === 'cuadro' && o.ancho > 0) { const d = G.unit(G.sub(e.b, e.a)); e.b = { x: G.r6(e.a.x + d.x * o.ancho), y: G.r6(e.a.y + d.y * o.ancho) }; }
+  } else if (e.tipo === 'cuadro' && o.ancho > 0) { e.b = G.finConAncho(e, S.doc.entidades, o.ancho); }
   else if (e.tipo === 'cuadro') { o.ancho = G.r6(G.dist(e.a, e.b)); o.estimado.ancho = false; }
   e.obraId = o.id;
   if (ctx.onObraCambiada) ctx.onObraCambiada(o.id);
@@ -469,7 +469,7 @@ const enlazarPanel = (e) => {
       const o = obraDe(e); if (!o) return; const k = i.dataset.odim; const txt = String(i.value).trim(); const v = G.parseNum(txt);
       if (txt && !(v > 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
       snap(); o[k] = txt ? G.r6(v) : null; o.estimado[k] = !txt;
-      if (k === 'ancho' && e.tipo === 'cuadro' && v > 0) { const d = G.unit(G.sub(e.b, e.a)); e.b = { x: G.r6(e.a.x + d.x * v), y: G.r6(e.a.y + d.y * v) }; }
+      if (k === 'ancho' && e.tipo === 'cuadro' && v > 0) { e.b = G.finConAncho(e, S.doc.entidades, v); }
       cambio(); if (ctx.onObraCambiada) ctx.onObraCambiada(o.id);
     };
     i.addEventListener('change', aplicar);
@@ -478,7 +478,7 @@ const enlazarPanel = (e) => {
   $$('[data-cambiar-obra]', P).forEach((s) => s.addEventListener('change', () => {
     const o = M.obraDe(ctx.proyecto, s.value); if (!o) return;
     snap(); e.obraId = o.id;
-    if (e.tipo === 'cuadro' && o.ancho > 0) { const d = G.unit(G.sub(e.b, e.a)); e.b = { x: G.r6(e.a.x + d.x * o.ancho), y: G.r6(e.a.y + d.y * o.ancho) }; }
+    if (e.tipo === 'cuadro' && o.ancho > 0) { e.b = G.finConAncho(e, S.doc.entidades, o.ancho); }
     cambio(); if (ctx.onObraCambiada) ctx.onObraCambiada(o.id);
   }));
   // tramos
@@ -558,7 +558,7 @@ const enlazarPanel = (e) => {
       if (!Number.isFinite(v) || (k === 'altura' && v < 0) || ((k === 'diametro' || k === 'ancho' || k === 'tam' || k === 'largo' || k === 'esp' || /^p[A-Z]/.test(k)) && !(v > 0)) || (k === 'espesor' && v < 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
       snap();
       if (k === 'diametro') e.r = v / 2;
-      else if (k === 'ancho' || k === 'largo') { const d = G.unit(G.sub(e.b, e.a)); e.b = { x: G.r6(e.a.x + d.x * v), y: G.r6(e.a.y + d.y * v) }; const o = e.tipo === 'cuadro' ? obraDe(e) : null; if (o) { o.ancho = G.r6(v); o.estimado.ancho = false; if (ctx.onObraCambiada) ctx.onObraCambiada(o.id); } }
+      else if (k === 'ancho' || k === 'largo') { e.b = G.finConAncho(e, S.doc.entidades, v); const o = e.tipo === 'cuadro' ? obraDe(e) : null; if (o) { o.ancho = G.r6(v); o.estimado.ancho = false; if (ctx.onObraCambiada) ctx.onObraCambiada(o.id); } }
       else if (k === 'tam') e.tam = v;
       else if (k === 'rot') e.rot = v;
       else if (k === 'desp') e.desp = v;
