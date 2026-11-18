@@ -3825,7 +3825,9 @@ const escena = (proyecto, sala, cam) => {
         const mu = muroDelTramo(proyecto, sala, e, i); const c = mu && mu.colgado.find((cc) => cc.obraId === o.id);
         if (c) zTop = mu.alto - c.y - c.marco - c.pp;
         const zBot = Math.max(0, zTop - hh);
-        const off = caraMuro > 0 ? omax : omin; const salto = 0.03;
+        const off = caraMuro > 0 ? omax : omin;
+        // profundidad de la pieza: la del colgado del alzado (prof); con 3 cm o menos se dibuja solo su frente, como un cuadro
+        const salto = c && c.prof > 0.03 ? c.prof : 0.03;
         // en un arco la pieza sigue siendo plana: arranca de la cara del muro en cada extremo y, en la cara convexa, se apoya en su centro
         const gO = segO && G.arcoDe(e, segO); const apoyo = gO && caraMuro === gO.s ? G.sagitaCuerda(gO.R, G.dist(q.a, q.b)) : 0;
         const nA = segO ? G.normalEn(e, segO, q.a) : n, nB = segO ? G.normalEn(e, segO, q.b) : n;
@@ -3838,6 +3840,15 @@ const escena = (proyecto, sala, cam) => {
         const ua = G.dot(G.sub(q.a, a), d), ub = G.dot(G.sub(q.b, a), d), umn = Math.min(ua, ub), umx = Math.max(ua, ub);
         const dMuro = rebs.reduce((m, r) => (r.u1 > umn && r.u0 < umx ? Math.max(m, r.d) : m), -Infinity);
         const pieza = { tipo: 'cuadro', d: Math.max(prof([base0, base1]) + 0.01, dMuro + 0.001), caras: [cara(esqC, { fill: col, stroke: '#2a2a28', lw: 1 })], imagenes: [] };
+        if (salto > 0.03) { // objeto con volumen (un libro, una caja): sus caras laterales visibles, más oscuras que el frente
+          const muro0 = G.add(G.add(q.a, G.mul(nA, off)), G.mul(nc, apoyo)), muro1 = G.add(G.add(q.b, G.mul(nB, off)), G.mul(nc, apoyo));
+          const lat = { fill: col, stroke: '#2a2a28', lw: 1, lateral: true };
+          const q3 = (p2, z) => [p2.x, p2.y, z];
+          if (visible(G.mul(dirQ, -1), muro0)) pieza.caras.push(cara([q3(muro0, zBot), q3(base0, zBot), q3(base0, zTop), q3(muro0, zTop)], lat));
+          if (visible(dirQ, muro1)) pieza.caras.push(cara([q3(base1, zBot), q3(muro1, zBot), q3(muro1, zTop), q3(base1, zTop)], lat));
+          if (!P.ojo || P.ojo[2] > zTop) pieza.caras.push(cara([q3(muro0, zTop), q3(base0, zTop), q3(base1, zTop), q3(muro1, zTop)], lat));
+          else if (P.ojo[2] < zBot) pieza.caras.push(cara([q3(muro0, zBot), q3(muro1, zBot), q3(base1, zBot), q3(base0, zBot)], lat));
+        }
         if (o.imagenId && proyecto.imagenes[o.imagenId]) {
           const izq = G.dot(dirQ, { x: -nc.y, y: nc.x }) < 0;
           const o0 = izq ? base0 : base1, dd = izq ? dirQ : G.mul(dirQ, -1);

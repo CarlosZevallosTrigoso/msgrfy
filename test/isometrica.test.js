@@ -242,3 +242,18 @@ test('cuadros angostos: cada uno se pinta después de las rebanadas de muro sobr
     }
   }
 });
+
+test('profundidad: con prof del colgado mayor a 3 cm el cuadro sale como volumen; con 3 cm, solo su frente', async () => {
+  const { p, s } = sala();
+  const P2 = await import('../src/core/puente.js');
+  const m = P2.muroDesdeTramo(p, s, s.entidades[0], 0); p.muros.push(m);
+  const cam = { ...I.camDefecto(), giro: 20, inclinacion: 35 };
+  const plano = I.escena(p, s, cam).find((z) => z.tipo === 'cuadro');
+  assert.equal(plano.caras.length, 1, 'un cuadro de 3 cm: solo el frente');
+  m.colgado[0].prof = 0.07;
+  const caja = I.escena(p, s, cam).find((z) => z.tipo === 'cuadro');
+  assert.ok(caja.caras.length >= 2, 'con 7 cm aparecen caras laterales');
+  const ys = caja.caras[0].pts3.map((q) => q[1]);
+  assert.ok(ys.every((y) => Math.abs(y - 0.07) < 1e-9), `el frente queda a 7 cm del muro: ${ys}`);
+  assert.ok(caja.caras.slice(1).every((c) => c.lateral), 'las caras de canto van más oscuras');
+});
