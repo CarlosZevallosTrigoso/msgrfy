@@ -3755,6 +3755,7 @@ const escena = (proyecto, sala, cam) => {
         [omax, n, G.dot(G.sub(Imax[i0], a), d), G.dot(G.sub(Imax[i1], a), d)]];
       const punto = (off, u) => G.add(a, G.add(G.mul(d, u), G.mul(n, off)));
       const nReb = Math.max(1, Math.ceil(L / REB));
+      const rebs = []; // tramo que cubre cada rebanada (u a lo largo de d) y su profundidad, para pintar los cuadros encima
       for (let k = 0; k < nReb; k++) {
         const t0 = k / nReb, t1 = (k + 1) / nReb;
         const uDe = (ld, tt) => ld[2] + (ld[3] - ld[2]) * tt;
@@ -3806,6 +3807,7 @@ const escena = (proyecto, sala, cam) => {
         const esqE = [ext(esq[0], -1, sAnt), ext(esq[1], 1, sSig), ext(esq[2], 1, sSig), ext(esq[3], -1, sAnt)];
         if (!P.ojo || P.ojo[2] > alto) caras.push(cara(esqE.map((q) => [q.x, q.y, alto]), { fill: trans ? 'rgba(255,255,255,0)' : '#ffffff', stroke: null })); // la tapa no se ve desde abajo
         piezas.push({ tipo: 'muro', d: prof(esq), dmin: profMin(esq), caras, frente, tramo: e.id + ':' + i });
+        rebs.push({ u0: Math.min(uDe(lmin, t0), uDe(lmax, t0)), u1: Math.max(uDe(lmin, t1), uDe(lmax, t1)), d: prof(esq) });
       }
       // cuadros sobre este tramo (solo si el muro está entero)
       if (!frente || modo !== 'cortados') for (const q of ents) {
@@ -3831,7 +3833,11 @@ const escena = (proyecto, sala, cam) => {
         const dirQ = G.unit(G.sub(q.b, q.a));
         const esqC = [[base0.x, base0.y, zBot], [base1.x, base1.y, zBot], [base1.x, base1.y, zTop], [base0.x, base0.y, zTop]];
         const col = q.color || '#b06a36';
-        const pieza = { tipo: 'cuadro', d: prof([base0, base1]) + 0.01, caras: [cara(esqC, { fill: col, stroke: '#2a2a28', lw: 1 })], imagenes: [] };
+        // un cuadro va siempre delante de las rebanadas de su muro: si fuera angosto y cayera en la mitad lejana
+        // de una rebanada, la profundidad de esa rebanada (su esquina más cercana) lo dejaría tapado
+        const ua = G.dot(G.sub(q.a, a), d), ub = G.dot(G.sub(q.b, a), d), umn = Math.min(ua, ub), umx = Math.max(ua, ub);
+        const dMuro = rebs.reduce((m, r) => (r.u1 > umn && r.u0 < umx ? Math.max(m, r.d) : m), -Infinity);
+        const pieza = { tipo: 'cuadro', d: Math.max(prof([base0, base1]) + 0.01, dMuro + 0.001), caras: [cara(esqC, { fill: col, stroke: '#2a2a28', lw: 1 })], imagenes: [] };
         if (o.imagenId && proyecto.imagenes[o.imagenId]) {
           const izq = G.dot(dirQ, { x: -nc.y, y: nc.x }) < 0;
           const o0 = izq ? base0 : base1, dd = izq ? dirQ : G.mul(dirQ, -1);

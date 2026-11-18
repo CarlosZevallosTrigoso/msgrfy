@@ -217,3 +217,28 @@ test('proyección: la imagen arranca en zImagen si se da; sin dato, centrada en 
   const [b0, b1] = zs();
   assert.ok(Math.abs(b0 - 0.31) < 1e-9 && Math.abs(b1 - (0.31 + alto)) < 1e-9, `con zImagen: ${b0}–${b1}`);
 });
+
+test('cuadros angostos: cada uno se pinta después de las rebanadas de muro sobre las que cuelga', () => {
+  const { p, s } = sala();
+  s.entidades = s.entidades.filter((e) => e.tipo === 'linea');
+  const xs = [];
+  for (let x = 1; x + 0.132 <= 7; x += 0.152) {
+    const o = M.nuevaObra({ nombre: 'p', ancho: 0.132, alto: 0.217, estimado: { ancho: false, alto: false } }); p.obras.push(o);
+    s.entidades.push({ id: 'Q' + xs.length, tipo: 'cuadro', a: { x, y: 0 }, b: { x: x + 0.132, y: 0 }, lado: 1, obraId: o.id });
+    xs.push(x + 0.066);
+  }
+  for (const giro of [20, 35, -25]) {
+    const piezas = I.escena(p, s, { ...I.camDefecto(), giro, muros: 'cortados' });
+    const orden = piezas.slice().sort((a, b) => a.d - b.d);
+    const reb = orden.map((pz, i) => ({ pz, i })).filter(({ pz }) => pz.tipo === 'muro' && pz.tramo === 'L:0');
+    const cuadros = orden.map((pz, i) => ({ pz, i })).filter(({ pz }) => pz.tipo === 'cuadro');
+    assert.equal(cuadros.length, xs.length, `giro ${giro}: se ven todos`);
+    // rebanada (de 0,5 m) que contiene el centro de cada cuadro, en el orden en que se crearon a lo largo del tramo
+    const enOrden = reb.slice().sort((r1, r2) => piezas.indexOf(r1.pz) - piezas.indexOf(r2.pz));
+    for (const { pz, i } of cuadros) {
+      const xc = pz.caras[0].pts3.reduce((m, q) => m + q[0], 0) / pz.caras[0].pts3.length;
+      const k = Math.min(enOrden.length - 1, Math.floor(xc / 0.5));
+      assert.ok(i > enOrden[k].i, `giro ${giro}: el cuadro en x=${xc.toFixed(2)} queda tapado por su muro`);
+    }
+  }
+});
