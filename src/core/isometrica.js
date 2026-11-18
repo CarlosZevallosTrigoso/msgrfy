@@ -295,7 +295,8 @@ export const escena = (proyecto, sala, cam) => {
       const g = G.proyGeom(e, ents); const zc = e.altoProy > 0 ? e.altoProy : 2.4; const L = e.largo > 0 ? e.largo : 0.4, W = e.anchoCuerpo > 0 ? e.anchoCuerpo : 0.3;
       const col = e.color || '#4f6b82';
       piezas.push(prisma(g.cuerpo, 0.12, alfa(col, 0.4), col, P, cara, prof, false, zc));
-      const z0 = eje - g.alto / 2, z1 = eje + g.alto / 2;
+      // borde inferior de la imagen sobre el piso (zImagen); sin dato, centrada en el eje visual
+      const z0 = Number.isFinite(e.zImagen) && e.zImagen >= 0 ? e.zImagen : eje - g.alto / 2, z1 = z0 + g.alto;
       const A = g.frenteA, B = g.frenteB;
       piezas.push({ tipo: 'pantalla', d: prof([A, B]) + 0.01, caras: [cara([[A.x, A.y, z0], [B.x, B.y, z0], [B.x, B.y, z1], [A.x, A.y, z1]], { fill: alfa(col, 0.8), stroke: col, lw: 1 })] });
       if (e.verHaz !== false) piezas.push({ tipo: 'haz', d: prof([e.p, A, B]) + 0.003, caras: [cara([[e.p.x, e.p.y, zc], [A.x, A.y, z0], [B.x, B.y, z0]], { fill: alfa(col, 0.08), stroke: col, lw: 0.8, dash: [4, 3] }), cara([[e.p.x, e.p.y, zc], [A.x, A.y, z1], [B.x, B.y, z1]], { fill: alfa(col, 0.08), stroke: col, lw: 0.8, dash: [4, 3] })] });

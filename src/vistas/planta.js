@@ -375,6 +375,7 @@ const renderPanel = () => {
       h += `<div class="fila">${num('pAncho', 'ancho imagen (m)', g.w)}${num('pAlto', 'alto imagen (m)', g.alto)}</div>`;
       h += `<div class="fila">${num('pDist', 'distancia (m)', g.dist)}${num('pTiro', 'relación de tiro', g.tiro)}</div>`;
       h += `<div class="nota">Tiro = distancia ÷ ancho de imagen. Escribe el de tu proyector y se coloca a la distancia justa para este ancho.</div>`;
+      h += `<label>alturas en 3D</label><div class="fila">${num('zProy', 'proyector, base (m)', e.altoProy > 0 ? e.altoProy : 2.4)}${num('zImg', 'imagen, borde inferior (m)', Number.isFinite(e.zImagen) && e.zImagen >= 0 ? e.zImagen : 1.5 - g.alto / 2)}</div>`;
       h += `<label>cuerpo del proyector</label><div class="fila">${num('pLargo', 'largo (m)', e.largo > 0 ? e.largo : 0.4)}${num('pCuerpo', 'ancho (m)', e.anchoCuerpo > 0 ? e.anchoCuerpo : 0.3)}</div>`;
       h += check('verHaz', 'mostrar el haz', e.verHaz !== false) + check('verDatos', 'mostrar medidas y tiro', e.verDatos !== false);
       h += `<label>nota</label><textarea data-k="nota" rows="2" placeholder="modelo, altura de montaje…">${esc(e.nota || '')}</textarea>`;
@@ -555,7 +556,7 @@ const enlazarPanel = (e) => {
         if (e.partes) for (const pz of e.partes) { pz[prop] *= f; if (prop === 'l') pz.dx *= f; if (prop === 'a') pz.dy *= f; if (prop === 'h') pz.dz = (pz.dz || 0) * f; }
         e[prop] = G.r6(v); if (e.forma === 'cilindro' && prop === 'l') e.a = e.l; cambio(); return;
       }
-      if (!Number.isFinite(v) || (k === 'altura' && v < 0) || ((k === 'diametro' || k === 'ancho' || k === 'tam' || k === 'largo' || k === 'esp' || /^p[A-Z]/.test(k)) && !(v > 0)) || (k === 'espesor' && v < 0)) { mensaje('Medida no válida', true); renderPanel(); return; }
+      if (!Number.isFinite(v) || (k === 'altura' && v < 0) || ((k === 'diametro' || k === 'ancho' || k === 'tam' || k === 'largo' || k === 'esp' || /^p[A-Z]/.test(k)) && !(v > 0)) || (k === 'espesor' && v < 0) || (k === 'zImg' && v < 0) || (k === 'zProy' && !(v > 0))) { mensaje('Medida no válida', true); renderPanel(); return; }
       snap();
       if (k === 'diametro') e.r = v / 2;
       else if (k === 'ancho' || k === 'largo') { e.b = G.finConAncho(e, S.doc.entidades, v); const o = e.tipo === 'cuadro' ? obraDe(e) : null; if (o) { o.ancho = G.r6(v); o.estimado.ancho = false; if (ctx.onObraCambiada) ctx.onObraCambiada(o.id); } }
@@ -569,6 +570,8 @@ const enlazarPanel = (e) => {
       else if (k === 'pTiro') e.p = G.proyConDistancia(e, v * G.proyGeom(e).w);
       else if (k === 'pLargo') e.largo = v;
       else if (k === 'pCuerpo') e.anchoCuerpo = v;
+      else if (k === 'zProy') e.altoProy = v;
+      else if (k === 'zImg') e.zImagen = v;
       else if (k === 'altura') { if (v > 0) e.altura = v; else delete e.altura; }
       else if (k === 'espesor') { e.espesor = v; if (v > 0) { e.cara ||= 'fuera'; e.muroRelleno ||= 'gris'; } }
       cambio();
