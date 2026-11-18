@@ -205,3 +205,15 @@ test('piso: una línea abierta no se cierra con una recta entre sus extremos; un
   const cerrado = caja(I.escena(p, s, cam).find((z) => z.tipo === 'piso'));
   assert.equal(cerrado.n, 5, 'el contorno de la línea cerrada'); assert.ok(cerrado.x1 <= 6);
 });
+
+test('proyección: la imagen arranca en zImagen si se da; sin dato, centrada en el eje de 1,50', () => {
+  const { p, s } = sala();
+  s.entidades.push({ id: 'PR', tipo: 'proyeccion', a: { x: 0, y: 1 }, b: { x: 0, y: 1.465 }, p: { x: 0.6, y: 1.2325 }, formato: '16:9', altoProy: 0.15 });
+  const zs = () => { const pz = I.escena(p, s, { ...I.camDefecto(), giro: 270 }).find((z) => z.tipo === 'pantalla'); const v = pz.caras[0].pts3.map((q) => q[2]); return [Math.min(...v), Math.max(...v)]; };
+  const alto = 0.465 * 9 / 16;
+  const [a0, a1] = zs();
+  assert.ok(Math.abs(a0 - (1.5 - alto / 2)) < 1e-9 && Math.abs(a1 - (1.5 + alto / 2)) < 1e-9, `sin zImagen: ${a0}–${a1}`);
+  s.entidades.find((e) => e.id === 'PR').zImagen = 0.31;
+  const [b0, b1] = zs();
+  assert.ok(Math.abs(b0 - 0.31) < 1e-9 && Math.abs(b1 - (0.31 + alto)) < 1e-9, `con zImagen: ${b0}–${b1}`);
+});
